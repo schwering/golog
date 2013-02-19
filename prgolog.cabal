@@ -1,0 +1,38 @@
+Name: prgolog
+Version: 0.0
+License: BSD3
+Author: Christoph Schwering
+Synopsis: Golog interpreter for plan recognition
+Cabal-Version: >= 1.8
+Build-Type: Simple
+
+Description:
+    Golog interpreter for plan recognition.
+
+Library
+    Hs-Source-Dirs:  src
+    Exposed-Modules: Interpreter.Golog
+                     Interpreter.Tree
+                     Interpreter.TreeUtil
+                     RSTC.BAT
+                     RSTC.Progs
+                     RSTC.Theorems
+                     Util.PSO
+                     Car
+    Other-Modules:
+    Build-Depends:   base, random
+    GHC-Options:     -Wall
+
+Executable Main
+    Hs-Source-Dirs: main
+    Main-Is:         Main.hs
+    Build-Depends:   base, prgolog
+    GHC-Options:     -Wall
+
+Executable Test
+    Hs-Source-Dirs:   test
+    Main-Is:         Main.hs
+    -- Type:             detailed-1.0
+    --Test-Module:      Test
+    Build-Depends:    base, QuickCheck, prgolog
+
