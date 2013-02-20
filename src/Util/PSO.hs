@@ -122,7 +122,8 @@ iterations m params bounds f (ps0, opt0, gen0)
       | m > 1     = (ps2, opt2, gen2)
       | otherwise = error "PSO.iterations: m < 1"
    where (ps1, opt1, gen1) = iteration params bounds f (ps0, opt0, gen0)
-         (ps2, opt2, gen2) = iterations (m-1) params bounds f (ps1, max opt0 opt1, gen1)
+         (ps2, opt2, gen2) = iterations (m-1) params bounds f
+                                                (ps1, max opt0 opt1, gen1)
 
 
 initial :: (Num a, VectorSpace v a, Ord (v a), Ord b,

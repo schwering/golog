@@ -51,4 +51,3 @@ prop_three = const True
 runTests :: IO Bool
 runTests = $quickCheckAll
 
-
