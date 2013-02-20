@@ -10,6 +10,14 @@
 --  * V stands for the current velocity of a certain particle,
 --
 --  * G stands for the optimal position of all particles found thus far.
+--
+-- The results seem to be worse than in the Mercury implementation. Maybe there
+-- is some bug, possibly unintended re-usage of random number generators? (Btw.,
+-- Mercury's destructive modes are really good to avoid this kind of stuff.)
+--
+-- Also, a more functional implementation might be faster.
+-- Or just write it in C? But then how can we call the lambda objective
+-- function?
 
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -30,8 +38,6 @@ type Bounds a = (a, a)
 data Objective a b = Min (a -> b)
                    | Max (a -> b)
 
-type ObjectiveF a b = a -> b
-
 type Optimum a = a
 
 data Particle a = Particle { position     :: a,
@@ -50,16 +56,16 @@ class VectorSpace v a where
    smult :: a -> v a -> v a
 
 
-data Vector1 a = Vector1 a deriving (Eq, Ord)
+data Vector1d a = Vector1d a deriving (Eq, Ord)
 
 
-instance (Num a) => VectorSpace Vector1 a where
-   zero = Vector1 0
-   one  = Vector1 1
-   inv (Vector1 x) = Vector1 (-x)
-   (Vector1 x) `plus`  (Vector1 y) = Vector1 (x + y)
-   (Vector1 x) `minus` (Vector1 y) = Vector1 (x - y)
-   x           `smult` (Vector1 y) = Vector1 (x * y)
+instance (Num a) => VectorSpace Vector1d a where
+   zero = Vector1d 0
+   one  = Vector1d 1
+   inv (Vector1d x) = Vector1d (-x)
+   (Vector1d x) `plus`  (Vector1d y) = Vector1d (x + y)
+   (Vector1d x) `minus` (Vector1d y) = Vector1d (x - y)
+   x            `smult` (Vector1d y) = Vector1d (x * y)
 
 
 instance (Num a, Enum a) => VectorSpace [] a where
@@ -71,11 +77,22 @@ instance (Num a, Enum a) => VectorSpace [] a where
    x `smult` y = map (x*) y
 
 
-instance (Random a) => Random (Vector1 a) where
-   randomR (Vector1 lo, Vector1 hi) g = let (x, g') = randomR (lo, hi) g
-                                        in (Vector1 x, g')
+instance (Random a) => Random (Vector1d a) where
+   randomR (Vector1d lo, Vector1d hi) g = let (x, g') = randomR (lo, hi) g
+                                        in (Vector1d x, g')
    random g = let (x, g') = random g
-              in (Vector1 x, g')
+              in (Vector1d x, g')
+
+
+{-
+instance (Random a, Random b) => Random (a, b) where
+   randomR ((xlo,ylo), (xhi,yhi)) g = let (x, g1) = randomR (xlo,xhi) g
+                                          (y, g2) = randomR (ylo,yhi) g1
+                                      in ((x, y), g2)
+   random g = let (x, g1) = random g
+                  (y, g2) = random g1
+              in ((x, y), g2)
+-}
 
 
 defaultParams :: (RealFloat a) => Params a
@@ -97,7 +114,7 @@ update (Params iw cp sp) (lo, hi) f (Particle x v p, opt, gen0) =
        x'         = x `plus` v'
        (p', opt') = if lo <= x' && x' <= hi && f x' > f p
                     then (x', if f x' > f opt then x' else opt)
-                    else (x, opt)
+                    else (p, opt)
    in (Particle x' v' p', opt', gen2)
 
 

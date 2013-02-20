@@ -30,9 +30,9 @@ Executable Main
     GHC-Options:     -Wall
 
 Executable Test
-    Hs-Source-Dirs:   test
+    Hs-Source-Dirs:  test
     Main-Is:         Main.hs
     -- Type:             detailed-1.0
     --Test-Module:      Test
-    Build-Depends:    base, QuickCheck, prgolog
+    Build-Depends:    base, QuickCheck, random, prgolog
 

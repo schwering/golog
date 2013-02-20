@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module RSTC.TheoremsTest where
 
+import Prelude hiding ((!!))
 import Car
 import RSTC.Theorems
 import Test.QuickCheck
@@ -9,7 +10,7 @@ import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Modifiers
 import Control.Monad (liftM2)
-import Data.List
+import Data.List hiding ((!!))
 
 data Info a = Info { v :: a,
                      x :: a } deriving (Eq, Show)
@@ -30,6 +31,11 @@ instance (Arbitrary a) => Arbitrary (Info a) where
 []          ! b             = Nothing
 ((c, cc):m) ! b | b == c    = Just cc
                 | otherwise = m ! b
+
+(!!) :: Map a -> Car -> Info a
+[]          !! b             = error ("RSTC.TheoremsTest.!!: [] " ++ (show b))
+((c, cc):m) !! b | b == c    = cc
+                 | otherwise = m !! b
 
 ntg m b c
    | b == c    = 0/0
@@ -61,34 +67,39 @@ ok x = not (isNaN x) && not (isInfinite x)
 nok = not . ok
 
 
-present m c = case m ! c of Nothing -> True
-                            Just _  -> False
+present m c = case m ! c of Nothing -> False
+                            Just _  -> True
 
 
-prop_def_if :: NonEmptyList (Car, Info Double) -> Car -> Car -> Bool
+-- prop_* :: NonEmptyList (Car, Info Double) -> [Car -> Car ->] Bool
+
 prop_def_if (NonEmpty m) b c = if (nok (ttc m b c)) then (nok (ntg m b c)) else True
-
-
-prop_def_oif :: NonEmptyList (Car, Info Double) -> Car -> Car -> Bool
 prop_def_oif (NonEmpty m) b c = if (nok (ntg m b c)) then (nok (ttc m b c)) else True
 
 
-prop_ntgSymm :: NonEmptyList (Car, Info Double) -> Bool
 prop_ntgSymm (NonEmpty m) = and [ (ntg m b c) `ssim` ntgSymm (ntg m) (ttc m) c b | b <- cars, c <- cars ]
-
-
-prop_ttcSymm :: NonEmptyList (Car, Info Double) -> Bool
 prop_ttcSymm (NonEmpty m) = and [ (ttc m b c) `ssim` ttcSymm (ntg m) (ttc m) c b | b <- cars, c <- cars ]
+prop_ntgTrans (NonEmpty m) = and [ (ntg m b d) `ssim` ntgTrans (ntg m) (ttc m) b c d | b <- cars, c <- cars, d <- cars, b /= c, b /= d, c /= d, present m c ]
+prop_ttcTrans (NonEmpty m) = and [ (ttc m b d) `ssim` ttcTrans (ntg m) (ttc m) b c d | b <- cars, c <- cars, d <- cars, b /= c, b /= d, c /= d, present m c ]
 
 
--- XXX Why is the stupid 'present' needed?!
-prop_ntgTrans :: NonEmptyList (Car, Info Double) -> Bool
-prop_ntgTrans (NonEmpty m) = and [ (ntg m b c) `ssim` ntgTrans (ntg m) (ttc m) b c d | b <- cars, c <- cars, d <- cars, b /= c, b /= d, c /= d, present m b, present m c, present m d ]
+prop_following :: NonEmptyList (Car, Info Double) -> Bool
+prop_following (NonEmpty m) = and [ not (x (m !! b) < x (m !! c) && v (m !! b) > 0 && v (m !! c) > 0) || isFollowing (ntg m) b c | b <- cars, c <- cars, b /= c, present m b, present m c ]
 
+prop_followed :: NonEmptyList (Car, Info Double) -> Bool
+prop_followed (NonEmpty m) = and [ not (x (m !! b) > x (m !! c) && v (m !! b) > 0 && v (m !! c) > 0) || isFollowed (ntg m) b c | b <- cars, c <- cars, b /= c, present m b, present m c ]
 
--- XXX Why is the stupid 'present' needed?!
-prop_ttcTrans :: NonEmptyList (Car, Info Double) -> Bool
-prop_ttcTrans (NonEmpty m) = and [ (ttc m b c) `ssim` ttcTrans (ntg m) (ttc m) b c d | b <- cars, c <- cars, d <- cars, b /= c, b /= d, c /= d, present m b, present m c, present m d ]
+prop_approaching :: NonEmptyList (Car, Info Double) -> Bool
+prop_approaching (NonEmpty m) = and [ not (x (m !! b) < x (m !! c) && v (m !! b) > 0 && v (m !! c) < 0) || isApproaching (ntg m) b c | b <- cars, c <- cars, b /= c, present m b, present m c ]
+
+prop_aparting :: NonEmptyList (Car, Info Double) -> Bool
+prop_aparting (NonEmpty m) = and [ not (x (m !! b) < x (m !! c) && v (m !! b) < 0 && v (m !! c) > 0) || isMovingApart (ntg m) b c | b <- cars, c <- cars, b /= c, present m b, present m c ]
+
+prop_converging :: NonEmptyList (Car, Info Double) -> Bool
+prop_converging (NonEmpty m) = and [ not (x (m !! b) < x (m !! c) && v (m !! b) > v (m !! c)) || isConverging (ttc m) b c | b <- cars, c <- cars, b /= c, present m b, present m c ]
+
+prop_diverging :: NonEmptyList (Car, Info Double) -> Bool
+prop_diverging (NonEmpty m) = and [ not (x (m !! b) < x (m !! c) && v (m !! b) < v (m !! c)) || isDiverging (ttc m) b c | b <- cars, c <- cars, b /= c, present m b, present m c ]
 
 
 runTests :: IO Bool

@@ -59,8 +59,7 @@ ttcSymm _ ttc b c = ttc c b
 
 -- | Transitivity of NTG. The `via car is the third Car argument!
 ntgTrans :: (RealFloat a) => NTGF a -> TTCF a -> Car -> Car -> Car -> NTG a
-ntgTrans ntg ttc b c d =
-   (ntg b c) + (1 - (ntg b c) / (ttc b c)) * (ntg c d)
+ntgTrans ntg ttc b c d = (ntg b c) + (1 - (ntg b c) / (ttc b c)) * (ntg c d)
 
 
 -- | Transitivity of TTC. The `via car is the third Car argument!
@@ -149,8 +148,8 @@ isApproaching ntg b c = ntgRelation ntg b c == Just IsApproaching
 
 
 -- | True iff b, c move apart.
-movingApart :: (RealFloat a) => NTGF a -> Car -> Car -> Bool
-movingApart ntg b c = ntgRelation ntg b c == Just IsMovingApart
+isMovingApart :: (RealFloat a) => NTGF a -> Car -> Car -> Bool
+isMovingApart ntg b c = ntgRelation ntg b c == Just IsMovingApart
 
 
 -- | What TTC tells us.
