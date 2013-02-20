@@ -18,8 +18,10 @@ Library
                      RSTC.Progs
                      RSTC.Theorems
                      Util.PSO
+                     Util.NativePSO
                      Car
     Other-Modules:
+    C-Sources:	     src/Util/native_pso.c
     Build-Depends:   base, random
     GHC-Options:     -Wall
 
