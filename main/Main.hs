@@ -35,7 +35,7 @@ showTree n Empty = (replicate (2*n) ' ') ++ "Empty\n"
 showTree n (Leaf x) = (replicate (2*n) ' ') ++ "Leaf " ++ (show x) ++ "\n"
 showTree n (Parent x t) = (replicate (2*n) ' ') ++ "Parent " ++ (show x) ++ "\n" ++ (showTree (n+1) t)
 showTree n (Branch t1 t2) = (replicate (2*n) ' ') ++ "Branch\n" ++ (showTree (n+1) t1) ++ (showTree (n+1) t2)
-showTree n (Sprout _ x0 t) = (replicate (2*n) ' ') ++ "Sprout g, x0,\n" ++ (showTree (n+1) (t x0))
+showTree n (Sprout _ t) = (replicate (2*n) ' ') ++ "Sprout g, <unknown tree>\n"
 
 
 sit2list :: Sit a -> [a]
@@ -44,17 +44,17 @@ sit2list (Do a s) = (sit2list s) ++ [a]
 
 
 filterEmpty :: Tree v a -> Tree v a
-filterEmpty Empty             = Empty
-filterEmpty t @ (Leaf _)      = t
+filterEmpty Empty          = Empty
+filterEmpty t @ (Leaf _)   = t
 filterEmpty (Parent x t1) = case filterEmpty t1
    of Empty -> Leaf x
       t2    -> Parent x t2
-filterEmpty (Branch t1 t2)    = case (filterEmpty t1, filterEmpty t2)
+filterEmpty (Branch t1 t2) = case (filterEmpty t1, filterEmpty t2)
    of (Empty, Empty) -> Empty
       (Empty, t)     -> t
       (t, Empty)     -> t
       (t3, t4)       -> Branch t3 t4
-filterEmpty (Sprout _ _ _)    = error "Main.filterEmpty: Sprout"
+filterEmpty (Sprout _ _)   = error "Main.filterEmpty: Sprout"
 
 
 data Prim = A | B | C | D deriving Show

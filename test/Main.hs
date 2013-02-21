@@ -10,9 +10,9 @@ import Test.QuickCheck.All
 
 main :: IO ()
 main = do passed <- return True
-          --passed <- liftM2 (&&) (return passed) Interpreter.GologTest.runTests
-          --passed <- liftM2 (&&) (return passed) RSTC.TheoremsTest.runTests
-          --passed <- liftM2 (&&) (return passed) Util.PSOTest.runTests
+          passed <- liftM2 (&&) (return passed) Interpreter.GologTest.runTests
+          passed <- liftM2 (&&) (return passed) RSTC.TheoremsTest.runTests
+          passed <- liftM2 (&&) (return passed) Util.PSOTest.runTests
           passed <- liftM2 (&&) (return passed) Util.NativePSOTest.runTests
           if passed then putStrLn "All tests passed."
                     else putStrLn "Some tests failed."

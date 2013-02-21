@@ -30,10 +30,10 @@ import Interpreter.Tree
 data Sit a = S0
            | Do a (Sit a)
 
-type Reward = Float
+type Reward = Double
 type Depth = Int
 
-type MaxiF b = b -> (b -> (Reward, Depth)) -> b
+type MaxiF b = (b -> (Reward, Depth)) -> b
 
 data Atom a = Prim a
             | PrimF (Sit a -> a)
@@ -69,7 +69,7 @@ next (Seq p1 p2)    = let t1 = fmap (\(c, r) -> (c, Seq r p2)) (next p1)
 next (Nondet p1 p2) = branch (next p1) (next p2)
 next (Conc p1 p2)   = branch (fmap (\(c, r) -> (c, Conc r p2)) (next p1))
                              (fmap (\(c, r) -> (c, Conc p1 r)) (next p2))
-next (Pick g x0 p)  = Sprout g x0 (\x -> next (p x))
+next (Pick g _ p)   = Sprout g (\x -> next (p x))
 next (Star p)       = fmap (\(c, r) -> (c, Seq r (Star p))) (next p)
 next (PseudoAtom c) = Leaf (c, Nil)
 next Nil            = Empty
@@ -119,7 +119,7 @@ value d t @ (Parent (_, _, d') t')
              | d == d'   = max (quality t) (value d t')
              | otherwise = quality Empty
 value d (Branch t1 t2)   = max (value d t1) (value d t2)
-value _ (Sprout _ _ _)   = error "Golog.value: Sprout"
+value _ (Sprout _ _)     = error "Golog.value: Sprout"
 
 
 quality :: SitTree a -> (Reward, Depth)
@@ -127,7 +127,7 @@ quality Empty                = (0.0, 0)
 quality (Leaf (_, r, d))     = (r, d)
 quality (Parent (_, r, d) _) = (r, d)
 quality (Branch _ _)         = error "Golog.quality: Branch"
-quality (Sprout _ _ _)       = error "Golog.quality: Sprout"
+quality (Sprout _ _)         = error "Golog.quality: Sprout"
 
 
 trans :: Depth -> SitTree a -> SitTree a
@@ -135,13 +135,13 @@ trans _ t @ Empty         = t
 trans _ t @ (Leaf _)      = t
 trans d t @ (Parent _ t') = if value d t >= value d t' then t else trans d t'
 trans d (Branch t1 t2)    = trans d (if value d t1 >= value d t2 then t1 else t2)
-trans _ (Sprout _ _ _)    = error "Golog.trans: Sprout"
+trans _ (Sprout _ _)      = error "Golog.trans: Sprout"
 
 
 final :: SitTree a -> Bool
-final Empty          = True
-final (Leaf _)       = True
-final (Parent _ _)   = False
-final (Branch _ _)   = False
-final (Sprout _ _ _) = error "Golog.final: Sprout"
+final Empty        = True
+final (Leaf _)     = True
+final (Parent _ _) = False
+final (Branch _ _) = False
+final (Sprout _ _) = error "Golog.final: Sprout"
 
