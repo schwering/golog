@@ -4,6 +4,10 @@ import Interpreter.Golog
 import Interpreter.Tree
 import Interpreter.TreeUtil
 
+instance Show Finality where
+   show Final = "Final"
+   show Nonfinal = "Nonfinal"
+
 instance (Show a) => Show (Atom a) where
    show (Prim a) = "Prim(" ++ (show a) ++ ")"
    show (Test _) = "Test(...)"
@@ -73,7 +77,9 @@ instance BAT Prim where
                           _      -> 0
 
 
-depth t = snd (value 0 t)
+-- Ist eh falsch, doch nicht von value!
+-- Achso, doch, ist ja value 0. Ich Flachpfeife.
+--depth t = snd (value 0 t)
 
 
 main :: IO ()
@@ -82,24 +88,26 @@ main =
          b = PseudoAtom (Atom (Prim B))
          c = PseudoAtom (Atom (Prim C))
          d = PseudoAtom (Atom (Prim D))
-         p1 = ((a `Nondet` b) `Seq` ((a `Seq` a `Seq` c) `Conc` (b `Seq` b `Seq` c))) `Nondet` Star(a `Seq` c `Seq` c `Seq` c `Seq` c)
+         p1 = ((a `Nondet` b `Nondet` c) `Seq` ((a `Seq` a `Seq` c) `Conc` (b `Seq` b `Seq` c))) `Nondet` Star(a `Seq` c `Seq` c `Seq` c `Seq` c)
          p2 = ((a `Nondet` b) `Seq` ((a `Seq` a `Seq` c) `Conc` (b `Seq` b `Seq` c)))
          --p = Star(a)
          t1 = tree p1 S0 0.0 0
          t2 = tree p2 S0 0.0 0
          t = t2
          exec n t = trans ((depth t) + n) t
-   in do putStrLn (show t)
+   in do putStrLn ((show . cutoff 2) t)
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (show (cutoff 3 (exec 0 t)))
+         putStrLn (maybe "nothing" (show . cutoff 3) (exec 0 t))
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (show (cutoff 3 (exec 1 t)))
+         putStrLn (maybe "nothing" (show . cutoff 3) (exec 1 t))
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (show (cutoff 3 (exec 2 t)))
+         putStrLn (maybe "nothing" (show . cutoff 3) (exec 2 t))
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (show (cutoff 3 (exec 3 t)))
+         putStrLn (maybe "nothing" (show . cutoff 3) (exec 3 t))
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (show (cutoff 100 (exec 100000 t1)))
+         putStrLn ((show . cutoff 10) t1)
+         putStrLn "-------------------------------------------------------\n"
+         putStrLn (maybe "nothing" (show . cutoff 10) (exec 100000 t1))
 --         putStrLn "-------"
 --         putStrLn (show (cutoff 30 (trans 14 t1)))
 --         putStrLn "-------"
