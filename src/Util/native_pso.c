@@ -1,3 +1,15 @@
+/* Particle Swarm Optimization for Double -> Double functions.
+ *
+ *  * X stands for the current position of a certain particle,
+ *
+ *  * P stands for the optimal position of a certain particle found thus far,
+ *
+ *  * V stands for the current velocity of a certain particle,
+ *
+ *  * G stands for the optimal position of all particles found thus far.
+ */
+
+
 /* --------------------------------------------------------------------- *
  * Random number generator (copied from Mercury copied from Knuth TAOCP) *
  * --------------------------------------------------------------------- */
@@ -81,7 +93,7 @@ inline static double rand_next_float_in_range(double lo, double hi, random_t *r)
  * Particle Swarm Optimization, one-dimensional, only for double *
  * ------------------------------------------------------------- */
 
-#define MAX_PARTICLES 1000
+#define MAX_PARTICLES 100
 
 typedef double (objective_t)(double);
 

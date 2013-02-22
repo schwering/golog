@@ -7,8 +7,8 @@
 -- definition:
 --
 -- * Programs are decomposed into a next atomic action and the respective
---   remaining program. This is done by the functions private functions @next@
---   and and @next'@ as in [1].
+--   remaining program. This is done by the functions private functions 'next'
+--   and and 'next'' as in [1].
 --
 -- * The tree of reachable situations is constructed (lazily). This is done by
 --   decomposing the program, executing the next atomic action, and continuing
@@ -164,28 +164,33 @@ pickbest d = force (value d) (-1/0, minBound)
 -- configuration. For this reason we even have to inspect the subtree of the
 -- 'Parent' node when we've reached the maximum depth.
 --
+-- The depth argument specifies the search depth up to which value is computed.
+-- Note that it is relative to the depth of the situation tree's root node.
+--
 -- This function expects that 'Sprout' nodes have been resolved already (e.g.,
 -- using 'pickbest'). Otherwise 'Sprout's yield errors.
 value :: Depth -> SitTree a -> (Reward, Depth)
 value _ Empty            = (0.0, 0)
-value d (Parent (_, v, d', _) t')
-            | d > d'    = value d t'
-            | d == d'   = max (v, d') (value d t')
-            | otherwise = (0.0, 0)
+value d (Parent (_, v, d', _) t') | d > d'    = value d t'
+                                  | d == d'   = max (v, d') (value d t')
+                                  | otherwise = (0.0, 0)
 value d (Branch t1 t2)   = max (value d t1) (value d t2)
 value _ (Leaf _)         = error "Golog.value: Leaf"
 value _ (Sprout _ _)     = error "Golog.value: Sprout"
 
 
 -- | Transitions to the next best configuration is there one.
--- Otherwise Nothing is returned.
+-- Otherwise 'Nothing' is returned.
+--
 -- At 'Parent' nodes it stops unless the subtree has a higher value.
 -- At 'Branch' nodes it opts for the higher values alternative.
+--
+-- The depth argument specifies the search depth up to which value is computed.
+-- Note that it is relative to the depth of the situation tree's root node.
 trans :: Depth -> SitTree a -> Maybe (SitTree a)
-trans d (Parent (_, v, d', f) t)
-            | f == Nonfinal       = trans' t
-            | (v, d') < value d t = trans' t
-            | otherwise           = Nothing
+trans d (Parent (_, v, d', f) t) | f == Nonfinal       = trans' t
+                                 | (v, d') < value d t = trans' t
+                                 | otherwise           = Nothing
    where trans' Empty             = Nothing
          trans' t' @ (Parent _ _) = Just t'
          trans' (Branch t1 t2)    = trans' (maxBy (value d) t1 t2)
@@ -243,10 +248,19 @@ final (Branch _ _)            = error "Golog.final: Branch"
 final (Sprout _ _)            = error "Golog.final: Sprout"
 
 
+-- | Executes a program in a situation and returns the resulting situation.
+-- If the execution fails, 'Nothing' is returned.
+--
+-- The depth argument specifies the search depth up to which value is computed.
 do1 :: (BAT a) => Depth -> Prog a -> Sit a -> Maybe (Sit a)
 do1 d p s = do2 d (tree p s 0.0 0)
 
 
+-- | Searches for the best final reachable situation in the tree.
+-- If none is found, 'Nothing' is returned.
+--
+-- The depth argument specifies the search depth up to which value is computed.
+-- Note that it is relative to the depth of the situation tree's root node.
 do2 :: Depth -> SitTree a -> Maybe (Sit a)
 do2 d t | final t   = Nothing
         | otherwise = trans d t >>= Just . sit

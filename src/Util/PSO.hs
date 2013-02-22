@@ -1,5 +1,9 @@
 -- | Partical swarm optimization.
 --
+-- Disclaimer: this implementation sucks (I think) in terms of speed, quality of
+-- results (don't know why), and quality of code. I'd recommend to use the
+-- 'Util.NativePSO' implementation.
+--
 -- We adhere to the naming conventions used by the English Wikipedia article
 -- (among others):
 --
@@ -15,14 +19,14 @@
 -- is some bug, possibly unintended re-usage of random number generators? (Btw.,
 -- Mercury's destructive modes are really good to avoid this kind of stuff.)
 --
--- Also, a more functional implementation might be faster.
--- Or just write it in C? But then how can we call the lambda objective
--- function?
+-- For a much faster implementation see 'Util.NativePSO'.
 
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Util.PSO where
+module Util.PSO (IterationCount, ParticleCount, Params(..), Bounds,
+                 Objective(..), Optimum, VectorSpace, Vector1d(..),
+                 defaultParams, pso) where
 
 import System.Random
 
