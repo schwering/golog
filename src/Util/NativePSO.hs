@@ -32,13 +32,13 @@ defaultParams = Params { inertiaWeight  = 0.729
                        , socialParam    = 1.49445 }
 
 
-pso :: Seed -> IterationCount -> ParticleCount -> Params -> Bounds -> Objective -> Optimum
-pso seed m n params bounds (Min f) = pso seed m n params bounds (Max (negate .f ))
-pso seed m n params bounds (Max f) = unsafePerformIO (
+pso :: Seed -> IterationCount -> ParticleCount -> Params ->
+       Bounds -> Objective -> Optimum
+pso seed m n params bounds (Min f) = pso seed m n params bounds (Max (negate.f))
+pso seed m n params bounds (Max f) = unsafePerformIO $
       do fW <- wrap f'
          r <- c_pso s' m' n' iw cw sp lo hi fW
          return (realToFrac r)
-   )
    where s' = fromIntegral seed
          m' = fromIntegral m
          n' = fromIntegral n

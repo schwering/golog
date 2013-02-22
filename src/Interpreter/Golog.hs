@@ -171,9 +171,10 @@ pickbest d = force (value d) (-1/0, minBound)
 -- using 'pickbest'). Otherwise 'Sprout's yield errors.
 value :: Depth -> SitTree a -> (Reward, Depth)
 value _ Empty            = (0.0, 0)
-value d (Parent (_, v, d', _) t') | d > d'    = value d t'
-                                  | d == d'   = max (v, d') (value d t')
-                                  | otherwise = (0.0, 0)
+value d (Parent (_, v, d', f) t') | f == Final = max (v, d') (value d t')
+                                  | d' < d     = value d t'
+                                  | d == d'    = (v, d')
+                                  | otherwise  = (0.0, 0)
 value d (Branch t1 t2)   = max (value d t1) (value d t2)
 value _ (Leaf _)         = error "Golog.value: Leaf"
 value _ (Sprout _ _)     = error "Golog.value: Sprout"
@@ -249,19 +250,21 @@ final (Sprout _ _)            = error "Golog.final: Sprout"
 
 
 -- | Executes a program in a situation and returns the resulting situation.
+-- Additionally the reward and depth are returned.
 -- If the execution fails, 'Nothing' is returned.
 --
 -- The depth argument specifies the search depth up to which value is computed.
-do1 :: (BAT a) => Depth -> Prog a -> Sit a -> Maybe (Sit a)
+do1 :: (BAT a) => Depth -> Prog a -> Sit a -> Maybe (Sit a, Reward, Depth)
 do1 d p s = do2 d (tree p s 0.0 0)
 
 
 -- | Searches for the best final reachable situation in the tree.
+-- Additionally the reward and depth are returned.
 -- If none is found, 'Nothing' is returned.
 --
 -- The depth argument specifies the search depth up to which value is computed.
 -- Note that it is relative to the depth of the situation tree's root node.
-do2 :: Depth -> SitTree a -> Maybe (Sit a)
-do2 d t | final t   = Nothing
-        | otherwise = trans d t >>= Just . sit
+do2 :: Depth -> SitTree a -> Maybe (Sit a, Reward, Depth)
+do2 d t | final t   = Just (sit t, rew t, depth t)
+        | otherwise = trans d t >>= do2 d
 

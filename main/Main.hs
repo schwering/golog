@@ -108,6 +108,8 @@ main =
          putStrLn ((show . cutoff 10) t1)
          putStrLn "-------------------------------------------------------\n"
          putStrLn (maybe "nothing" (show . cutoff 10) (exec 100000 t1))
+         putStrLn "-------------------------------------------------------\n"
+         mapM_ (\i -> putStrLn (show i ++ ": " ++ show (do1 i p2 S0))) [0..9]
 --         putStrLn "-------"
 --         putStrLn (show (cutoff 30 (trans 14 t1)))
 --         putStrLn "-------"

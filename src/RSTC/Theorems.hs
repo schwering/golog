@@ -7,8 +7,8 @@
 --
 -- We use floating point arithmetic. We omit all non-zero-checks! We use NaN and
 -- infinity as representants for undefined values.
--- The idea is for using modules to go the transitive way in case NaN or
--- infinity occurs. The orTrans function is helpful.
+-- When NaN or infinity occurs, the callee should try to compute a valid value
+-- via transitivity. The 'orTrans' function is helpful in this regard.
 
 module RSTC.Theorems where
 
@@ -104,9 +104,9 @@ attc2 ntg ttc q b c = (1 / ((1-q) * (ttc b c) / (ntg b c) + q) * (ttc b c))
 -- Some useful properties.
 
 
--- | Ratio v(b) / v(c).
-rel_v :: (RealFloat a) => NTGF a -> TTCF a -> Car -> Car -> a
-rel_v ntg ttc b c = 1 / (1 - (ntg b c) / (ttc b c))
+-- | Ratio v(b) / v(c) where b is the first and c the second 'Car'.
+relVeloc :: (RealFloat a) => NTGF a -> TTCF a -> Car -> Car -> a
+relVeloc ntg ttc b c = 1 / (1 - (ntg b c) / (ttc b c))
 
 
 
@@ -166,5 +166,4 @@ isConverging ttc b c = ttcRelation ttc b c == Just IsConverging
 
 isDiverging :: (RealFloat a) => TTCF a -> Car -> Car -> Bool
 isDiverging ttc b c = ttcRelation ttc b c == Just IsDiverging
-
 
