@@ -5,8 +5,20 @@ import Interpreter.Golog
 import Interpreter.Tree
 import Interpreter.TreeUtil
 import Util.NativePSO
-import RSTC.Obs
-import qualified RSTC.Obs as O
+import qualified RSTC.BAT as BAT
+import qualified RSTC.Obs as Obs
+import RSTC.Progs
+
+instance (Show a) => Show (BAT.Prim a) where
+   show (BAT.Wait t) = "Wait " ++ (show t)
+   show (BAT.Accel b q) = "Accel " ++ (show b) ++ " " ++ (show q)
+   show (BAT.LaneChange b l) = "LaneChange " ++ (show b) ++ " " ++ (show l)
+   show (BAT.Init e) = "Init " ++ (show (Obs.time e))
+   show (BAT.Match e) = "Match " ++ (show (Obs.time e))
+   show BAT.Abort = "Abort"
+   show BAT.NoOp = "NoOp"
+   show (BAT.Start b s) = "Start " ++ (show b) ++ " " ++ s
+   show (BAT.End b s) = "End " ++ (show b) ++ " " ++ s
 
 instance Show Finality where
    show Final = "Final"
@@ -132,14 +144,19 @@ main =
          putStrLn "-------------------------------------------------------"
          mapM_ (\i -> putStrLn ("Pick nested 2: " ++ show i ++ ": " ++ show (do1 i p6 S0))) [0..5]
          putStrLn "-------------------------------------------------------"
-         --mapM_ (putStrLn . show) (take 30 observations)
+         mapM_ (putStrLn . show) (take 30 Obs.observations)
          putStrLn "-------------------------------------------------------"
+         --mapM_ (\i -> putStrLn ((show . cutoff i) (tree (obsprog Obs.observations) S0 0.0 0))) [0..30]
+         --putStrLn "-------------------------------------------------------\n"
+{-
          mapM_ (putStrLn . show) (map (maybe Nothing $ (\x -> Just
-               ( O.time x
-               , map (O.lane x) [C.B,C.D,C.H]
-               , map (uncurry (O.ntg x)) [(x,y) | x <- [C.B,C.D,C.H], y <- [C.B,C.D,C.H]]
-               , map (uncurry (O.ttc x)) [(x,y) | x <- [C.B,C.D,C.H], y <- [C.B,C.D,C.H]]
+               ( x
+               , Obs.time x
+               , map (Obs.lane x) [C.B,C.D,C.H]
+               , map (uncurry (Obs.ntg x)) [(x,y) | x <- [C.B,C.D,C.H], y <- [C.B,C.D,C.H]]
+               , map (uncurry (Obs.ttc x)) [(x,y) | x <- [C.B,C.D,C.H], y <- [C.B,C.D,C.H]]
                ))) (take 30 observations))
+-}
 --         putStrLn "-------"
 --         putStrLn (show (cutoff 30 (trans 14 t1)))
 --         putStrLn "-------"

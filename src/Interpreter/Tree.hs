@@ -6,8 +6,8 @@ module Interpreter.Tree (Tree(Empty, Leaf, Parent, Branch, Sprout), OptiF,
                          Functor(..), Foldable(..),
                          branch, force, lmap) where
 
-import Data.Foldable
 import Prelude hiding (foldl, foldr)
+import Data.Foldable
 
 type OptiF u v = (u -> v) -> u
 

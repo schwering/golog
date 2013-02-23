@@ -1,11 +1,16 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module RSTC.Progs where
 
 import Car
 import Interpreter.Golog
 import RSTC.BAT
 import qualified RSTC.BAT as BAT
+import qualified RSTC.Obs as Obs
 import RSTC.Theorems
 import Util.NativePSO
+
+import Data.Maybe
 
 interpol :: (Fractional a, Ord a) => (a -> a) -> a -> a -> a -> Maybe a
 interpol f lo hi goal
@@ -35,6 +40,17 @@ test t = PseudoAtom (Atom (Test t))
 
 atomic :: Prog a -> Prog a
 atomic p = PseudoAtom (Complex p)
+
+
+obsprog :: (Obs.Obs a b) => [Maybe b] -> Prog (Prim a)
+obsprog []     = Nil
+obsprog (e:es) = seq' (initAct:acts)
+   where initAct = maybe Nil (act . Init) e
+         acts = map (\e' -> atomic ((actf (\s -> Wait (Obs.time e' - start s)))
+                              `Seq` (act (Match e'))))
+                    (catMaybes es)
+         seq' []     = Nil
+         seq' (p:ps) = Seq p (seq' ps)
 
 
 follow :: Car -> Car -> Prog (Prim Double)

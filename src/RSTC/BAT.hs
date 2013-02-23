@@ -39,6 +39,8 @@ data TTCCat = ConvergingFast
             | DivergingFast
             deriving (Eq, Enum, Ord, Show)
 
+----------
+-- Precondition and reward.
 
 instance (RealFloat a) => BAT (Prim a) where
    poss (Wait t)             _ = t >= 0

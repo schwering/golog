@@ -16,7 +16,7 @@
 
 #ifndef NAN
 #define NAN (0.0/0.0)
-#define
+#endif
 
 
 static int server_sockfd = -1;
@@ -71,7 +71,6 @@ static bool receive_obs(int sockfd, int obs_id)
 	struct planrecog_state msg;
 	int ret;
 
-	assert(obs_id == last_obs + 1);
 	ret = read(sockfd, &obs[obs_id], sizeof(obs[obs_id]));
 	if (ret == sizeof(obs[obs_id])) {
 		memset(&msg, 0, sizeof(msg));
@@ -101,8 +100,10 @@ int obs_next(int obs_id)
 		res = accept_connection(server_sockfd, &sockfd);
 	}
 	if (res && obs_id > last_obs) {
-		assert(obs_id == last_obs + 1);
-		res = receive_obs(sockfd, obs_id);
+		int i;
+		for (i = last_obs + 1; i <= obs_id; ++i) {
+			res = receive_obs(sockfd, i);
+		}
 		last_obs = obs_id;
 	}
 	return (res) ? 1 : -1;
