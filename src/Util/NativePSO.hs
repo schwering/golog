@@ -54,7 +54,7 @@ foreign import ccall "wrapper"
   wrap :: (CDouble -> CDouble) -> IO (FunPtr (CDouble -> CDouble))
 
 
-foreign import ccall
+foreign import ccall "pso"
    c_pso :: CInt -> CInt -> CInt ->          -- seed, m, n
             CDouble -> CDouble -> CDouble -> -- params
             CDouble -> CDouble ->            -- bounds

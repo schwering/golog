@@ -1,16 +1,21 @@
 module Main (main) where
 
+import qualified Car as C
 import Interpreter.Golog
 import Interpreter.Tree
 import Interpreter.TreeUtil
+import Util.NativePSO
+import RSTC.Obs
+import qualified RSTC.Obs as O
 
 instance Show Finality where
    show Final = "Final"
    show Nonfinal = "Nonfinal"
 
 instance (Show a) => Show (Atom a) where
-   show (Prim a) = "Prim(" ++ (show a) ++ ")"
-   show (Test _) = "Test(...)"
+   show (Prim a)  = "Prim(" ++ (show a) ++ ")"
+   show (PrimF _) = "PrimF(...)"
+   show (Test _)  = "Test(...)"
 
 instance (Show a) => Show (PseudoAtom a) where
    show (Atom a) = "Atom(" ++ (show a) ++ ")"
@@ -39,7 +44,7 @@ showTree n Empty = (replicate (2*n) ' ') ++ "Empty\n"
 showTree n (Leaf x) = (replicate (2*n) ' ') ++ "Leaf " ++ (show x) ++ "\n"
 showTree n (Parent x t) = (replicate (2*n) ' ') ++ "Parent " ++ (show x) ++ "\n" ++ (showTree (n+1) t)
 showTree n (Branch t1 t2) = (replicate (2*n) ' ') ++ "Branch\n" ++ (showTree (n+1) t1) ++ (showTree (n+1) t2)
-showTree n (Sprout _ t) = (replicate (2*n) ' ') ++ "Sprout g, <unknown tree>\n"
+showTree n (Sprout _ _) = (replicate (2*n) ' ') ++ "Sprout g, <unknown tree>\n"
 
 
 sit2list :: Sit a -> [a]
@@ -47,6 +52,7 @@ sit2list S0 = []
 sit2list (Do a s) = (sit2list s) ++ [a]
 
 
+{-
 filterEmpty :: Tree v a -> Tree v a
 filterEmpty Empty          = Empty
 filterEmpty t @ (Leaf _)   = t
@@ -59,9 +65,10 @@ filterEmpty (Branch t1 t2) = case (filterEmpty t1, filterEmpty t2)
       (t, Empty)     -> t
       (t3, t4)       -> Branch t3 t4
 filterEmpty (Sprout _ _)   = error "Main.filterEmpty: Sprout"
+-}
 
 
-data Prim = A | B | C | D deriving Show
+data Prim = A | B | C | D | E Double deriving Show
 
 instance BAT Prim where
    poss D _ = False
@@ -75,6 +82,7 @@ instance BAT Prim where
                           _      -> 0
    reward D s = case s of Do D _ -> 3
                           _      -> 0
+   reward (E x) _ = max 0 (-x*x+100)
 
 
 -- Ist eh falsch, doch nicht von value!
@@ -87,29 +95,51 @@ main =
    let   a = PseudoAtom (Atom (Prim A))
          b = PseudoAtom (Atom (Prim B))
          c = PseudoAtom (Atom (Prim C))
-         d = PseudoAtom (Atom (Prim D))
+         --d = PseudoAtom (Atom (Prim D))
+         e x = PseudoAtom (Atom (Prim (E x)))
          p1 = ((a `Nondet` b `Nondet` c) `Seq` ((a `Seq` a `Seq` c) `Conc` (b `Seq` b `Seq` c))) `Nondet` Star(a `Seq` c `Seq` c `Seq` c `Seq` c)
          p2 = ((a `Nondet` b) `Seq` ((a `Seq` a `Seq` c) `Conc` (b `Seq` b `Seq` c)))
+         ppick p = Pick (\f -> pso 10 25 5 defaultParams (-20, 20) (Max (fst.f))) 10 p
+         p3 = ppick e
+         p4 = (ppick e) `Seq` (ppick e)
+         p5 = ppick (\x -> (e x) `Seq` (ppick e))
+         p6 = ppick (\x -> (e x) `Seq` (ppick (\y -> e (x*y))))
          --p = Star(a)
          t1 = tree p1 S0 0.0 0
          t2 = tree p2 S0 0.0 0
-         t = t2
-         exec n t = trans ((depth t) + n) t
-   in do putStrLn ((show . cutoff 2) t)
+         exec n t' = trans ((depth t') + n) t'
+   in do putStrLn ((show . cutoff 2) t2)
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 3) (exec 0 t))
+         putStrLn (maybe "nothing" (show . cutoff 3) (exec 0 t2))
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 3) (exec 1 t))
+         putStrLn (maybe "nothing" (show . cutoff 3) (exec 1 t2))
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 3) (exec 2 t))
+         putStrLn (maybe "nothing" (show . cutoff 3) (exec 2 t2))
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 3) (exec 3 t))
+         putStrLn (maybe "nothing" (show . cutoff 3) (exec 3 t2))
          putStrLn "-------------------------------------------------------\n"
          putStrLn ((show . cutoff 10) t1)
          putStrLn "-------------------------------------------------------\n"
          putStrLn (maybe "nothing" (show . cutoff 10) (exec 100000 t1))
          putStrLn "-------------------------------------------------------\n"
          mapM_ (\i -> putStrLn (show i ++ ": " ++ show (do1 i p2 S0))) [0..9]
+         putStrLn "-------------------------------------------------------"
+         mapM_ (\i -> putStrLn ("Pick one: " ++ show i ++ ": " ++ show (do1 i p3 S0))) [0..5]
+         putStrLn "-------------------------------------------------------"
+         mapM_ (\i -> putStrLn ("Pick seq: " ++ show i ++ ": " ++ show (do1 i p4 S0))) [0..5]
+         putStrLn "-------------------------------------------------------"
+         mapM_ (\i -> putStrLn ("Pick nested: " ++ show i ++ ": " ++ show (do1 i p5 S0))) [0..5]
+         putStrLn "-------------------------------------------------------"
+         mapM_ (\i -> putStrLn ("Pick nested 2: " ++ show i ++ ": " ++ show (do1 i p6 S0))) [0..5]
+         putStrLn "-------------------------------------------------------"
+         --mapM_ (putStrLn . show) (take 30 observations)
+         putStrLn "-------------------------------------------------------"
+         mapM_ (putStrLn . show) (map (maybe Nothing $ (\x -> Just
+               ( O.time x
+               , map (O.lane x) [C.B,C.D,C.H]
+               , map (uncurry (O.ntg x)) [(x,y) | x <- [C.B,C.D,C.H], y <- [C.B,C.D,C.H]]
+               , map (uncurry (O.ttc x)) [(x,y) | x <- [C.B,C.D,C.H], y <- [C.B,C.D,C.H]]
+               ))) (take 30 observations))
 --         putStrLn "-------"
 --         putStrLn (show (cutoff 30 (trans 14 t1)))
 --         putStrLn "-------"

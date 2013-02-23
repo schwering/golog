@@ -83,6 +83,10 @@ prop_ntgTrans (NonEmpty m) = and [ (ntg m b d) `ssim` ntgTrans (ntg m) (ttc m) b
 prop_ttcTrans (NonEmpty m) = and [ (ttc m b d) `ssim` ttcTrans (ntg m) (ttc m) b c d | b <- cars, c <- cars, d <- cars, b /= c, b /= d, c /= d, present m c ]
 
 
+prop_relVeloc :: NonEmptyList (Car, Info Double) -> Bool
+prop_relVeloc (NonEmpty m) = and [ relVeloc (ntg m) (ttc m) b c `ssim` (v (m !! b) / v (m !! c)) | b <- cars, c <- cars, b /= c, present m b, present m c ]
+
+
 prop_following :: NonEmptyList (Car, Info Double) -> Bool
 prop_following (NonEmpty m) = and [ not (x (m !! b) < x (m !! c) && v (m !! b) > 0 && v (m !! c) > 0) || isFollowing (ntg m) b c | b <- cars, c <- cars, b /= c, present m b, present m c ]
 

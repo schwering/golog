@@ -15,13 +15,15 @@ Library
                      Interpreter.Tree
                      Interpreter.TreeUtil
                      RSTC.BAT
+                     RSTC.Obs
                      RSTC.Progs
                      RSTC.Theorems
                      Util.PSO
                      Util.NativePSO
                      Car
     Other-Modules:
-    C-Sources:	     src/Util/native_pso.c
+    C-Sources:       src/RSTC/obs.c
+                     src/Util/native_pso.c
     Build-Depends:   base, random
     GHC-Options:     -Wall
 

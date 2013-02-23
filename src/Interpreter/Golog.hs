@@ -255,7 +255,7 @@ final (Sprout _ _)            = error "Golog.final: Sprout"
 --
 -- The depth argument specifies the search depth up to which value is computed.
 do1 :: (BAT a) => Depth -> Prog a -> Sit a -> Maybe (Sit a, Reward, Depth)
-do1 d p s = do2 d (tree p s 0.0 0)
+do1 d p s = do2 d (pickbest d (tree p s 0.0 0))
 
 
 -- | Searches for the best final reachable situation in the tree.

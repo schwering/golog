@@ -175,7 +175,7 @@ inline static void pso_iteration(
 	}
 }
 
-double c_pso(				/* Returns global optimum (out). */
+double pso(				/* Returns global optimum (out). */
 		const int seed,		/* Random number generator seed (in). */
 		const int m,		/* Number of iterations (in). */
 		const int n,		/* Number of particles (in). */

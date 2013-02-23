@@ -1,22 +1,17 @@
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FunctionalDependencies #-}
 
 module RSTC.BAT where
 
 import Car
 import Interpreter.Golog
+import qualified RSTC.Obs as O
 import RSTC.Theorems
-
-data Lane = LeftLane
-          | RightLane
-          deriving (Eq, Show)
 
 data Prim a = Wait (Time a)
             | Accel Car (Accel a)
             | LaneChange Car Lane
-            | forall b. Obs a b => Init b
-            | forall b. Obs a b => Match b
+            | forall b. O.Obs a b => Init b
+            | forall b. O.Obs a b => Match b
             | Abort
             | NoOp
             | Start Car String
@@ -43,13 +38,6 @@ data TTCCat = ConvergingFast
             | Diverging
             | DivergingFast
             deriving (Eq, Enum, Ord, Show)
-
-
-class (RealFloat a) => Obs a b | b -> a where
-   obs_time :: b -> Time a
-   obs_ntg :: b -> Car -> Car -> NTG a
-   obs_ttc :: b -> Car -> Car -> TTC a
-   obs_lane :: b -> Car -> Lane
 
 
 instance (RealFloat a) => BAT (Prim a) where
@@ -80,10 +68,10 @@ sitlen (Do _ s) = 1 + (sitlen s)
 sitlen S0       = 0
 
 
-match :: (RealFloat a, Obs a b) => b -> Sit (Prim a) -> Bool
-match e s = let ntgs  = [(ntg s b c, obs_ntg e b c) | b <- cars, c <- cars, b /= c]
-                ttcs  = [(ttc s b c, obs_ttc e b c) | b <- cars, c <- cars, b < c]
-                lanes = [(lane b s, obs_lane e b)   | b <- cars]
+match :: (RealFloat a, O.Obs a b) => b -> Sit (Prim a) -> Bool
+match e s = let ntgs  = [(ntg s b c, O.ntg e b c) | b <- cars, c <- cars, b /= c]
+                ttcs  = [(ttc s b c, O.ttc e b c) | b <- cars, c <- cars, b < c]
+                lanes = [(lane b s, O.lane e b)   | b <- cars]
             in all (\(x, y) -> x == y) lanes &&
                all (\(x, y) -> haveCommon (ntgCats x) (ntgCats y)) ntgs &&
                all (\(x, y) -> haveCommon (ttcCats x) (ttcCats y)) ttcs
@@ -144,7 +132,7 @@ start S0              = 0
 -- | SSA for lane.
 lane :: (RealFloat a) => Car -> Sit (Prim a) -> Lane
 lane b (Do (LaneChange c l) _) | b == c = l
-lane b (Do (Init e) _)                  = obs_lane e b
+lane b (Do (Init e) _)                  = O.lane e b
 lane b (Do _ s)                         = lane b s
 lane _ S0                               = RightLane
 
@@ -160,7 +148,7 @@ ntg (Do (Wait t) s)    b c          = orTrans
                                           b c
 ntg (Do (Accel d q) s) b c | b == d = antg1 (ntg s) (ttc s) q b c
                            | c == d = antg2 (ntg s) (ttc s) q b c
-ntg (Do (Init e) _)    b c          = obs_ntg e b c
+ntg (Do (Init e) _)    b c          = O.ntg e b c
 ntg (Do _        s)    b c          = ntg s b c
 ntg S0                 _ _          = nan
 
@@ -180,7 +168,7 @@ ttc (Do (Accel d q) s) b c | b == d = orTrans
                                           (ttcTrans (antg2 (ntg s) (ttc s) q)
                                                     (attc2 (ntg s) (ttc s) q))
                                           b c
-ttc (Do (Init e) _)    b c          = obs_ttc e b c
+ttc (Do (Init e) _)    b c          = O.ttc e b c
 ttc (Do _        s)    b c          = ttc s b c
 ttc S0                 _ _          = nan
 
