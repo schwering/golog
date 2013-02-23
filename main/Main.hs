@@ -1,6 +1,6 @@
 module Main (main) where
 
-import qualified Car as C
+import qualified Car as Car
 import Interpreter.Golog
 import Interpreter.Tree
 import Interpreter.TreeUtil
@@ -120,7 +120,10 @@ main =
          t1 = tree p1 S0 0.0 0
          t2 = tree p2 S0 0.0 0
          exec n t' = trans ((depth t') + n) t'
-   in do putStrLn ((show . cutoff 2) t2)
+         candProg = tailgate Car.H Car.D
+   in do
+{-
+         putStrLn ((show . cutoff 2) t2)
          putStrLn "-------------------------------------------------------\n"
          putStrLn (maybe "nothing" (show . cutoff 3) (exec 0 t2))
          putStrLn "-------------------------------------------------------\n"
@@ -144,17 +147,20 @@ main =
          putStrLn "-------------------------------------------------------"
          mapM_ (\i -> putStrLn ("Pick nested 2: " ++ show i ++ ": " ++ show (do1 i p6 S0))) [0..5]
          putStrLn "-------------------------------------------------------"
-         mapM_ (putStrLn . show) (take 30 Obs.observations)
-         putStrLn "-------------------------------------------------------"
+-}
+         --mapM_ (putStrLn . show) (take 30 Obs.observations)
+         --putStrLn "-------------------------------------------------------"
          --mapM_ (\i -> putStrLn ((show . cutoff i) (tree (obsprog Obs.observations) S0 0.0 0))) [0..30]
          --putStrLn "-------------------------------------------------------\n"
+         mapM_ (putStrLn . show) (do3 4 (Conc (obsprog (take 30 Obs.observations)) (candProg)) S0)
+         putStrLn "-------------------------------------------------------"
 {-
          mapM_ (putStrLn . show) (map (maybe Nothing $ (\x -> Just
                ( x
                , Obs.time x
-               , map (Obs.lane x) [C.B,C.D,C.H]
-               , map (uncurry (Obs.ntg x)) [(x,y) | x <- [C.B,C.D,C.H], y <- [C.B,C.D,C.H]]
-               , map (uncurry (Obs.ttc x)) [(x,y) | x <- [C.B,C.D,C.H], y <- [C.B,C.D,C.H]]
+               , map (Obs.lane x) [Car.B,Car.D,Car.H]
+               , map (uncurry (Obs.ntg x)) [(x,y) | x <- [Car.B,Car.D,Car.H], y <- [Car.B,Car.D,Car.H]]
+               , map (uncurry (Obs.ttc x)) [(x,y) | x <- [Car.B,Car.D,Car.H], y <- [Car.B,Car.D,Car.H]]
                ))) (take 30 observations))
 -}
 --         putStrLn "-------"

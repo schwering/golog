@@ -11,6 +11,7 @@ import RSTC.Theorems
 import Util.NativePSO
 
 import Data.Maybe
+import System.IO.Unsafe
 
 interpol :: (Fractional a, Ord a) => (a -> a) -> a -> a -> a -> Maybe a
 interpol f lo hi goal
@@ -38,6 +39,10 @@ test :: (Sit a -> Bool) -> Prog a
 test t = PseudoAtom (Atom (Test t))
 
 
+ptest :: String -> Prog a
+ptest s = test (\_ -> unsafePerformIO (putStrLn s >>= \_ -> return True))
+
+
 atomic :: Prog a -> Prog a
 atomic p = PseudoAtom (Complex p)
 
@@ -59,17 +64,32 @@ follow b c =
       act (Start b "follow") `Seq`
       test (\s -> lane b s == lane c s) `Seq`
       test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
-      test (\s -> (CloseBehind `elem` (ntgCats (BAT.ntg s b c)))) `Seq`
-      Pick (picknum (0, 2)) 1 (\q -> act (Accel b q)) `Seq`
-      act (End b "follow")
-   )
+      test (\s -> (CloseBehind `elem` (ntgCats (BAT.ntg s b c))))
+   ) `Seq`
+   --Pick (picknum (0, 2)) 1 (\q -> act (Accel b q)) `Seq`
+   actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b)) `Seq`
+   act (End b "follow")
+
+
+tailgate :: Car -> Car -> Prog (Prim Double)
+tailgate b c =
+   atomic (
+      act (Start b "tailgate") `Seq`
+      test (\s -> lane b s == lane c s) `Seq`
+      test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
+      test (\s -> any (`elem` (ntgCats (BAT.ntg s b c))) [VeryCloseBehind, CloseBehind])
+   ) `Seq`
+   --Pick (picknum (0, 2)) 1 (\q -> act (Accel b q)) `Seq`
+   actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b)) `Seq`
+   ptest "Huhu" `Seq`
+   act (End b "tailgate")
 
 
 pass :: Car -> Car -> Prog (Prim Double)
 pass b c =
    atomic (
       act (Start b "pass") `Seq`
-      test (\s -> lane b s == lane c s) `Seq`
+      test (\s -> lane b s /= lane c s) `Seq`
       test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
       test (\s -> isConverging (BAT.ttc s) b c)
    ) `Seq` (

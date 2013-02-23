@@ -23,7 +23,7 @@
 module Interpreter.Golog (Sit(S0, Do), Reward, Depth, MaxiF, Finality(..),
                           Atom(..), PseudoAtom(..), Prog(..), SitTree,
                           BAT(..),
-                          tree, trans, do1, do2, sit, rew, depth) where
+                          tree, trans, do1, do2, do3, sit, rew, depth) where
 
 --module Interpreter.Golog where
 
@@ -267,4 +267,15 @@ do1 d p s = do2 d (pickbest d (tree p s 0.0 0))
 do2 :: Depth -> SitTree a -> Maybe (Sit a, Reward, Depth)
 do2 d t | final t   = Just (sit t, rew t, depth t)
         | otherwise = trans d t >>= do2 d
+
+
+do3 :: (BAT a) => Depth -> Prog a -> Sit a -> [(Sit a, Reward, Depth)]
+do3 d p s = do4 d (pickbest d (tree p s 0.0 0))
+
+
+do4 :: Depth -> SitTree a -> [(Sit a, Reward, Depth)]
+do4 d t | final t   = [(sit t, rew t, depth t)]
+        | otherwise = case trans d t of
+                           Nothing -> []
+                           Just t  -> (sit t, rew t, depth t) : do4 d t
 

@@ -33,7 +33,7 @@ data NTGCat = VeryFarBehind
 data TTCCat = ConvergingFast
             | Converging
             | ConvergingSlowly
-            | Reached
+            | Stable
             | DivergingSlowly
             | Diverging
             | DivergingFast
@@ -99,15 +99,23 @@ ntgCats x = [cat | cat <- [VeryFarBehind .. VeryFarInfront], inCat cat ]
          inCat VeryFarInfront   = x <= -5
 
 
+-- | Lists the TTC categories of a temporal distance.
+--
+-- There's a special case that deals with the real world's problems:
+-- When two cars drive at the same speed, TTC is not defined in our model.
+-- In reality, however, they probably never drive at the very same speed, but
+-- instead balance their velocities so that they don't approach each other.
+-- We simply hard-code this case by saying the time to collision must be at
+-- least 30.
 ttcCats :: (RealFloat a) => TTC a -> [TTCCat]
 ttcCats x = [cat | cat <- [ConvergingFast .. DivergingFast], inCat cat ]
-   where inCat ConvergingFast   = 10 <= x
+   where inCat ConvergingSlowly = 10 <= x
          inCat Converging       = 3.5 <= x && x <= 12
-         inCat ConvergingSlowly = 0 <= x && x <= 5
-         inCat Reached          = -2 <= x && x <= 2
-         inCat DivergingSlowly  = -5 <= x && x <= 0
+         inCat ConvergingFast   = 0 <= x && x <= 5
+         inCat Stable           = -2 <= x && x <= 2 || isNaN x || abs x >= 30
+         inCat DivergingFast    = -5 <= x && x <= 0
          inCat Diverging        = -12 <= x && x <= -3.5
-         inCat DivergingFast    = x <= -10
+         inCat DivergingSlowly  = x <= -10
 
 
 noDupe :: Prim a -> Sit (Prim a) -> Bool
@@ -119,6 +127,7 @@ noDupe a' @ (LaneChange b _) (Do a s) = case a
    of Wait _         -> True
       LaneChange c _ -> c < b
       _              -> noDupe a' s
+noDupe _ S0 = True
 noDupe _ _ = error "RSTC.BAT.noDupe: neither Accel nor LaneChange"
 
 
