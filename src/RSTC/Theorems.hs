@@ -12,7 +12,7 @@
 
 module RSTC.Theorems where
 
-import Car
+import RSTC.Car
 
 type NTG a = a
 type TTC a = a

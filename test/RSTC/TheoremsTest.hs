@@ -2,7 +2,7 @@
 module RSTC.TheoremsTest where
 
 import Prelude hiding ((!!))
-import Car
+import RSTC.Car
 import RSTC.Theorems
 import Test.QuickCheck
 import Test.QuickCheck.All

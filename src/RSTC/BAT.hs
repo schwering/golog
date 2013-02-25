@@ -1,8 +1,13 @@
+-- | Basic action theory based on relative temporal measures.
+--
+-- The two measures are net time gap (NTG) and time to collision (TTC).
+-- The successor state axioms (SSAs) use the 'RSTC.Theorems' module.
+
 {-# LANGUAGE ExistentialQuantification #-}
 
 module RSTC.BAT where
 
-import Car
+import RSTC.Car
 import Interpreter.Golog
 import qualified RSTC.Obs as O
 import RSTC.Theorems
@@ -29,7 +34,7 @@ data NTGCat = VeryFarBehind
             | Infront
             | FarInfront
             | VeryFarInfront
-            deriving (Eq, Enum, Ord, Show)
+            deriving (Bounded, Eq, Enum, Ord, Show)
 
 data TTCCat = ConvergingFast
             | Converging
@@ -39,7 +44,7 @@ data TTCCat = ConvergingFast
             | DivergingSlowly
             | Diverging
             | DivergingFast
-            deriving (Eq, Enum, Ord, Show)
+            deriving (Bounded, Eq, Enum, Ord, Show)
 
 ----------
 -- Precondition and reward.
@@ -93,7 +98,7 @@ match e s = let ntg_ttc = [(b, c, ntg s b c, O.ntg e b c,
 
 
 ntgCats :: RealFloat a => NTG a -> [NTGCat]
-ntgCats t = [cat | cat <- [VeryFarBehind .. VeryFarInfront], inCat cat ]
+ntgCats t = [cat | cat <- [minBound .. maxBound], inCat cat ]
    where inCat VeryFarBehind    = 5 <= t
          inCat FarBehind        = 3 <= t && t <= 7
          inCat Behind           = 2 <= t && t <= 4
@@ -116,7 +121,7 @@ ntgCats t = [cat | cat <- [VeryFarBehind .. VeryFarInfront], inCat cat ]
 -- We simply hard-code this case by saying the time to collision must be at
 -- least 30.
 ttcCats :: (RealFloat a, Show a) => TTC a -> a -> [TTCCat]
-ttcCats t rv = [cat | cat <- [ConvergingFast .. DivergingFast], inCat cat ]
+ttcCats t rv = [cat | cat <- [minBound .. maxBound], inCat cat ]
    where inCat ConvergingSlowly = 10 <= t
          inCat Converging       = 3.5 <= t && t <= 12
          inCat ConvergingFast   = 0 <= t && t <= 5
@@ -162,7 +167,7 @@ lane _ S0                               = RightLane
 -- Situation argument is first for better currying inside the SSAs.
 -- This is the memoizing function.
 ntg :: RealFloat a => Sit (Prim a) -> Car -> Car -> NTG a
-ntg = curry3 (memo stableNameFirstOfThree (uncurry3 ntg'))
+ntg = memo'' ntg'
 
 
 -- | SSA of NTG. For Accel actions, transitivity is tried.
@@ -185,9 +190,8 @@ ntg' S0                 _ _          = nan
 -- | SSA of TTC. For Accel actions, transitivity is tried.
 -- Situation argument is first for better currying inside the SSAs.
 -- This is the memoizing function.
-{-# NOINLINE ttc #-}
 ttc :: RealFloat a => Sit (Prim a) -> Car -> Car -> TTC a
-ttc = ttc'
+ttc = memo'' ttc'
 
 
 -- | SSA of TTC. For Accel actions, transitivity is tried.
@@ -209,6 +213,21 @@ ttc' (Do (Accel d q) s) b c | b == d = orTrans
 ttc' (Do (Init e) _)    b c          = O.ttc e b c
 ttc' (Do _        s)    b c          = ttc s b c
 ttc' S0                 _ _          = nan
+
+
+memo' :: (Sit (Prim a) -> Car -> Car -> NTG a) ->
+         (Sit (Prim a) -> Car -> Car -> NTG a)
+memo' f = curry3 (memoOblivious stableNameFirstOfThree
+                                hashStableNameFirstOfThree
+                                (0,    minBound::Car, minBound::Car)
+                                (2617, maxBound::Car, maxBound::Car)
+                                (uncurry3 f))
+
+
+memo'' :: (Sit (Prim a) -> Car -> Car -> NTG a) ->
+          (Sit (Prim a) -> Car -> Car -> NTG a)
+memo'' f = curry3 (memo stableNameAndHashFirstOfThree
+                        (uncurry3 f))
 
 
 nan :: RealFloat a => a

@@ -1,8 +1,10 @@
+-- | Golog programs based on the RSTC action theory.
+
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module RSTC.Progs where
 
-import Car
+import RSTC.Car
 import Interpreter.Golog
 import RSTC.BAT
 import qualified RSTC.BAT as BAT
@@ -64,10 +66,10 @@ follow b c =
       act (Start b "follow") `Seq`
       test (\s -> lane b s == lane c s) `Seq`
       test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
-      test (\s -> (CloseBehind `elem` (ntgCats (BAT.ntg s b c))))
+      test (\s -> (CloseBehind `elem` (ntgCats (BAT.ntg s b c)))) `Seq`
+      actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b))
    ) `Seq`
    --Pick (picknum (0, 2)) 1 (\q -> act (Accel b q)) `Seq`
-   actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b)) `Seq`
    act (End b "follow")
 
 
@@ -80,8 +82,7 @@ tailgate b c =
       test (\s -> any (`elem` (ntgCats (BAT.ntg s b c))) [VeryCloseBehind, CloseBehind]) `Seq`
       actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b))
    ) `Seq`
-   --Pick (picknum (0, 2)) 1 (\q -> act (Accel b q)) `Seq`
-   ptest "Huhu" `Seq`
+   Pick (picknum (0, 2)) 1 (\q -> act (Accel b q)) `Seq`
    act (End b "tailgate")
 
 

@@ -1,6 +1,6 @@
 module Main (main) where
 
-import qualified Car as Car
+import qualified RSTC.Car as Car
 import Interpreter.Golog
 import Interpreter.Tree
 import Interpreter.TreeUtil

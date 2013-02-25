@@ -14,41 +14,81 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 #include "RSTC/obs.h"
 
+//#define SERVER_MODE
 #define HOST "localhost"
 #define PORT 19123
 
-static int make_socket(void)
-{
-    int sockfd;
-    struct sockaddr_in server_addr;
-    struct hostent *server;
 
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) {
-        fprintf(stderr, "Couldn't open socket\n");
-        exit(1);
-    }
-    server = gethostbyname(HOST);
-    if (server == NULL) {
-        fprintf(stderr, "Couldn't resolve host %s\n", HOST);
-        exit(1);
-    }
-    bzero((char *) &server_addr, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    bcopy( server->h_addr, &server_addr.sin_addr.s_addr, server->h_length);
-    server_addr.sin_port = htons(PORT);
-    if (connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
-        fprintf(stderr, "Couldn't connect to server\n");
-        exit(1);
-    }
-    return sockfd;
+#ifdef SERVER_MODE
+
+static bool make_server_socket(int *sockfd)
+{
+	struct sockaddr_in server_addr;
+	*sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (*sockfd < 0) {
+		fprintf(stderr, "Couldn't open socket\n");
+		exit(1);
+	}
+	bzero((char*) &server_addr, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_addr.s_addr = INADDR_ANY;
+	server_addr.sin_port = htons(PORT);
+	if (bind(*sockfd, (struct sockaddr*) &server_addr, sizeof(server_addr)) < 0) {
+	fprintf(stderr, "Couldn't bind socket\n");
+		exit(1);
+	}
+	listen(*sockfd, 1);
+	return *sockfd != -1;
 }
+
+static bool accept_connection(int server_sockfd, int *sockfd)
+{
+	struct sockaddr_in client_addr;
+	socklen_t client_len = sizeof(client_addr);
+	*sockfd = accept(server_sockfd, (struct sockaddr*) &client_addr, &client_len);
+	if (*sockfd < 0) {
+		fprintf(stderr, "Couldn't accept connection\n");
+		exit(1);
+	}
+	return *sockfd != -1;
+}
+
+#else
+
+static bool make_socket(int *sockfd)
+{
+	struct sockaddr_in server_addr;
+	struct hostent *server;
+
+	*sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (*sockfd < 0) {
+		fprintf(stderr, "Couldn't open socket\n");
+		exit(1);
+	}
+	server = gethostbyname(HOST);
+	if (server == NULL) {
+		fprintf(stderr, "Couldn't resolve host %s\n", HOST);
+		exit(1);
+	}
+	bzero((char *) &server_addr, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	bcopy(server->h_addr, &server_addr.sin_addr.s_addr, server->h_length);
+	server_addr.sin_port = htons(PORT);
+	if (connect(*sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
+		fprintf(stderr, "Couldn't connect to server\n");
+		exit(1);
+	}
+	return *sockfd != -1;
+}
+
+#endif
 
 static float min_conf(const struct planrecog_state *msg, const int i)
 {
@@ -150,9 +190,13 @@ static void klatschtgleich2(FILE *fp, int sockfd, int n_agents, bool do_sleep)
 
 int main(int argc, char *argv[])
 {
-    int sockfd = make_socket();
     int n_agents = 2;
     bool do_sleep = true;
+#ifdef SERVER_MODE
+    int server_sockfd;
+#endif
+    int sockfd;
+    int flag_offset;
     int i;
 
     for (i = 1; i < argc; ++i) {
@@ -167,17 +211,30 @@ int main(int argc, char *argv[])
         else
             break;
     }
+    flag_offset = i;
 
-    if (i == argc) {
-        klatschtgleich2(stdin, sockfd, n_agents, do_sleep);
-    } else {
-        for (; i < argc; ++i) {
-            FILE *fp = fopen(argv[i], "r");
-            klatschtgleich2(fp, sockfd, n_agents, do_sleep);
-            fclose(fp);
-        }
+#ifdef SERVER_MODE
+    if (!make_server_socket(&server_sockfd)) {
+        fprintf(stderr, "Couldn't create server socket.\n");
+        exit(1);
     }
-    close(sockfd);
+    while (accept_connection(server_sockfd, &sockfd))
+#else
+    if (make_socket(&sockfd))
+#endif
+    {
+        if (flag_offset == argc) {
+            klatschtgleich2(stdin, sockfd, n_agents, do_sleep);
+            fprintf(stderr, "Note: stdin doesn't work more than one iterations!\n");
+        } else {
+            for (i = flag_offset; i < argc; ++i) {
+                FILE *fp = fopen(argv[i], "r");
+                klatschtgleich2(fp, sockfd, n_agents, do_sleep);
+                fclose(fp);
+            }
+        }
+        close(sockfd);
+    }
     return 0;
 }
 

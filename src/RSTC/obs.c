@@ -2,6 +2,7 @@
 #include "obs.h"
 #include <assert.h>
 #include <math.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -12,18 +13,23 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define MAX_OBSERVATIONS    1000
+#define MAX_OBSERVATIONS	1000
 
 #ifndef NAN
 #define NAN (0.0/0.0)
 #endif
 
+#define SERVER_MODE
+#define HOST "localhost"
+#define PORT 19123
 
 static int server_sockfd = -1;
 static int sockfd = -1;
 static int last_obs = -1;
 static struct observation_record obs[MAX_OBSERVATIONS];
 
+
+#ifdef SERVER_MODE
 
 static bool make_server_socket(int *sockfd)
 {
@@ -58,6 +64,35 @@ static bool accept_connection(int server_sockfd, int *sockfd)
 	return *sockfd != -1;
 }
 
+#else
+
+static bool make_socket(int *sockfd)
+{
+	struct sockaddr_in server_addr;
+	struct hostent *server;
+
+	*sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (*sockfd < 0) {
+		fprintf(stderr, "Couldn't open socket\n");
+		exit(1);
+	}
+	server = gethostbyname(HOST);
+	if (server == NULL) {
+		fprintf(stderr, "Couldn't resolve host %s\n", HOST);
+		exit(1);
+	}
+	bzero((char *) &server_addr, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	bcopy(server->h_addr, &server_addr.sin_addr.s_addr, server->h_length);
+	server_addr.sin_port = htons(PORT);
+	if (connect(*sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
+		fprintf(stderr, "Couldn't connect to server\n");
+		exit(1);
+	}
+	return *sockfd != -1;
+}
+
+#endif
 
 static void finalize_connection(int *sockfd)
 {
@@ -93,12 +128,18 @@ int obs_next(int obs_id)
 {
 	bool res = true;
 
+#ifdef SERVER_MODE
 	if (res && server_sockfd == -1) {
 		res = make_server_socket(&server_sockfd);
 	}
 	if (res && sockfd == -1) {
 		res = accept_connection(server_sockfd, &sockfd);
 	}
+#else
+	if (res && sockfd == -1) {
+		res = make_socket(&sockfd);
+	}
+#endif
 	if (res && obs_id > last_obs) {
 		int i;
 		for (i = last_obs + 1; i <= obs_id; ++i) {
@@ -110,7 +151,7 @@ int obs_next(int obs_id)
 }
 
 
-double obs_timestamp(int obs_id)
+double obs_time(int obs_id)
 {
 	assert(0 <= obs_id && obs_id <= last_obs);
 

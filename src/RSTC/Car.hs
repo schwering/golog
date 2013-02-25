@@ -1,11 +1,11 @@
-module Car where
+module RSTC.Car where
 
 import Data.Ix
 import System.IO.Unsafe
 
 data Lane = LeftLane | RightLane deriving (Eq, Show)
 
-data Car = A | B | C | D | E | F | G | H deriving (Enum, Eq, Ix, Ord, Show)
+data Car = A | B | C | D | E | F | G | H deriving (Bounded, Enum, Eq, Ix, Ord, Show)
 
 cars :: [Car]
 --cars = [B .. H]
