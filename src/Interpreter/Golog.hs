@@ -23,7 +23,8 @@
 module Interpreter.Golog (Sit(S0, Do), Reward, Depth, MaxiF, Finality(..),
                           Atom(..), PseudoAtom(..), Prog(..), SitTree,
                           BAT(..),
-                          tree, trans, do1, do2, do3, sit, rew, depth) where
+                          tree, pickbest,
+                          trans, do1, do2, do3, sit, rew, depth, final, value) where
 
 --module Interpreter.Golog where
 
@@ -153,7 +154,7 @@ tree p s r d = Parent (s, r, d, finality p) (lmap transAtom (next' p))
 
 
 pickbest :: Depth -> SitTree a -> SitTree a
-pickbest d = force (value d) (-1/0, minBound)
+pickbest l = force (value l) (-1/0, minBound)
 
 
 -- | Computes the maximum achievable reward and depth in a tree up to a certain
@@ -164,20 +165,20 @@ pickbest d = force (value d) (-1/0, minBound)
 -- configuration. For this reason we even have to inspect the subtree of the
 -- 'Parent' node when we've reached the maximum depth.
 --
--- The depth argument specifies the search depth up to which value is computed.
--- Note that it is relative to the depth of the situation tree's root node.
+-- The lookahead argument specifies the search depth up to which value is
+-- computed.
 --
 -- This function expects that 'Sprout' nodes have been resolved already (e.g.,
 -- using 'pickbest'). Otherwise 'Sprout's yield errors.
 value :: Depth -> SitTree a -> (Reward, Depth)
-value _ Empty            = (0.0, 0)
-value d (Parent (_, v, d', f) t') | f == Final = max (v, d') (value d t')
-                                  | d' < d     = value d t'
-                                  | d == d'    = (v, d')
-                                  | otherwise  = (0.0, 0)
-value d (Branch t1 t2)   = max (value d t1) (value d t2)
-value _ (Leaf _)         = error "Golog.value: Leaf"
-value _ (Sprout _ _)     = error "Golog.value: Sprout"
+value _ Empty          = (0.0, 0)
+value l (Parent (_, v, d, f) t') | l == 0     = (v, d)
+                                 | f == Final = max (v, d) (value (l-1) t')
+                                 | l > 0      = value (l-1) t'
+                                 | otherwise  = (0.0, 0)
+value l (Branch t1 t2) = max (value l t1) (value l t2)
+value _ (Leaf _)       = error "Golog.value: Leaf"
+value _ (Sprout _ _)   = error "Golog.value: Sprout"
 
 
 -- | Transitions to the next best configuration is there one.
@@ -186,15 +187,15 @@ value _ (Sprout _ _)     = error "Golog.value: Sprout"
 -- At 'Parent' nodes it stops unless the subtree has a higher value.
 -- At 'Branch' nodes it opts for the higher values alternative.
 --
--- The depth argument specifies the search depth up to which value is computed.
--- Note that it is relative to the depth of the situation tree's root node.
+-- The lookahead argument specifies the search depth up to which value is
+-- computed.
 trans :: Depth -> SitTree a -> Maybe (SitTree a)
-trans d (Parent (_, v, d', f) t) | f == Nonfinal       = trans' t
-                                 | (v, d') < value d t = trans' t
-                                 | otherwise           = Nothing
+trans l (Parent (_, v, d, f) t) | f == Nonfinal      = trans' t
+                                | (v, d) < value l t = trans' t
+                                | otherwise          = Nothing
    where trans' Empty             = Nothing
          trans' t' @ (Parent _ _) = Just t'
-         trans' (Branch t1 t2)    = trans' (maxBy (value d) t1 t2)
+         trans' (Branch t1 t2)    = trans' (maxBy (value l) t1 t2)
          trans' (Leaf _)          = error "Golog.trans': Leaf"
          trans' (Sprout _ _)      = error "Golog.trans': Sprout"
 trans _ Empty         = error "Golog.trans: Empty"
@@ -253,29 +254,30 @@ final (Sprout _ _)            = error "Golog.final: Sprout"
 -- Additionally the reward and depth are returned.
 -- If the execution fails, 'Nothing' is returned.
 --
--- The depth argument specifies the search depth up to which value is computed.
+-- The lookahead argument specifies the search depth up to which value is
+-- computed.
 do1 :: BAT a => Depth -> Prog a -> Sit a -> Maybe (Sit a, Reward, Depth)
-do1 d p s = do2 d (pickbest d (tree p s 0.0 0))
+do1 l p s = do2 l (pickbest l (tree p s 0.0 0))
 
 
 -- | Searches for the best final reachable situation in the tree.
 -- Additionally the reward and depth are returned.
 -- If none is found, 'Nothing' is returned.
 --
--- The depth argument specifies the search depth up to which value is computed.
--- Note that it is relative to the depth of the situation tree's root node.
+-- The lookahead argument specifies the search depth up to which value is
+-- computed.
 do2 :: Depth -> SitTree a -> Maybe (Sit a, Reward, Depth)
-do2 d t | final t   = Just (sit t, rew t, depth t)
-        | otherwise = trans d t >>= do2 d
+do2 l t | final t   = Just (sit t, rew t, depth t)
+        | otherwise = trans l t >>= do2 l
 
 
 do3 :: BAT a => Depth -> Prog a -> Sit a -> [(Sit a, Reward, Depth)]
-do3 d p s = do4 d (pickbest d (tree p s 0.0 0))
+do3 l p s = do4 l (pickbest l (tree p s 0.0 0))
 
 
 do4 :: Depth -> SitTree a -> [(Sit a, Reward, Depth)]
-do4 d t | final t   = [(sit t, rew t, depth t)]
-        | otherwise = case trans d t of
+do4 l t | final t   = [(sit t, rew t, depth t)]
+        | otherwise = case trans l t of
                            Nothing -> []
-                           Just t  -> (sit t, rew t, depth t) : do4 d t
+                           Just t' -> (sit t', rew t', depth t') : do4 l t'
 

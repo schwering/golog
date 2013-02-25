@@ -24,21 +24,21 @@ interpol f lo hi goal
 
 
 picknum :: (Double, Double) -> (Double -> (Reward, Depth)) -> Double
-picknum bounds val = (pso 10 m n defaultParams bounds (Max (fst . val)))
-   where m = 20
+picknum bounds val = pso 10 m n defaultParams bounds (Max (fst . val))
+   where m = 10
          n = 1
 
 
 act :: a -> Prog a
-act a = PseudoAtom (Atom (Prim a))
+act = PseudoAtom . Atom . Prim
 
 
 actf :: (Sit a -> a) -> Prog a
-actf a = PseudoAtom (Atom (PrimF a))
+actf = PseudoAtom . Atom . PrimF
 
 
 test :: (Sit a -> Bool) -> Prog a
-test t = PseudoAtom (Atom (Test t))
+test = PseudoAtom . Atom . Test
 
 
 ptest :: String -> Prog a
@@ -46,7 +46,7 @@ ptest s = test (\_ -> unsafePerformIO (putStrLn s >>= \_ -> return True))
 
 
 atomic :: Prog a -> Prog a
-atomic p = PseudoAtom (Complex p)
+atomic = PseudoAtom . Complex
 
 
 obsprog :: (Obs.Obs a b) => [Maybe b] -> Prog (Prim a)
@@ -82,7 +82,7 @@ tailgate b c =
       test (\s -> any (`elem` (ntgCats (BAT.ntg s b c))) [VeryCloseBehind, CloseBehind]) `Seq`
       actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b))
    ) `Seq`
-   Pick (picknum (0, 2)) 1 (\q -> act (Accel b q)) `Seq`
+   --Pick (picknum (0, 2)) 1 (\q -> act (Accel b q)) `Seq`
    act (End b "tailgate")
 
 
@@ -106,15 +106,18 @@ overtake b c =
    atomic (
       act (Start b "overtake") `Seq`
       test (\s -> lane b s == lane c s) `Seq`
+      ptest "huhu1" `Seq`
       test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
-      test (\s -> isConverging (BAT.ttc s) b c)
+      ptest "huhu2" `Seq`
+      --test (\s -> isConverging (BAT.ttc s) b c) `Seq`
+      ptest "huhu3"
    ) `Seq` (
       (
          act (LaneChange b LeftLane) `Seq`
          test (\s -> BAT.ntg s b c < 0) `Seq`
          act (LaneChange b RightLane)
       ) `Conc` (
-         Star (Pick (picknum (0.95, 1.2)) 1 (\q -> act (Accel b q)))
+         Star (Pick (picknum (0.9, 1.5)) 1 (\q -> act (Accel b q)))
       )
    ) `Seq` atomic (
       test (\s -> BAT.ntg s b c < 0) `Seq`

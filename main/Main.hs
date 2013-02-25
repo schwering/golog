@@ -53,7 +53,7 @@ instance Show a => Show (Sit a) where
    --show (Do a s) = "Do(" ++ (show a) ++ ", " ++ (show s) ++ ")"
 
 showTree :: (Show v, Show a) => Int -> Tree v a -> String
-showTree n _ | n > 25 = (replicate (2*n) ' ') ++ "...\n"
+showTree n _ | n > 5 = (replicate (2*n) ' ') ++ "...\n"
 showTree n Empty = (replicate (2*n) ' ') ++ "Empty\n"
 showTree n (Leaf x) = (replicate (2*n) ' ') ++ "Leaf " ++ (show x) ++ "\n"
 showTree n (Parent x t) = (replicate (2*n) ' ') ++ "Parent " ++ (show x) ++ "\n" ++ (showTree (n+1) t)
@@ -164,8 +164,10 @@ main =
          --putStrLn "-------------------------------------------------------\n"
          let obs      = take 100 Obs.observations
              obsProg  = obsprog obs
-             candProg = tailgate Car.H Car.D
-             confs    = do3 4 (Conc obsProg candProg) S0
+             candProg = overtake Car.H Car.D
+             prog     = Conc obsProg candProg
+             confs    = do3 4 prog S0
+         --putStrLn (show (pickbest 4 (tree prog S0 0.0 0)))
          mapM_ (\(s,v,d) -> do putStrLn (show s)
                                putStrLn (show (v, d))
                                printFluents s
@@ -193,4 +195,17 @@ main =
 --         putStrLn (show (cutoff 7 (trans 3 t2)))
 --         --putStrLn "-------"
 --         --putStrLn (show (toList (cutparents t)))
+
+mydo3 :: (Show a, BAT a) => Depth -> Prog a -> Sit a -> [(Sit a, Reward, Depth)]
+mydo3 l p s = mydo4 l (pickbest l (tree p s 0.0 0))
+
+
+mydo4 :: (Show a) => Depth -> SitTree a -> [(Sit a, Reward, Depth)]
+mydo4 l t | final t   = [(sit t, rew t, depth t)]
+          | otherwise = case trans l t of
+                             Nothing -> []
+                             Just t  -> (sit t, rew t, depth t) : mydo4 l t
+   where bla x @ (Just t) | depth t >= 35 = Just (Car.debug' ((show (value l t)) ++ " " ++ (show (depth t))) t)
+                          | otherwise = x
+         bla x @ Nothing = x
 

@@ -16,3 +16,8 @@ debug :: (Show a) => a -> a
 debug x = unsafePerformIO (do putStrLn (show x)
                               return x)
 
+
+debug' :: (Show a) => String -> a -> a
+debug' s x = unsafePerformIO (do putStrLn (s ++ ": " ++ (show x))
+                                 return x)
+

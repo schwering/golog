@@ -51,7 +51,7 @@ data TTCCat = ConvergingFast
 
 instance (RealFloat a, Show a) => BAT (Prim a) where
    poss (Wait t)             _ = t >= 0
-   poss a @ (Accel _ _)      s = noDupe a s
+   poss a @ (Accel b q)      s = noDupe a s
    poss a @ (LaneChange b l) s = l /= lane b s && noDupe a s
    poss (Init _)             _ = True
    poss (Match e)            s = match e s
@@ -86,10 +86,10 @@ match e s = let ntg_ttc = [(b, c, ntg s b c, O.ntg e b c,
                            | (b, c, ntg1, ntg2, ttc1, ttc2) <- ntg_ttc, b < c]
                 lanes = [(lane b s, O.lane e b) | b <- cars]
             in all (\(l1, l2) -> l1 == l2) lanes &&
-               all (\(ntg1, ntg2) -> haveCommon (ntgCats ntg1)
-                                                (ntgCats ntg2)) ntgs &&
-               all (\(ttc1, rv1, ttc2, rv2) -> haveCommon (ttcCats ttc1 rv1)
-                                                          (ttcCats ttc2 rv2)) ttcs
+               all (\(ntg1, ntg2) -> haveCommon (debug' ("NTG1 " ++ (show ntg1)) $ ntgCats ntg1)
+                                                (debug' ("NTG2 " ++ (show ntg2)) $ ntgCats ntg2)) ntgs &&
+               all (\(ttc1, rv1, ttc2, rv2) -> haveCommon (debug' ("TTC1 " ++ (show ttc1)) $ ttcCats ttc1 rv1)
+                                                          (debug' ("TTC2 " ++ (show ttc2)) $ ttcCats ttc2 rv2)) ttcs
    where haveCommon (x:xs) (y:ys) | x < y     = haveCommon xs (y:ys)
                                   | y < x     = haveCommon (x:xs) ys
                                   | otherwise = True

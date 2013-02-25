@@ -21,7 +21,7 @@
 
 #include "RSTC/obs.h"
 
-//#define SERVER_MODE
+#define SERVER_MODE
 #define HOST "localhost"
 #define PORT 19123
 
@@ -134,7 +134,7 @@ static bool scan(FILE *fp, int n_agents, struct observation_record *r)
     return true;
 }
 
-static void klatschtgleich2(FILE *fp, int sockfd, int n_agents, bool do_sleep)
+static bool klatschtgleich2(FILE *fp, int sockfd, int n_agents, bool do_sleep)
 {
     struct observation_record r;
     struct planrecog_state state;
@@ -163,13 +163,13 @@ static void klatschtgleich2(FILE *fp, int sockfd, int n_agents, bool do_sleep)
         ret = write(sockfd, &r, sizeof(r));
         if (ret != sizeof(r)) {
             fprintf(stderr, "Couldn't write %lu bytes\n", sizeof(r));
-            exit(1);
+            return false;
         }
 
         ret = read(sockfd, &state, sizeof(state));
         if (ret != sizeof(state)) {
             fprintf(stderr, "Couldn't read %lu bytes\n", sizeof(state));
-            exit(1);
+            return false;
         }
 
         for (i = 0; i < NAGENTS; ++i) {
@@ -186,6 +186,7 @@ static void klatschtgleich2(FILE *fp, int sockfd, int n_agents, bool do_sleep)
         printf("%.2lf =< confidence working=%d, finished=%d, failed=%d =< %.2lf\n",
                 min_conf(&state, 0), state.sources[0].working, state.sources[0].finished, state.sources[0].failed, max_conf(&state, 0));
     }
+    return true;
 }
 
 int main(int argc, char *argv[])
@@ -229,8 +230,11 @@ int main(int argc, char *argv[])
         } else {
             for (i = flag_offset; i < argc; ++i) {
                 FILE *fp = fopen(argv[i], "r");
-                klatschtgleich2(fp, sockfd, n_agents, do_sleep);
+                bool retval = klatschtgleich2(fp, sockfd, n_agents, do_sleep);
                 fclose(fp);
+                if (!retval) {
+                    break;
+                }
             }
         }
         close(sockfd);

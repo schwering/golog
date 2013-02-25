@@ -19,7 +19,7 @@
 #define NAN (0.0/0.0)
 #endif
 
-#define SERVER_MODE
+//#define SERVER_MODE
 #define HOST "localhost"
 #define PORT 19123
 
@@ -93,12 +93,6 @@ static bool make_socket(int *sockfd)
 }
 
 #endif
-
-static void finalize_connection(int *sockfd)
-{
-	close(*sockfd);
-	*sockfd = -1;
-}
 
 
 static bool receive_obs(int sockfd, int obs_id)
