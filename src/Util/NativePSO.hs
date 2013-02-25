@@ -35,10 +35,8 @@ defaultParams = Params { inertiaWeight  = 0.729
 pso :: Seed -> IterationCount -> ParticleCount -> Params ->
        Bounds -> Objective -> Optimum
 pso seed m n params bounds (Min f) = pso seed m n params bounds (Max (negate.f))
-pso seed m n params bounds (Max f) = unsafePerformIO $
-      do fW <- wrap f'
-         r <- c_pso s' m' n' iw cw sp lo hi fW
-         return (realToFrac r)
+pso seed m n params bounds (Max f) =
+      realToFrac (c_pso s' m' n' iw cw sp lo hi fW)
    where s' = fromIntegral seed
          m' = fromIntegral m
          n' = fromIntegral n
@@ -48,6 +46,7 @@ pso seed m n params bounds (Max f) = unsafePerformIO $
          lo = realToFrac (fst bounds)
          hi = realToFrac (snd bounds)
          f' = (\x -> realToFrac (f (realToFrac x)))
+         fW = unsafePerformIO (wrap f')
 
 
 foreign import ccall "wrapper"
@@ -59,5 +58,5 @@ foreign import ccall "pso"
             CDouble -> CDouble -> CDouble -> -- params
             CDouble -> CDouble ->            -- bounds
             FunPtr (CDouble -> CDouble) ->   -- objective (max)
-            IO CDouble
+            CDouble
 

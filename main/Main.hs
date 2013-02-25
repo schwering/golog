@@ -9,7 +9,9 @@ import qualified RSTC.BAT as BAT
 import qualified RSTC.Obs as Obs
 import RSTC.Progs
 
-instance (Show a) => Show (BAT.Prim a) where
+import Text.Printf
+
+instance Show a => Show (BAT.Prim a) where
    show (BAT.Wait t) = "Wait " ++ (show t)
    show (BAT.Accel b q) = "Accel " ++ (show b) ++ " " ++ (show q)
    show (BAT.LaneChange b l) = "LaneChange " ++ (show b) ++ " " ++ (show l)
@@ -24,16 +26,16 @@ instance Show Finality where
    show Final = "Final"
    show Nonfinal = "Nonfinal"
 
-instance (Show a) => Show (Atom a) where
+instance Show a => Show (Atom a) where
    show (Prim a)  = "Prim(" ++ (show a) ++ ")"
    show (PrimF _) = "PrimF(...)"
    show (Test _)  = "Test(...)"
 
-instance (Show a) => Show (PseudoAtom a) where
+instance Show a => Show (PseudoAtom a) where
    show (Atom a) = "Atom(" ++ (show a) ++ ")"
    show (Complex p) = "Complex(" ++ (show p) ++ ")"
 
-instance (Show a) => Show (Prog a) where
+instance Show a => Show (Prog a) where
    show (Seq p1 p2) = "Seq(" ++ (show p1) ++ " " ++ (show p2) ++ ")"
    show (Nondet p1 p2) = "Nondet(" ++ (show p1) ++ " " ++ (show p2) ++ ")"
    show (Conc p1 p2) = "Conc(" ++ (show p1) ++ " " ++ (show p2) ++ ")"
@@ -45,7 +47,7 @@ instance (Show a) => Show (Prog a) where
 instance (Show v, Show a) => Show (Tree v a) where
    show = showTree 0
 
-instance (Show a) => Show (Sit a) where
+instance Show a => Show (Sit a) where
    show s = show (sit2list s)
    --show S0 = "S0"
    --show (Do a s) = "Do(" ++ (show a) ++ ", " ++ (show s) ++ ")"
@@ -102,6 +104,15 @@ instance BAT Prim where
 --depth t = snd (value 0 t)
 
 
+printFluents :: (RealFloat a, PrintfArg a) => Sit (BAT.Prim a) -> IO ()
+printFluents s = do printf "start = %.2f\n" (BAT.start s)
+                    mapM_ (\(b,c) -> printf "ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntg s b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
+                    mapM_ (\(b,c) -> printf "ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttc s b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
+                    --putStrLn ("start = " ++ show (BAT.start s))
+                    --mapM_ (\(b,c) -> putStrLn ("ntg " ++ show b ++ " " ++ show c ++ " = " ++ show (BAT.ntg s b c))) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
+                    --mapM_ (\(b,c) -> putStrLn ("ttc " ++ show b ++ " " ++ show c ++ " = " ++ show (BAT.ttc s b c))) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
+
+
 main :: IO ()
 main =
    let   a = PseudoAtom (Atom (Prim A))
@@ -120,7 +131,6 @@ main =
          t1 = tree p1 S0 0.0 0
          t2 = tree p2 S0 0.0 0
          exec n t' = trans ((depth t') + n) t'
-         candProg = tailgate Car.H Car.D
    in do
 {-
          putStrLn ((show . cutoff 2) t2)
@@ -152,7 +162,15 @@ main =
          --putStrLn "-------------------------------------------------------"
          --mapM_ (\i -> putStrLn ((show . cutoff i) (tree (obsprog Obs.observations) S0 0.0 0))) [0..30]
          --putStrLn "-------------------------------------------------------\n"
-         mapM_ (putStrLn . show) (do3 4 (Conc (obsprog (take 30 Obs.observations)) (candProg)) S0)
+         let obs      = take 100 Obs.observations
+             obsProg  = obsprog obs
+             candProg = tailgate Car.H Car.D
+             confs    = do3 4 (Conc obsProg candProg) S0
+         mapM_ (\(s,v,d) -> do putStrLn (show s)
+                               putStrLn (show (v, d))
+                               printFluents s
+                               putStrLn ""
+               ) confs
          putStrLn "-------------------------------------------------------"
 {-
          mapM_ (putStrLn . show) (map (maybe Nothing $ (\x -> Just

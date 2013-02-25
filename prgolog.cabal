@@ -19,12 +19,13 @@ Library
                      RSTC.Progs
                      RSTC.Theorems
                      Util.PSO
+                     Util.Memo
                      Util.NativePSO
                      Car
     Other-Modules:
     C-Sources:       src/RSTC/obs.c
                      src/Util/native_pso.c
-    Build-Depends:   base, random
+    Build-Depends:   base, random, containers
     GHC-Options:     -Wall
 
 Executable Main

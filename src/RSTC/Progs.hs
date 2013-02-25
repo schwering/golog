@@ -77,10 +77,10 @@ tailgate b c =
       act (Start b "tailgate") `Seq`
       test (\s -> lane b s == lane c s) `Seq`
       test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
-      test (\s -> any (`elem` (ntgCats (BAT.ntg s b c))) [VeryCloseBehind, CloseBehind])
+      test (\s -> any (`elem` (ntgCats (BAT.ntg s b c))) [VeryCloseBehind, CloseBehind]) `Seq`
+      actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b))
    ) `Seq`
    --Pick (picknum (0, 2)) 1 (\q -> act (Accel b q)) `Seq`
-   actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b)) `Seq`
    ptest "Huhu" `Seq`
    act (End b "tailgate")
 

@@ -46,7 +46,7 @@ branch t     Empty = t
 branch t1    t2    = Branch t1 t2
 
 
-force :: (Ord v) => (Tree v a -> v) -> v -> Tree v a -> Tree v a
+force :: Ord v => (Tree v a -> v) -> v -> Tree v a -> Tree v a
 force _  _    t @ Empty       = t
 force _  _    t @ (Leaf _)    = t
 force val inf (Parent x t)    = Parent x (force val inf t)

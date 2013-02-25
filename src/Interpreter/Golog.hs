@@ -140,7 +140,7 @@ next' p = lmap h (next p)
 --
 -- Note that 'Leaf' nodes to not occur as they are replaced with 'Parent' and/or
 -- 'Empty' nodes.
-tree :: (BAT a) => Prog a -> Sit a -> Reward -> Depth -> SitTree a
+tree :: BAT a => Prog a -> Sit a -> Reward -> Depth -> SitTree a
 tree p s r d = Parent (s, r, d, finality p) (lmap transAtom (next' p))
    where transAtom (Prim a, p')  | poss a s  = let s' = Do a s
                                                    r' = r + (reward a s)
@@ -204,7 +204,7 @@ trans _ (Sprout _ _)  = error "Golog.trans: Sprout"
 
 
 -- | Returns the function-maximizing element.
-maxBy :: (Ord b) => (a -> b) -> a -> a -> a
+maxBy :: Ord b => (a -> b) -> a -> a -> a
 maxBy f x y | f x >= f y = x
             | otherwise  = y
 
@@ -254,7 +254,7 @@ final (Sprout _ _)            = error "Golog.final: Sprout"
 -- If the execution fails, 'Nothing' is returned.
 --
 -- The depth argument specifies the search depth up to which value is computed.
-do1 :: (BAT a) => Depth -> Prog a -> Sit a -> Maybe (Sit a, Reward, Depth)
+do1 :: BAT a => Depth -> Prog a -> Sit a -> Maybe (Sit a, Reward, Depth)
 do1 d p s = do2 d (pickbest d (tree p s 0.0 0))
 
 
@@ -269,7 +269,7 @@ do2 d t | final t   = Just (sit t, rew t, depth t)
         | otherwise = trans d t >>= do2 d
 
 
-do3 :: (BAT a) => Depth -> Prog a -> Sit a -> [(Sit a, Reward, Depth)]
+do3 :: BAT a => Depth -> Prog a -> Sit a -> [(Sit a, Reward, Depth)]
 do3 d p s = do4 d (pickbest d (tree p s 0.0 0))
 
 
