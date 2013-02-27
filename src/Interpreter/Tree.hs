@@ -46,13 +46,13 @@ branch t     Empty = t
 branch t1    t2    = Branch t1 t2
 
 
-force :: Ord v => (Tree v a -> v) -> v -> Tree v a -> Tree v a
-force _  _    t @ Empty       = t
-force _  _    t @ (Leaf _)    = t
-force val inf (Parent x t)    = Parent x (force val inf t)
-force val inf (Branch t1 t2)  = Branch (force val inf t1) (force val inf t2)
-force val inf (Sprout opti t) = force val inf (t (opti val'))
-      where val' x = val (force val inf (t x))
+force :: Ord v => (Tree v a -> v) -> Tree v a -> Tree v a
+force _   t @ Empty       = t
+force _   t @ (Leaf _)    = t
+force val (Parent x t)    = Parent x (force val t)
+force val (Branch t1 t2)  = Branch (force val t1) (force val t2)
+force val (Sprout opti t) = force val (t (opti val'))
+      where val' x = val (force val (t x))
 
 
 lmap :: (a -> Tree v b) -> Tree v a -> Tree v b

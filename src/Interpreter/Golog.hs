@@ -154,7 +154,7 @@ tree p s r d = Parent (s, r, d, finality p) (lmap transAtom (next' p))
 
 
 pickbest :: Depth -> SitTree a -> SitTree a
-pickbest l = force (value l) (-1/0, minBound)
+pickbest l = force (value l)
 
 
 -- | Computes the maximum achievable reward and depth in a tree up to a certain
