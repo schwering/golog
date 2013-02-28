@@ -1,6 +1,7 @@
 -- | Tree container.
 
-{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE GADTs #-}
 
 module Interpreter.Tree (Tree(Empty, Leaf, Parent, Branch, Sprout), OptiF,
                          Functor(..), Foldable(..),
@@ -11,14 +12,15 @@ import Data.Foldable
 
 type OptiF u v = (u -> v) -> u
 
-data Tree v a = Empty
-              | Leaf a
-              | Parent a (Tree v a)
-              | Branch (Tree v a) (Tree v a)
-              | forall u. Sprout (OptiF u v) (u -> Tree v a)
+data Tree a where
+   Empty  :: Tree a
+   Leaf   :: a -> Tree a
+   Parent :: a -> Tree a -> Tree a
+   Branch :: Tree a -> Tree a -> Tree a
+   Sprout :: (forall v. Ord v => OptiF u v) -> (u -> Tree a) -> Tree a
 
 
-instance Functor (Tree v) where
+instance Functor Tree where
    fmap _ Empty           = Empty
    fmap f (Leaf x)        = Leaf (f x)
    fmap f (Parent x t)    = Parent (f x) (fmap f t)
@@ -26,7 +28,7 @@ instance Functor (Tree v) where
    fmap f (Sprout opti t) = Sprout opti (\x -> fmap f (t x))
 
 
-instance Foldable (Tree v) where
+instance Foldable Tree where
    foldl _ z Empty          = z
    foldl f z (Leaf x)       = f z x
    foldl f z (Parent x t)   = foldl f (f z x) t
@@ -40,22 +42,22 @@ instance Foldable (Tree v) where
    foldr _ _ (Sprout _ _)   = error "Tree.foldr: Sprout"
 
 
-branch :: Tree v a -> Tree v a -> Tree v a
+branch :: Tree a -> Tree a -> Tree a
 branch Empty t     = t
 branch t     Empty = t
 branch t1    t2    = Branch t1 t2
 
 
-force :: Ord v => (Tree v a -> v) -> Tree v a -> Tree v a
+force :: Ord v => (Tree a -> v) -> Tree a -> Tree a
 force _   t @ Empty       = t
 force _   t @ (Leaf _)    = t
 force val (Parent x t)    = Parent x (force val t)
 force val (Branch t1 t2)  = Branch (force val t1) (force val t2)
 force val (Sprout opti t) = force val (t (opti val'))
-      where val' x = val (force val (t x))
+   where val' x = val (force val (t x))
 
 
-lmap :: (a -> Tree v b) -> Tree v a -> Tree v b
+lmap :: (a -> Tree b) -> Tree a -> Tree b
 lmap _ Empty           = Empty
 lmap f (Leaf x)        = f x
 lmap f (Branch t1 t2)  = Branch (lmap f t1) (lmap f t2)

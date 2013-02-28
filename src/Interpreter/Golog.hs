@@ -18,7 +18,8 @@
 --
 -- \[1\] http:\/\/www.aaai.org\/ocs\/index.php\/WS\/AAAIW12\/paper\/view\/5281
 
-{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE GADTs #-}
 
 module Interpreter.Golog (Sit(S0, Do), Reward, Depth, MaxiF, Finality(..),
                           Atom(..), PseudoAtom(..), Prog(..), SitTree,
@@ -36,7 +37,7 @@ data Sit a = S0
 type Reward = Double
 type Depth = Int
 
-type MaxiF a = (a -> (Reward, Depth)) -> a
+type MaxiF u v = OptiF u v
 
 data Atom a = Prim a
             | PrimF (Sit a -> a)
@@ -45,19 +46,19 @@ data Atom a = Prim a
 data PseudoAtom a = Atom (Atom a)
                   | Complex (Prog a)
 
-data Prog a = Seq (Prog a) (Prog a)
-            | Nondet (Prog a) (Prog a)
-            | Conc (Prog a) (Prog a)
-            | Star (Prog a)
-            | forall b. Pick (MaxiF b) b (b -> Prog a)
-            | PseudoAtom (PseudoAtom a)
-            | Nil
+data Prog a where
+   Seq        :: Prog a -> Prog a -> Prog a
+   Nondet     :: Prog a -> Prog a -> Prog a
+   Conc       :: Prog a -> Prog a -> Prog a
+   Star       :: Prog a -> Prog a
+   Pick       :: (forall v. Ord v => MaxiF u v) -> u -> (u -> Prog a) -> Prog a
+   PseudoAtom :: PseudoAtom a -> Prog a
+   Nil        :: Prog a
 
 data Finality = Final
               | Nonfinal
-              deriving Eq
 
-type SitTree a = Tree (Reward, Depth) (Sit a, Reward, Depth, Finality)
+type SitTree a = Tree (Sit a, Reward, Depth, Finality)
 
 
 class BAT a where
@@ -83,7 +84,7 @@ type Decomp a = (Atom a, Prog a)
 -- * 'Sprout' for each pick.
 --
 -- Note that 'Parent' nodes do not occur.
-next :: Prog a -> Tree (Reward, Depth) (PseudoDecomp a)
+next :: Prog a -> Tree (PseudoDecomp a)
 next (Seq p1 p2)    = let t1 = fmap (\(c, p') -> (c, Seq p' p2)) (next p1)
                       in if final' p1 then branch (next p2) t1 else t1
 next (Nondet p1 p2) = branch (next p1) (next p2)
@@ -112,11 +113,16 @@ finality :: Prog a -> Finality
 finality p = (if final' p then Final else Nonfinal)
 
 
+isFinal :: Finality -> Bool
+isFinal Final    = True
+isFinal Nonfinal = False
+
+
 -- | Computes the next atomic actions and the remainders.
 -- This is done by simply re-decomposing the 'Complex' actions returned by
 -- 'next'.
 -- The tree structure is the same as for 'next'.
-next' :: Prog a -> Tree (Reward, Depth) (Decomp a)
+next' :: Prog a -> Tree (Decomp a)
 next' p = lmap h (next p)
    where h ((Atom c), p')      = Leaf (c, p')
          h ((Complex p''), p') = next' (Seq p'' p')
@@ -172,10 +178,10 @@ pickbest l = force (value l)
 -- using 'pickbest'). Otherwise 'Sprout's yield errors.
 value :: Depth -> SitTree a -> (Reward, Depth)
 value _ Empty          = (0.0, 0)
-value l (Parent (_, v, d, f) t') | l == 0     = (v, d)
-                                 | f == Final = max (v, d) (value (l-1) t')
-                                 | l > 0      = value (l-1) t'
-                                 | otherwise  = (0.0, 0)
+value l (Parent (_, v, d, f) t') | l == 0    = (v, d)
+                                 | isFinal f = max (v, d) (value (l-1) t')
+                                 | l > 0     = value (l-1) t'
+                                 | otherwise = (0.0, 0)
 value l (Branch t1 t2) = max (value l t1) (value l t2)
 value _ (Leaf _)       = error "Golog.value: Leaf"
 value _ (Sprout _ _)   = error "Golog.value: Sprout"
@@ -190,7 +196,7 @@ value _ (Sprout _ _)   = error "Golog.value: Sprout"
 -- The lookahead argument specifies the search depth up to which value is
 -- computed.
 trans :: Depth -> SitTree a -> Maybe (SitTree a)
-trans l (Parent (_, v, d, f) t) | f == Nonfinal      = trans' t
+trans l (Parent (_, v, d, f) t) | not (isFinal f)    = trans' t
                                 | (v, d) < value l t = trans' t
                                 | otherwise          = Nothing
    where trans' Empty             = Nothing
@@ -243,7 +249,7 @@ depth (Sprout _ _)            = error "Golog.depth: Sprout"
 --
 -- To avoid confusion, we probably should not export this function.
 final :: SitTree a -> Bool
-final (Parent (_, _, _, f) _) = f == Final
+final (Parent (_, _, _, f) _) = isFinal f
 final Empty                   = error "Golog.final: Empty"
 final (Leaf _)                = error "Golog.final: Leaf"
 final (Branch _ _)            = error "Golog.final: Branch"

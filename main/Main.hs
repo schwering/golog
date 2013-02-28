@@ -44,7 +44,7 @@ instance Show a => Show (Prog a) where
    show (PseudoAtom p) = "PseudoAtom(" ++ (show p) ++ ")"
    show Nil = "nil"
 
-instance (Show v, Show a) => Show (Tree v a) where
+instance Show a => Show (Tree a) where
    show = showTree 0
 
 instance Show a => Show (Sit a) where
@@ -52,7 +52,7 @@ instance Show a => Show (Sit a) where
    --show S0 = "S0"
    --show (Do a s) = "Do(" ++ (show a) ++ ", " ++ (show s) ++ ")"
 
-showTree :: (Show v, Show a) => Int -> Tree v a -> String
+showTree :: Show a => Int -> Tree a -> String
 showTree n _ | n > 5 = (replicate (2*n) ' ') ++ "...\n"
 showTree n Empty = (replicate (2*n) ' ') ++ "Empty\n"
 showTree n (Leaf x) = (replicate (2*n) ' ') ++ "Leaf " ++ (show x) ++ "\n"
@@ -122,11 +122,13 @@ main =
          e x = PseudoAtom (Atom (Prim (E x)))
          p1 = ((a `Nondet` b `Nondet` c) `Seq` ((a `Seq` a `Seq` c) `Conc` (b `Seq` b `Seq` c))) `Nondet` Star(a `Seq` c `Seq` c `Seq` c `Seq` c)
          p2 = ((a `Nondet` b) `Seq` ((a `Seq` a `Seq` c) `Conc` (b `Seq` b `Seq` c)))
+{-
          ppick p = Pick (\f -> pso 10 25 5 defaultParams (-20, 20) (Max (fst.f))) 10 p
          p3 = ppick e
          p4 = (ppick e) `Seq` (ppick e)
          p5 = ppick (\x -> (e x) `Seq` (ppick e))
          p6 = ppick (\x -> (e x) `Seq` (ppick (\y -> e (x*y))))
+-}
          --p = Star(a)
          t1 = tree p1 S0 0.0 0
          t2 = tree p2 S0 0.0 0
