@@ -1,9 +1,9 @@
 -- | Tree container.
 
-{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE Rank2Types #-}
 
-module Interpreter.Tree (Tree(Empty, Leaf, Parent, Branch, Sprout), OptiF,
+module Interpreter.Tree (Tree(..), OptiF,
                          Functor(..), Foldable(..),
                          branch, force, lmap) where
 

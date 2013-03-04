@@ -18,8 +18,8 @@
 --
 -- \[1\] http:\/\/www.aaai.org\/ocs\/index.php\/WS\/AAAIW12\/paper\/view\/5281
 
-{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE Rank2Types #-}
 
 module Interpreter.Golog (Sit(S0, Do), Reward, Depth, MaxiF, Finality(..),
                           Atom(..), PseudoAtom(..), Prog(..), SitTree,
@@ -62,12 +62,8 @@ type SitTree a = Tree (Sit a, Reward, Depth, Finality)
 
 
 class BAT a where
-   poss :: a -> Sit a -> Bool
+   poss   :: a -> Sit a -> Bool
    reward :: a -> Sit a -> Reward
-
-
-type PseudoDecomp a = (PseudoAtom a, Prog a)
-type Decomp a = (Atom a, Prog a)
 
 
 -- | Computes the next pseudo-atomic actions and the remainders.
@@ -84,7 +80,7 @@ type Decomp a = (Atom a, Prog a)
 -- * 'Sprout' for each pick.
 --
 -- Note that 'Parent' nodes do not occur.
-next :: Prog a -> Tree (PseudoDecomp a)
+next :: Prog a -> Tree (PseudoAtom a, Prog a)
 next (Seq p1 p2)    = let t1 = fmap (\(c, p') -> (c, Seq p' p2)) (next p1)
                       in if final' p1 then branch (next p2) t1 else t1
 next (Nondet p1 p2) = branch (next p1) (next p2)
@@ -108,21 +104,11 @@ final' (PseudoAtom (Complex p)) = final' p
 final' Nil                      = True
 
 
--- | Indicates whether or not a program may be final.
-finality :: Prog a -> Finality
-finality p = (if final' p then Final else Nonfinal)
-
-
-isFinal :: Finality -> Bool
-isFinal Final    = True
-isFinal Nonfinal = False
-
-
 -- | Computes the next atomic actions and the remainders.
 -- This is done by simply re-decomposing the 'Complex' actions returned by
 -- 'next'.
 -- The tree structure is the same as for 'next'.
-next' :: Prog a -> Tree (Decomp a)
+next' :: Prog a -> Tree (Atom a, Prog a)
 next' p = lmap h (next p)
    where h ((Atom c), p')      = Leaf (c, p')
          h ((Complex p''), p') = next' (Seq p'' p')
@@ -148,7 +134,8 @@ next' p = lmap h (next p)
 -- Note that 'Leaf' nodes to not occur as they are replaced with 'Parent' and/or
 -- 'Empty' nodes.
 tree :: BAT a => Prog a -> Sit a -> Reward -> Depth -> SitTree a
-tree p s r d = Parent (s, r, d, finality p) (lmap transAtom (next' p))
+tree p s r d = let f = if final' p then Final else Nonfinal
+               in Parent (s, r, d, f) (lmap transAtom (next' p))
    where transAtom (Prim a, p')  | poss a s  = let s' = Do a s
                                                    r' = r + (reward a s)
                                                    d' = d + 1
@@ -254,6 +241,12 @@ final Empty                   = error "Golog.final: Empty"
 final (Leaf _)                = error "Golog.final: Leaf"
 final (Branch _ _)            = error "Golog.final: Branch"
 final (Sprout _ _)            = error "Golog.final: Sprout"
+
+
+-- | True iff Final.
+isFinal :: Finality -> Bool
+isFinal Final    = True
+isFinal Nonfinal = False
 
 
 -- | Executes a program in a situation and returns the resulting situation.
