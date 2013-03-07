@@ -14,6 +14,7 @@ import Util.NativePSO
 
 import Data.Maybe
 import System.IO.Unsafe
+import Unsafe.Coerce
 
 interpol :: (Fractional a, Ord a) => (a -> a) -> a -> a -> a -> Maybe a
 interpol f lo hi goal
@@ -27,8 +28,9 @@ interpol f lo hi goal
 --picknum bounds val = pso 10 m n defaultParams bounds (Max (fst . val))
 --XXX TODO val has now type (Double -> v) for some Ord v
 picknum :: Ord v => (Double, Double) -> (Double -> v) -> Double
-picknum bounds _ = pso 10 m n defaultParams bounds (Max undefined)
-   where m = 10
+picknum bounds val = pso 10 m n defaultParams bounds (Max f)
+   where f = \x -> fst (unsafeCoerce (val x))
+         m = 10
          n = 1
 
 

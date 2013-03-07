@@ -122,19 +122,17 @@ main =
          e x = PseudoAtom (Atom (Prim (E x)))
          p1 = ((a `Nondet` b `Nondet` c) `Seq` ((a `Seq` a `Seq` c) `Conc` (b `Seq` b `Seq` c))) `Nondet` Star(a `Seq` c `Seq` c `Seq` c `Seq` c)
          p2 = ((a `Nondet` b) `Seq` ((a `Seq` a `Seq` c) `Conc` (b `Seq` b `Seq` c)))
-{-
-         ppick p = Pick (\f -> pso 10 25 5 defaultParams (-20, 20) (Max (fst.f))) 10 p
+         --ppick p = Pick (\f -> pso 10 25 5 defaultParams (-20, 20) (Max (fst.f))) 10 p
+         ppick p = Pick (\f -> picknum (-20, 20) f) 10 p
          p3 = ppick e
          p4 = (ppick e) `Seq` (ppick e)
          p5 = ppick (\x -> (e x) `Seq` (ppick e))
          p6 = ppick (\x -> (e x) `Seq` (ppick (\y -> e (x*y))))
--}
-         --p = Star(a)
+         p = Star(a)
          t1 = tree p1 S0 0.0 0
          t2 = tree p2 S0 0.0 0
          exec n t' = trans ((depth t') + n) t'
    in do
-{-
          putStrLn ((show . cutoff 2) t2)
          putStrLn "-------------------------------------------------------\n"
          putStrLn (maybe "nothing" (show . cutoff 3) (exec 0 t2))
@@ -159,11 +157,13 @@ main =
          putStrLn "-------------------------------------------------------"
          mapM_ (\i -> putStrLn ("Pick nested 2: " ++ show i ++ ": " ++ show (do1 i p6 S0))) [0..5]
          putStrLn "-------------------------------------------------------"
+{-
 -}
          --mapM_ (putStrLn . show) (take 30 Obs.observations)
          --putStrLn "-------------------------------------------------------"
          --mapM_ (\i -> putStrLn ((show . cutoff i) (tree (obsprog Obs.observations) S0 0.0 0))) [0..30]
          --putStrLn "-------------------------------------------------------\n"
+{-
          let obs      = take 100 Obs.observations
              obsProg  = obsprog obs
              candProg = overtake Car.H Car.D
@@ -176,6 +176,7 @@ main =
                                putStrLn ""
                ) confs
          putStrLn "-------------------------------------------------------"
+-}
 {-
          mapM_ (putStrLn . show) (map (maybe Nothing $ (\x -> Just
                ( x

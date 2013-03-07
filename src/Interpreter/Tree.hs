@@ -3,13 +3,14 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE Rank2Types #-}
 
-module Interpreter.Tree (Tree(..), OptiF,
+module Interpreter.Tree (Tree(..), Depth, OptiF,
                          Functor(..), Foldable(..),
-                         branch, force, lmap) where
+                         branch, force, lmap, best) where
 
-import Prelude hiding (foldl, foldr)
+import Prelude hiding (foldl, foldr, max)
 import Data.Foldable
 
+type Depth = Int
 type OptiF u v = (u -> v) -> u
 
 data Tree a where
@@ -63,4 +64,16 @@ lmap f (Leaf x)        = f x
 lmap f (Branch t1 t2)  = Branch (lmap f t1) (lmap f t2)
 lmap f (Sprout opti t) = Sprout opti (\x -> lmap f (t x))
 lmap _ (Parent _ _)    = error "Tree.lmap: Parent"
+
+
+best :: a -> (a -> a -> a) -> (a -> Bool) -> Depth -> Tree a -> a
+best def _   _   _ Empty                    = def
+best def max cut l (Parent x t) | l == 0    = x
+                                | cut x     = max x (best def max cut (l-1) t)
+                                | l > 0     = best def max cut (l-1) t
+                                | otherwise = error "Tree.best: l < 0"
+best def max cut l (Branch t1 t2)           = max (best def max cut l t1)
+                                                  (best def max cut l t2)
+best _   _   _   _ (Leaf x)                 = x
+best _   _   _   _ (Sprout _ _)             = error "Tree.best: Sprout"
 

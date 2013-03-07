@@ -25,17 +25,18 @@ module Interpreter.Golog (Sit(S0, Do), Reward, Depth, MaxiF, Finality(..),
                           Atom(..), PseudoAtom(..), Prog(..), SitTree,
                           BAT(..),
                           tree, pickbest,
-                          trans, do1, do2, do3, sit, rew, depth, final, value) where
+                          trans, do1, do2, do3,
+                          sit, rew, depth, final, value) where
 
 --module Interpreter.Golog where
 
+import Prelude hiding (max)
 import Interpreter.Tree
 
 data Sit a = S0
            | Do a (Sit a)
 
 type Reward = Double
-type Depth = Int
 
 type MaxiF u v = OptiF u v
 
@@ -164,14 +165,11 @@ pickbest l = force (value l)
 -- This function expects that 'Sprout' nodes have been resolved already (e.g.,
 -- using 'pickbest'). Otherwise 'Sprout's yield errors.
 value :: Depth -> SitTree a -> (Reward, Depth)
-value _ Empty          = (0.0, 0)
-value l (Parent (_, v, d, f) t') | l == 0    = (v, d)
-                                 | isFinal f = max (v, d) (value (l-1) t')
-                                 | l > 0     = value (l-1) t'
-                                 | otherwise = (0.0, 0)
-value l (Branch t1 t2) = max (value l t1) (value l t2)
-value _ (Leaf _)       = error "Golog.value: Leaf"
-value _ (Sprout _ _)   = error "Golog.value: Sprout"
+value l t = val (best def max fnl l t)
+   where val (_, r, d, _) = (r, d)
+         fnl (_, _, _, f) = isFinal f
+         max              = maxBy (cmpBy val)
+         def              = (S0, 0, 0, Nonfinal)
 
 
 -- | Transitions to the next best configuration is there one.
@@ -188,7 +186,7 @@ trans l (Parent (_, v, d, f) t) | not (isFinal f)    = trans' t
                                 | otherwise          = Nothing
    where trans' Empty             = Nothing
          trans' t' @ (Parent _ _) = Just t'
-         trans' (Branch t1 t2)    = trans' (maxBy (value l) t1 t2)
+         trans' (Branch t1 t2)    = trans' (maxBy (cmpBy (value l)) t1 t2)
          trans' (Leaf _)          = error "Golog.trans': Leaf"
          trans' (Sprout _ _)      = error "Golog.trans': Sprout"
 trans _ Empty         = error "Golog.trans: Empty"
@@ -198,9 +196,14 @@ trans _ (Sprout _ _)  = error "Golog.trans: Sprout"
 
 
 -- | Returns the function-maximizing element.
-maxBy :: Ord b => (a -> b) -> a -> a -> a
-maxBy f x y | f x >= f y = x
-            | otherwise  = y
+maxBy :: (a -> a -> Ordering) -> a -> a -> a
+maxBy cmp x y | cmp x y == GT = x
+              | otherwise     = y
+
+
+-- | Returns the function-maximizing element.
+cmpBy :: Ord b => (a -> b) -> a -> a -> Ordering
+cmpBy f x y = compare (f x) (f y)
 
 
 -- | The current configurations situation term.
@@ -256,7 +259,7 @@ isFinal Nonfinal = False
 -- The lookahead argument specifies the search depth up to which value is
 -- computed.
 do1 :: BAT a => Depth -> Prog a -> Sit a -> Maybe (Sit a, Reward, Depth)
-do1 l p s = do2 l (pickbest l (tree p s 0.0 0))
+do1 l p s = do2 l (pickbest l (tree p s 0 0))
 
 
 -- | Searches for the best final reachable situation in the tree.
@@ -271,7 +274,7 @@ do2 l t | final t   = Just (sit t, rew t, depth t)
 
 
 do3 :: BAT a => Depth -> Prog a -> Sit a -> [(Sit a, Reward, Depth)]
-do3 l p s = do4 l (pickbest l (tree p s 0.0 0))
+do3 l p s = do4 l (pickbest l (tree p s 0 0))
 
 
 do4 :: Depth -> SitTree a -> [(Sit a, Reward, Depth)]
