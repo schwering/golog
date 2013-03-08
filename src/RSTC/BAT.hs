@@ -17,6 +17,7 @@ data Prim a = Wait (Time a)
             | Accel Car (Accel a)
             | LaneChange Car Lane
             | forall b. O.Obs a b => Init b
+            | forall b. O.Obs a b => Prematch b
             | forall b. O.Obs a b => Match b
             | Abort
             | NoOp
@@ -51,9 +52,10 @@ data TTCCat = ConvergingFast
 
 instance (RealFloat a, Show a) => BAT (Prim a) where
    poss (Wait t)             _ = t >= 0
-   poss a @ (Accel b q)      s = noDupe a s
+   poss a @ (Accel _ _)      s = noDupe a s
    poss a @ (LaneChange b l) s = l /= lane b s && noDupe a s
    poss (Init _)             _ = True
+   poss (Prematch _)         _ = True
    poss (Match e)            s = match e s
    poss Abort                _ = False
    poss NoOp                 _ = True
@@ -64,6 +66,7 @@ instance (RealFloat a, Show a) => BAT (Prim a) where
    reward (Accel _ _)      _                = -0.01
    reward (LaneChange _ _) _                = -0.01
    reward (Init _)         _                = 0
+   reward (Prematch _)     _                = 0
    reward (Match _)        _                = 1
    reward Abort            _                = 0
    reward NoOp             _                = 0
@@ -75,6 +78,35 @@ instance (RealFloat a, Show a) => BAT (Prim a) where
 sitlen :: Sit a -> Int
 sitlen (Do _ s) = 1 + (sitlen s)
 sitlen S0       = 0
+
+
+quality :: (RealFloat a, O.Obs a b) => b -> Sit (Prim a) -> a
+quality e s = let ntgs  = [(ntg s b c, O.ntg e b c) | b <- cars, c <- cars, b /= c]
+                  --ttcs  = [(ttc s b c, O.ttc e b c) | b <- cars, c <- cars, b < c]
+                  lanes = [(lane b s, O.lane e b) | b <- cars]
+            in sum (map (\(ntg1, ntg2) -> abs (ntg1 - ntg2)) ntgs) +
+               --sum (map (\(ttc1, ttc2) -> if True then abs (ttc1 - ttc2) else 0) ttcs) +
+               sum (map (\(l1, l2) -> if l1 == l2 then 0 else 1) lanes)
+-- isNaN t || abs (1 - rv) <= 0.03
+
+
+pickGen :: Ord b => ((Sit a, Reward, Depth, Finality) -> b) ->
+                    ((Sit a, Reward, Depth, Finality) -> Bool) ->
+                    Depth -> SitTree a -> SitTree a
+pickGen val cut l = force (\t -> val (best def max' cut l t))
+   where def      = (S0, 0, 0, Nonfinal)
+         max' x y = if val x >= val y then x else y
+
+
+pickByQuality :: RealFloat a => Depth -> SitTree (Prim a) -> SitTree (Prim a)
+pickByQuality l = pickGen val cut l
+   where val (s, r, d, f) = let fi = if isFinal f then 1 else 0 :: Int
+                                q  = case s of Do (Prematch e) s' -> - (quality e s')
+                                               _                  -> -1000
+                            in (fi, q, r, d)
+         cut (s, _, _, f) = isFinal f || case s of Do (Prematch _) _ -> True
+                                                   _                 -> False
+
 
 
 match :: (RealFloat a, O.Obs a b, Show a) => b -> Sit (Prim a) -> Bool
@@ -226,8 +258,7 @@ memo' f = curry3 (memoOblivious stableNameFirstOfThree
 
 memo'' :: (Sit (Prim a) -> Car -> Car -> NTG a) ->
           (Sit (Prim a) -> Car -> Car -> NTG a)
-memo'' f = curry3 (memo stableNameAndHashFirstOfThree
-                        (uncurry3 f))
+memo'' f = curry3 (memo stableNameAndHashFirstOfThree (uncurry3 f))
 
 
 nan :: RealFloat a => a

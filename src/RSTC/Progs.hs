@@ -59,6 +59,7 @@ obsprog []     = Nil
 obsprog (e:es) = seq' (initAct:acts)
    where initAct = maybe Nil (act . Init) e
          acts = map (\e' -> atomic ((actf (\s -> Wait (Obs.time e' - start s)))
+                              `Seq` (act (Prematch e'))
                               `Seq` (act (Match e'))))
                     (catMaybes es)
          seq' []     = Nil

@@ -4,7 +4,6 @@ import qualified RSTC.Car as Car
 import Interpreter.Golog
 import Interpreter.Tree
 import Interpreter.TreeUtil
-import Util.NativePSO
 import qualified RSTC.BAT as BAT
 import qualified RSTC.Obs as Obs
 import RSTC.Progs
@@ -16,6 +15,7 @@ instance Show a => Show (BAT.Prim a) where
    show (BAT.Accel b q) = "Accel " ++ (show b) ++ " " ++ (show q)
    show (BAT.LaneChange b l) = "LaneChange " ++ (show b) ++ " " ++ (show l)
    show (BAT.Init e) = "Init " ++ (show (Obs.time e))
+   show (BAT.Prematch e) = "Prematch " ++ (show (Obs.time e))
    show (BAT.Match e) = "Match " ++ (show (Obs.time e))
    show BAT.Abort = "Abort"
    show BAT.NoOp = "NoOp"
@@ -105,7 +105,7 @@ instance BAT Prim where
 
 
 printFluents :: (RealFloat a, PrintfArg a) => Sit (BAT.Prim a) -> IO ()
-printFluents s = do printf "start = %.2f\n" (BAT.start s)
+printFluents s = do _ <- printf "start = %.2f\n" (BAT.start s)
                     mapM_ (\(b,c) -> printf "ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntg s b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
                     mapM_ (\(b,c) -> printf "ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttc s b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
                     --putStrLn ("start = " ++ show (BAT.start s))
@@ -128,24 +128,23 @@ main =
          p4 = (ppick e) `Seq` (ppick e)
          p5 = ppick (\x -> (e x) `Seq` (ppick e))
          p6 = ppick (\x -> (e x) `Seq` (ppick (\y -> e (x*y))))
-         p = Star(a)
+         --p = Star(a)
          t1 = tree p1 S0 0.0 0
          t2 = tree p2 S0 0.0 0
-         exec n t' = trans ((depth t') + n) t'
    in do
          putStrLn ((show . cutoff 2) t2)
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 3) (exec 0 t2))
+         putStrLn (maybe "nothing" (show . cutoff 3) (trans 0 t2))
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 3) (exec 1 t2))
+         putStrLn (maybe "nothing" (show . cutoff 3) (trans 1 t2))
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 3) (exec 2 t2))
+         putStrLn (maybe "nothing" (show . cutoff 3) (trans 2 t2))
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 3) (exec 3 t2))
+         putStrLn (maybe "nothing" (show . cutoff 3) (trans 3 t2))
          putStrLn "-------------------------------------------------------\n"
          putStrLn ((show . cutoff 10) t1)
          putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 10) (exec 100000 t1))
+         putStrLn (maybe "nothing" (show . cutoff 10) (trans 100000 t1))
          putStrLn "-------------------------------------------------------\n"
          mapM_ (\i -> putStrLn (show i ++ ": " ++ show (do1 i p2 S0))) [0..9]
          putStrLn "-------------------------------------------------------"
@@ -199,6 +198,7 @@ main =
 --         --putStrLn "-------"
 --         --putStrLn (show (toList (cutparents t)))
 
+{-
 mydo3 :: (Show a, BAT a) => Depth -> Prog a -> Sit a -> [(Sit a, Reward, Depth)]
 mydo3 l p s = mydo4 l (pickbest l (tree p s 0.0 0))
 
@@ -207,8 +207,11 @@ mydo4 :: (Show a) => Depth -> SitTree a -> [(Sit a, Reward, Depth)]
 mydo4 l t | final t   = [(sit t, rew t, depth t)]
           | otherwise = case trans l t of
                              Nothing -> []
-                             Just t  -> (sit t, rew t, depth t) : mydo4 l t
-   where bla x @ (Just t) | depth t >= 35 = Just (Car.debug' ((show (value l t)) ++ " " ++ (show (depth t))) t)
-                          | otherwise = x
+                             Just t'  -> (sit t', rew t', depth t') : mydo4 l t'
+{-
+   where bla x @ (Just t') | depth t' >= 35 = Just (Car.debug' ((show (value l t')) ++ " " ++ (show (depth t'))) t')
+                           | otherwise = x
          bla x @ Nothing = x
+-}
+-}
 

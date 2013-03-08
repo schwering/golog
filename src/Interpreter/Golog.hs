@@ -24,6 +24,7 @@
 module Interpreter.Golog (Sit(S0, Do), Reward, Depth, MaxiF, Finality(..),
                           Atom(..), PseudoAtom(..), Prog(..), SitTree,
                           BAT(..),
+                          force, best, isFinal,
                           tree, pickbest,
                           trans, do1, do2, do3,
                           sit, rew, depth, final, value) where
@@ -145,6 +146,7 @@ tree p s r d = let f = if final' p then Final else Nonfinal
          transAtom (PrimF b, p')             = transAtom (Prim (b s), p')
          transAtom (Test e, p')  | e s       = tree p' s r (d+1)
                                  | otherwise = Empty
+
 
 
 pickbest :: Depth -> SitTree a -> SitTree a
