@@ -87,7 +87,6 @@ quality e s = let ntgs  = [(ntg s b c, O.ntg e b c) | b <- cars, c <- cars, b /=
             in sum (map (\(ntg1, ntg2) -> abs (ntg1 - ntg2)) ntgs) +
                --sum (map (\(ttc1, ttc2) -> if True then abs (ttc1 - ttc2) else 0) ttcs) +
                sum (map (\(l1, l2) -> if l1 == l2 then 0 else 1) lanes)
--- isNaN t || abs (1 - rv) <= 0.03
 
 
 pickGen :: Ord b => ((Sit a, Reward, Depth, Finality) -> b) ->
@@ -106,7 +105,6 @@ pickByQuality l = pickGen val cut l
                             in (fi, q, r, d)
          cut (s, _, _, f) = isFinal f || case s of Do (Prematch _) _ -> True
                                                    _                 -> False
-
 
 
 match :: (RealFloat a, O.Obs a b, Show a) => b -> Sit (Prim a) -> Bool
