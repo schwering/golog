@@ -51,8 +51,8 @@ data TTCCat = ConvergingFast
 -- Precondition and reward.
 
 instance (RealFloat a, Show a) => BAT (Prim a) where
-   poss (Wait t)             _ = t >= 0
-   poss a @ (Accel _ _)      s = noDupe a s
+   poss (Wait t)             _ = not (isNaN t) && t >= 0
+   poss a @ (Accel _ q)      s = not (isNaN q) && noDupe a s
    poss a @ (LaneChange b l) s = l /= lane b s && noDupe a s
    poss (Init _)             _ = True
    poss (Prematch _)         _ = True

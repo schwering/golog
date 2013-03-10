@@ -34,12 +34,8 @@ picknum bounds val = pso 10 m n defaultParams bounds (Max f)
          n = 1
 
 
-pickaccel :: Ord v => (Double, Double) -> (Double -> v) -> Double
-pickaccel (lo, hi) val = undefined
-   where w  = (hi - lo) / 2
-         m  = (hi + lo) / 2
-         m1 = m - 0.1 * w
-         m2 = m + 0.1 * w
+pickaccel :: Ord v => (Car, Car) -> ((Car, Car, Double) -> v) -> (Car, Car, Double)
+pickaccel (b, c) val = undefined
 
 
 act :: a -> Prog a

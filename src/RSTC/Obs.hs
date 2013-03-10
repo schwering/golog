@@ -1,3 +1,5 @@
+-- | Observation interface.
+
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -12,6 +14,7 @@ import Foreign.C
 
 
 class (RealFloat a) => Obs a b | b -> a where
+   next :: b -> Maybe b
    time :: b -> Time a
    ntg  :: b -> Car -> Car -> NTG a
    ttc  :: b -> Car -> Car -> TTC a
@@ -22,6 +25,7 @@ type ObsId = Int
 
 
 instance Obs Double ObsId where
+   next e     = getObs (succ e)
    time e     = realToFrac (c_time (e2c e))
    ntg  e b c = realToFrac (c_ntg (e2c e) (c2c b) (c2c c))
    ttc  e b c = realToFrac (c_ttc (e2c e) (c2c b) (c2c c))
@@ -37,14 +41,13 @@ c2c :: Car -> CInt
 c2c = fromIntegral . fromEnum
 
 
-
 observations :: [Maybe ObsId]
-observations = map next_obs_io [0..]
+observations = map getObs [0..]
 
 
-next_obs_io :: ObsId -> Maybe ObsId
-next_obs_io i = case c_next_obs (fromIntegral i) of 1 -> Just i
-                                                    _ -> Nothing
+getObs :: ObsId -> Maybe ObsId
+getObs e = case c_next_obs (e2c e) of 1 -> Just e
+                                      _ -> Nothing
 
 
 foreign import ccall unsafe "obs_next"
