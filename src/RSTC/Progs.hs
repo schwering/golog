@@ -134,3 +134,10 @@ overtake b c =
       act (End b "overtake") 
    )
 
+
+accelf :: Car -> Car -> Sit (Prim Double) -> Prim Double
+accelf b c s = undefined
+   where s' = Do (Wait ((time e') - (start s)) s
+         e  = lastObs s
+         e' = next e
+
