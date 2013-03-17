@@ -80,6 +80,12 @@ sitlen (Do _ s) = 1 + (sitlen s)
 sitlen S0       = 0
 
 
+lastObs :: Sit (Prim a) -> Maybe (Prim a)
+lastObs (Do (Match e) s) = Just e
+lastObs (Do _         s) = lastObs s
+lastObs S0               = Nothing
+
+
 quality :: (RealFloat a, O.Obs a b) => b -> Sit (Prim a) -> a
 quality e s = let ntgs  = [(ntg s b c, O.ntg e b c) | b <- cars, c <- cars, b /= c]
                   --ttcs  = [(ttc s b c, O.ttc e b c) | b <- cars, c <- cars, b < c]
