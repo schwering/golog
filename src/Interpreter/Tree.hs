@@ -2,23 +2,30 @@
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
-module Interpreter.Tree (Tree(..), Depth, OptiF,
+module Interpreter.Tree (Tree(..), Val, Depth, OptiF,
                          Functor(..), Foldable(..),
                          branch, force, lmap, best) where
 
 import Prelude hiding (foldl, foldr, max)
 import Data.Foldable
+import Data.Typeable
 
 type Depth = Int
 type OptiF u v = (u -> v) -> u
+
+class (Ord a, Typeable a) => Val a
+
+instance (Ord a, Typeable a) => Val a
 
 data Tree a where
    Empty  :: Tree a
    Leaf   :: a -> Tree a
    Parent :: a -> Tree a -> Tree a
    Branch :: Tree a -> Tree a -> Tree a
-   Sprout :: (forall v. Ord v => OptiF u v) -> (u -> Tree a) -> Tree a
+   Sprout :: (forall v. Val v => OptiF u v) -> (u -> Tree a) -> Tree a
 
 
 instance Functor Tree where
@@ -49,7 +56,7 @@ branch t     Empty = t
 branch t1    t2    = Branch t1 t2
 
 
-force :: Ord v => (Tree a -> v) -> Tree a -> Tree a
+force :: Val v => (Tree a -> v) -> Tree a -> Tree a
 force _   t @ Empty       = t
 force _   t @ (Leaf _)    = t
 force val (Parent x t)    = Parent x (force val t)

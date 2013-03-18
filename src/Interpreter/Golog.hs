@@ -21,7 +21,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE Rank2Types #-}
 
-module Interpreter.Golog (Sit(S0, Do), Reward, Depth, MaxiF, Finality(..),
+module Interpreter.Golog (Sit(S0, Do), Reward, Depth, Val, MaxiF, Finality(..),
                           Atom(..), PseudoAtom(..), Prog(..), SitTree,
                           BAT(..),
                           force, best, isFinal,
@@ -31,8 +31,9 @@ module Interpreter.Golog (Sit(S0, Do), Reward, Depth, MaxiF, Finality(..),
 
 --module Interpreter.Golog where
 
-import Prelude hiding (max)
 import Interpreter.Tree
+import Prelude hiding (max)
+import Data.Typeable
 
 data Sit a = S0
            | Do a (Sit a)
@@ -53,7 +54,7 @@ data Prog a where
    Nondet     :: Prog a -> Prog a -> Prog a
    Conc       :: Prog a -> Prog a -> Prog a
    Star       :: Prog a -> Prog a
-   Pick       :: (forall v. Ord v => MaxiF u v) -> u -> (u -> Prog a) -> Prog a
+   Pick       :: (forall v. Val v => MaxiF u v) -> u -> (u -> Prog a) -> Prog a
    PseudoAtom :: PseudoAtom a -> Prog a
    Nil        :: Prog a
 
