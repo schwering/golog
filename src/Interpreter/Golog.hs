@@ -150,7 +150,7 @@ tree p s r d = let f = if final' p then Final else Nonfinal
 
 
 pickbest :: Depth -> SitTree a -> SitTree a
-pickbest l = force (value l)
+pickbest l = force (const (value l))
 
 
 -- | Computes the maximum achievable reward and depth in a tree up to a certain
@@ -190,11 +190,11 @@ trans l (Parent (_, v, d, f) t) | not (isFinal f)    = trans' t
          trans' t' @ (Parent _ _) = Just t'
          trans' (Branch t1 t2)    = trans' (maxBy (cmpBy (value l)) t1 t2)
          trans' (Leaf _)          = error "Golog.trans': Leaf"
-         trans' (Sprout _ _)      = error "Golog.trans': Sprout"
-trans _ Empty         = error "Golog.trans: Empty"
-trans _ (Leaf _)      = error "Golog.trans: Leaf"
-trans _ (Branch _ _)  = error "Golog.trans: Branch"
-trans _ (Sprout _ _)  = error "Golog.trans: Sprout"
+         trans' (Sprout _ _ _)    = error "Golog.trans': Sprout"
+trans _ Empty           = error "Golog.trans: Empty"
+trans _ (Leaf _)        = error "Golog.trans: Leaf"
+trans _ (Branch _ _)    = error "Golog.trans: Branch"
+trans _ (Sprout _ _ _)  = error "Golog.trans: Sprout"
 
 
 -- | Returns the function-maximizing element.
@@ -214,7 +214,7 @@ sit (Parent (s, _, _, _) _) = s
 sit Empty                   = error "Golog.sit: Empty"
 sit (Leaf _)                = error "Golog.sit: Leaf"
 sit (Branch _ _)            = error "Golog.sit: Branch"
-sit (Sprout _ _)            = error "Golog.sit: Sprout"
+sit (Sprout _ _ _)          = error "Golog.sit: Sprout"
 
 
 -- | The current configurations reward.
@@ -223,7 +223,7 @@ rew (Parent (_, r, _, _) _) = r
 rew Empty                   = error "Golog.rew: Empty"
 rew (Leaf _)                = error "Golog.rew: Leaf"
 rew (Branch _ _)            = error "Golog.rew: Branch"
-rew (Sprout _ _)            = error "Golog.rew: Sprout"
+rew (Sprout _ _ _)          = error "Golog.rew: Sprout"
 
 
 -- | The current configurations depth.
@@ -232,7 +232,7 @@ depth (Parent (_, _, d, _) _) = d
 depth Empty                   = error "Golog.depth: Empty"
 depth (Leaf _)                = error "Golog.depth: Leaf"
 depth (Branch _ _)            = error "Golog.depth: Branch"
-depth (Sprout _ _)            = error "Golog.depth: Sprout"
+depth (Sprout _ _ _)          = error "Golog.depth: Sprout"
 
 
 -- | Indicates whether the execution /might/ stop in this configuration.
@@ -245,7 +245,7 @@ final (Parent (_, _, _, f) _) = isFinal f
 final Empty                   = error "Golog.final: Empty"
 final (Leaf _)                = error "Golog.final: Leaf"
 final (Branch _ _)            = error "Golog.final: Branch"
-final (Sprout _ _)            = error "Golog.final: Sprout"
+final (Sprout _ _ _)          = error "Golog.final: Sprout"
 
 
 -- | True iff Final.
