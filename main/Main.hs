@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 

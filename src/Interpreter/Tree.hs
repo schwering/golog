@@ -1,7 +1,6 @@
 -- | Tree container.
 
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE Rank2Types #-}
 
 module Interpreter.Tree (Tree(..), Depth, ValF, OptiF,
                          Functor(..), Foldable(..),
@@ -45,6 +44,7 @@ instance Foldable (Tree a) where
 
 
 branch :: Tree a b -> Tree a b -> Tree a b
+branch Empty Empty = Empty
 branch Empty t     = t
 branch t     Empty = t
 branch t1    t2    = Branch t1 t2
@@ -54,14 +54,14 @@ force :: Tree a a -> Tree a a
 force t @ Empty           = t
 force t @ (Leaf _)        = t
 force (Parent x t)        = Parent x (force t)
-force (Branch t1 t2)      = Branch (force t1) (force t2)
+force (Branch t1 t2)      = branch (force t1) (force t2)
 force (Sprout val opti t) = force (t (opti (val . force . t)))
 
 
 lmap :: (b -> Tree a c) -> Tree a b -> Tree a c
 lmap _ Empty               = Empty
 lmap f (Leaf x)            = f x
-lmap f (Branch t1 t2)      = Branch (lmap f t1) (lmap f t2)
+lmap f (Branch t1 t2)      = branch (lmap f t1) (lmap f t2)
 lmap f (Sprout val opti t) = Sprout val opti (\x -> lmap f (t x))
 lmap _ (Parent _ _)        = error "Tree.lmap: Parent"
 
