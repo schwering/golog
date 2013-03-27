@@ -53,7 +53,7 @@ data TTCCat = ConvergingFast
 instance (RealFloat a, Show a) => BAT (Prim a) where
    poss (Wait t)             _ = not (isNaN t) && t >= 0
    poss a @ (Accel _ q)      s = not (isNaN q) && noDupe a s
-   poss a @ (LaneChange b l) s = l /= lane b s && noDupe a s
+   poss a @ (LaneChange b l) s = l /= lane s b && noDupe a s
    poss (Init _)             _ = True
    poss (Prematch _)         _ = True
    poss (Match e)            s = match e s
@@ -75,36 +75,57 @@ instance (RealFloat a, Show a) => BAT (Prim a) where
    reward (End _ _)        _                = 0
 
 
+lookahead :: Depth
+lookahead = 3
+
+
 sitlen :: Sit a -> Int
 sitlen (Do _ s) = 1 + (sitlen s)
 sitlen S0       = 0
 
 
+{-
 quality :: (RealFloat a, O.Obs a b) => b -> Sit (Prim a) -> a
 quality e s = let ntgs  = [(ntg s b c, O.ntg e b c) | b <- cars, c <- cars, b /= c]
                   --ttcs  = [(ttc s b c, O.ttc e b c) | b <- cars, c <- cars, b < c]
-                  lanes = [(lane b s, O.lane e b) | b <- cars]
+                  lanes = [(lane s b, O.lane e b) | b <- cars]
             in sum (map (\(ntg1, ntg2) -> abs (ntg1 - ntg2)) ntgs) +
                --sum (map (\(ttc1, ttc2) -> if True then abs (ttc1 - ttc2) else 0) ttcs) +
                sum (map (\(l1, l2) -> if l1 == l2 then 0 else 1) lanes)
+-}
 
 
-pickGen :: Ord b => ((Sit a, Reward, Depth, Finality) -> b) ->
-                    ((Sit a, Reward, Depth, Finality) -> Bool) ->
-                    Depth -> SitTree a -> SitTree a
-pickGen val cut l = force (\t -> val (best def max' cut l t))
-   where def      = (S0, 0, 0, Nonfinal)
-         max' x y = if val x >= val y then x else y
+quality' :: (RealFloat a, O.Obs a b) => Car -> Car -> b -> Sit (Prim a) -> Maybe a
+quality' b c e s = if b /= c && lane s b == O.lane e b && lane s c == O.lane e c
+                   then Just (ntg s b c - O.ntg e b c)
+                   else Nothing
 
 
-pickByQuality :: RealFloat a => Depth -> SitTree (Prim a) -> SitTree (Prim a)
-pickByQuality l = pickGen val cut l
-   where val (s, r, d, f) = let fi = if isFinal f then 1 else 0 :: Int
-                                q  = case s of Do (Prematch e) s' -> - (quality e s')
-                                               _                  -> -1000
-                            in (fi, q, r, d)
-         cut (s, _, _, f) = isFinal f || case s of Do (Prematch _) _ -> True
-                                                   _                 -> False
+valueByQuality :: RealFloat a => Car -> Car -> Depth -> SitTree (Prim a) -> Maybe a
+valueByQuality b c l t = val (best def max' cut l t)
+   where val (Do (Prematch e) s, _, _, _)     = quality' b c e s
+         val (_,                 _, _, _)     = Nothing
+         cut (_,                 _, _, Final) = True
+         cut (Do (Prematch _) _, _, _, _)     = True
+         --cut (_,                 _, d, _)     = d - depth t < 
+         cut (_,                 _, _, _)     = False
+         def      = (S0, 0, 0, Nonfinal)
+         max' x y = case (val x, val y) of
+                         (Just x', Just y') -> if abs x' <= abs y' then x else y
+                         (Just _, Nothing)  -> x
+                         _                  -> y
+
+
+interpolate :: (Fractional a, Fractional b, Real b, Show a, Show b) =>
+             (a, a) -> b -> (a -> b) -> Maybe a
+interpolate (lo, hi) y f = case compare (f lo) (f hi) of
+   GT -> interpolate (lo, hi) (-y) (negate . f)
+   EQ -> if f lo == y then Just lo else Nothing
+   _  -> debug' ("f " ++ show lo ++ " = " ++ show (f lo) ++ " -> y* = " ++ show y ++ " -> " ++ "f " ++ show hi ++ " = " ++ show (f hi)) $ if f lo <= y && y <= f hi
+         then let r  = (y - (f lo)) / ((f hi) - (f lo))
+              in Just (lo + (realToFrac r) * (hi - lo))
+         else Nothing
+
 
 
 match :: (RealFloat a, O.Obs a b, Show a) => b -> Sit (Prim a) -> Bool
@@ -114,12 +135,12 @@ match e s = let ntg_ttc = [(b, c, ntg s b c, O.ntg e b c,
                            | (b, c, ntg1, ntg2, _, _) <- ntg_ttc, b /= c]
                 ttcs  = [(ttc1, ttc2, relVeloc' ntg1 ttc1, relVeloc' ntg2 ttc2)
                            | (b, c, ntg1, ntg2, ttc1, ttc2) <- ntg_ttc, b < c]
-                lanes = [(lane b s, O.lane e b) | b <- cars]
+                lanes = [(lane s b, O.lane e b) | b <- cars]
             in all (\(l1, l2) -> l1 == l2) lanes &&
-               all (\(ntg1, ntg2) -> haveCommon (debug' ("NTG1 " ++ (show ntg1)) $ ntgCats ntg1)
-                                                (debug' ("NTG2 " ++ (show ntg2)) $ ntgCats ntg2)) ntgs &&
-               all (\(ttc1, rv1, ttc2, rv2) -> haveCommon (debug' ("TTC1 " ++ (show ttc1)) $ ttcCats ttc1 rv1)
-                                                          (debug' ("TTC2 " ++ (show ttc2)) $ ttcCats ttc2 rv2)) ttcs
+               all (\(ntg1, ntg2) -> haveCommon (ntgCats ntg1)
+                                                (ntgCats ntg2)) ntgs &&
+               all (\(ttc1, rv1, ttc2, rv2) -> haveCommon (ttcCats ttc1 rv1)
+                                                          (ttcCats ttc2 rv2)) ttcs
    where haveCommon (x:xs) (y:ys) | x < y     = haveCommon xs (y:ys)
                                   | y < x     = haveCommon (x:xs) ys
                                   | otherwise = True
@@ -185,12 +206,20 @@ start (Do (Wait t) s) = t + (start s)
 start (Do _ s)        = start s
 start S0              = 0
 
+
 -- | SSA for lane.
-lane :: RealFloat a => Car -> Sit (Prim a) -> Lane
-lane b (Do (LaneChange c l) _) | b == c = l
-lane b (Do (Init e) _)                  = O.lane e b
-lane b (Do _ s)                         = lane b s
-lane _ S0                               = RightLane
+-- This is the memoizing function.
+lane :: RealFloat a => Sit (Prim a) -> Car -> Lane
+lane = memo''' lane'
+
+
+-- | SSA for lane.
+-- This is the non-memoized function doing the actual work.
+lane' :: RealFloat a => Sit (Prim a) -> Car -> Lane
+lane' (Do (LaneChange c l) _) b | b == c = l
+lane' (Do (Init e) _)         b          = O.lane e b
+lane' (Do _ s)                b          = lane s b
+lane' S0                      _          = RightLane
 
 
 -- | SSA of NTG. For Accel actions, transitivity is tried.
@@ -245,8 +274,8 @@ ttc' (Do _        s)    b c          = ttc s b c
 ttc' S0                 _ _          = nan
 
 
-memo' :: (Sit (Prim a) -> Car -> Car -> NTG a) ->
-         (Sit (Prim a) -> Car -> Car -> NTG a)
+memo' :: (Sit (Prim a) -> Car -> Car -> a) ->
+         (Sit (Prim a) -> Car -> Car -> a)
 memo' f = curry3 (memoOblivious stableNameFirstOfThree
                                 hashStableNameFirstOfThree
                                 (0,    minBound::Car, minBound::Car)
@@ -254,9 +283,14 @@ memo' f = curry3 (memoOblivious stableNameFirstOfThree
                                 (uncurry3 f))
 
 
-memo'' :: (Sit (Prim a) -> Car -> Car -> NTG a) ->
-          (Sit (Prim a) -> Car -> Car -> NTG a)
+memo'' :: (Sit (Prim a) -> Car -> Car -> a) ->
+          (Sit (Prim a) -> Car -> Car -> a)
 memo'' f = curry3 (memo stableNameAndHashFirstOfThree (uncurry3 f))
+
+
+memo''' :: (Sit (Prim a) -> Car -> Lane) ->
+           (Sit (Prim a) -> Car -> Lane)
+memo''' f = curry (memo stableNameAndHashFirstOfTwo (uncurry f))
 
 
 nan :: RealFloat a => a

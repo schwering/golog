@@ -1,3 +1,7 @@
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 module Main (main) where
 
 import qualified RSTC.Car as Car
@@ -7,8 +11,18 @@ import Interpreter.TreeUtil
 import qualified RSTC.BAT as BAT
 import qualified RSTC.Obs as Obs
 import RSTC.Progs
+import RSTC.Theorems
 
+import Data.Maybe
+import Control.Applicative
 import Text.Printf
+
+class Show a => ShowPart a where
+   showPart :: Int -> a -> String
+   partSize :: a -> Int
+
+   showPart _ = show
+   partSize _ = 0
 
 instance Show a => Show (BAT.Prim a) where
    show (BAT.Wait t) = "Wait " ++ (show t)
@@ -40,25 +54,39 @@ instance Show a => Show (Prog a) where
    show (Nondet p1 p2) = "Nondet(" ++ (show p1) ++ " " ++ (show p2) ++ ")"
    show (Conc p1 p2) = "Conc(" ++ (show p1) ++ " " ++ (show p2) ++ ")"
    show (Star p) = "Star(" ++ (show p) ++ ")"
-   show (Pick _ x0 p) = "Pick(MaxiF x0 " ++ (show (p x0)) ++ ")"
+   show (Pick _ _ _) = "Pick(...)"
    show (PseudoAtom p) = "PseudoAtom(" ++ (show p) ++ ")"
    show Nil = "nil"
 
-instance Show a => Show (Tree a) where
-   show = showTree 0
-
 instance Show a => Show (Sit a) where
-   show s = show (sit2list s)
-   --show S0 = "S0"
-   --show (Do a s) = "Do(" ++ (show a) ++ ", " ++ (show s) ++ ")"
+   show = show . sit2list
 
-showTree :: Show a => Int -> Tree a -> String
-showTree n _ | n > 5 = (replicate (2*n) ' ') ++ "...\n"
-showTree n Empty = (replicate (2*n) ' ') ++ "Empty\n"
-showTree n (Leaf x) = (replicate (2*n) ' ') ++ "Leaf " ++ (show x) ++ "\n"
-showTree n (Parent x t) = (replicate (2*n) ' ') ++ "Parent " ++ (show x) ++ "\n" ++ (showTree (n+1) t)
-showTree n (Branch t1 t2) = (replicate (2*n) ' ') ++ "Branch\n" ++ (showTree (n+1) t1) ++ (showTree (n+1) t2)
-showTree n (Sprout _ _) = (replicate (2*n) ' ') ++ "Sprout g, <unknown tree>\n"
+instance ShowPart b => Show (Tree a b) where
+   show = showTree 0 0
+
+instance ShowPart Double where
+instance ShowPart Prim where
+instance ShowPart a => ShowPart (BAT.Prim a) where
+instance ShowPart Finality where
+instance ShowPart a => ShowPart (Atom a) where
+instance ShowPart a => ShowPart (PseudoAtom a) where
+instance ShowPart a => ShowPart (Prog a) where
+
+instance Show a => ShowPart (Sit a) where
+   showPart n s = show (drop n (sit2list s))
+
+instance ShowPart a => ShowPart (Conf a) where
+   showPart n (s,r,d,f) = "("++ showPart n s ++", "++ show r ++", "++ show d ++", "++ show f ++")"
+   partSize (s,_,_,_) = length (sit2list s)
+
+
+showTree :: ShowPart b => Int -> Int -> Tree a b -> String
+showTree n _ _ | n > 100 = (replicate (2*n) ' ') ++ "...\n"
+showTree n _ Empty = (replicate (2*n) ' ') ++ "Empty\n"
+showTree n m (Leaf x) = (replicate (2*n) ' ') ++ "Leaf " ++ showPart m x ++ "\n"
+showTree n m (Parent x t) = (replicate (2*n) ' ') ++ "Parent " ++ showPart m x ++ "\n" ++ (showTree (n+1) (partSize x) t)
+showTree n m (Branch t1 t2) = (replicate (2*n) ' ') ++ "Branch\n" ++ (showTree (n+1) m t1) ++ (showTree (n+1) m t2)
+showTree n _ (Sprout _ _ _) = (replicate (2*n) ' ') ++ "Sprout g, <unknown tree>\n"
 
 
 sit2list :: Sit a -> [a]
@@ -113,6 +141,32 @@ printFluents s = do _ <- printf "start = %.2f\n" (BAT.start s)
                     --mapM_ (\(b,c) -> putStrLn ("ttc " ++ show b ++ " " ++ show c ++ " = " ++ show (BAT.ttc s b c))) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
 
 
+--lastObs :: Sit (BAT.Prim a) -> (forall b. Obs.Obs a b => Maybe b)
+--lastObs (Do (BAT.Match e) s) = Just e
+--lastObs S0                   = Nothing
+
+
+--nextObs :: Obs.Obs a b => Sit (BAT.Prim a) -> Maybe b
+--nextObs s = case lastObs s of Just e -> Obs.next e
+--                              _      -> Nothing
+--nextObs = fmap Obs.next . lastObs
+
+--nextObsNtg :: Sit (BAT.Prim a) -> Car.Car -> Car.Car -> a
+--nextObsNtg (Do (BAT.Match e) s) = Obs.ntg (fromJust (Obs.next e))
+
+
+nextObsNtg :: Sit (BAT.Prim a) -> Car.Car -> Car.Car -> Maybe (NTG a)
+nextObsNtg (Do (BAT.Match e) s) b c = case Obs.next e of Just e' -> Just (Obs.ntg e' b c)
+                                                         _       -> Nothing
+nextObsNtg S0                   _ _ = Nothing
+
+
+nextObsTtc :: Sit (BAT.Prim a) -> Car.Car -> Car.Car -> Maybe (NTG a)
+nextObsTtc (Do (BAT.Match e) s) b c = case Obs.next e of Just e' -> Just (Obs.ttc e' b c)
+                                                         _       -> Nothing
+nextObsTtc S0                   _ _ = Nothing
+
+
 main :: IO ()
 main =
    let   a = PseudoAtom (Atom (Prim A))
@@ -123,11 +177,11 @@ main =
          p1 = ((a `Nondet` b `Nondet` c) `Seq` ((a `Seq` a `Seq` c) `Conc` (b `Seq` b `Seq` c))) `Nondet` Star(a `Seq` c `Seq` c `Seq` c `Seq` c)
          p2 = ((a `Nondet` b) `Seq` ((a `Seq` a `Seq` c) `Conc` (b `Seq` b `Seq` c)))
          --ppick p = Pick (\f -> pso 10 25 5 defaultParams (-20, 20) (Max (fst.f))) 10 p
-         ppick p = Pick (\f -> picknum (-20, 20) f) 10 p
-         p3 = ppick e
-         p4 = (ppick e) `Seq` (ppick e)
-         p5 = ppick (\x -> (e x) `Seq` (ppick e))
-         p6 = ppick (\x -> (e x) `Seq` (ppick (\y -> e (x*y))))
+         ppick p l = Pick (value l) (\f -> picknum (-20, 20) f) p
+         p3 i = ppick e i
+         p4 i = (ppick e i) `Seq` (ppick e i)
+         p5 i = ppick (\x -> (e x) `Seq` (ppick e i)) i
+         p6 i = ppick (\x -> (e x) `Seq` (ppick (\y -> e (x*y)) i)) i
          --p = Star(a)
          t1 = tree p1 S0 0.0 0
          t2 = tree p2 S0 0.0 0
@@ -148,13 +202,13 @@ main =
          putStrLn "-------------------------------------------------------\n"
          mapM_ (\i -> putStrLn (show i ++ ": " ++ show (do1 i p2 S0))) [0..9]
          putStrLn "-------------------------------------------------------"
-         mapM_ (\i -> putStrLn ("Pick one: " ++ show i ++ ": " ++ show (do1 i p3 S0))) [0..5]
+         mapM_ (\i -> putStrLn ("Pick one: " ++ show i ++ ": " ++ show (do1 i (p3 i) S0))) [0..5]
          putStrLn "-------------------------------------------------------"
-         mapM_ (\i -> putStrLn ("Pick seq: " ++ show i ++ ": " ++ show (do1 i p4 S0))) [0..5]
+         mapM_ (\i -> putStrLn ("Pick seq: " ++ show i ++ ": " ++ show (do1 i (p4 i) S0))) [0..5]
          putStrLn "-------------------------------------------------------"
-         mapM_ (\i -> putStrLn ("Pick nested: " ++ show i ++ ": " ++ show (do1 i p5 S0))) [0..5]
+         mapM_ (\i -> putStrLn ("Pick nested: " ++ show i ++ ": " ++ show (do1 i (p5 i) S0))) [0..5]
          putStrLn "-------------------------------------------------------"
-         mapM_ (\i -> putStrLn ("Pick nested 2: " ++ show i ++ ": " ++ show (do1 i p6 S0))) [0..5]
+         mapM_ (\i -> putStrLn ("Pick nested 2: " ++ show i ++ ": " ++ show (do1 i (p6 i) S0))) [0..5]
          putStrLn "-------------------------------------------------------"
 {-
 -}
@@ -162,20 +216,22 @@ main =
          --putStrLn "-------------------------------------------------------"
          --mapM_ (\i -> putStrLn ((show . cutoff i) (tree (obsprog Obs.observations) S0 0.0 0))) [0..30]
          --putStrLn "-------------------------------------------------------\n"
-{-
+-- {-
          let obs      = take 100 Obs.observations
              obsProg  = obsprog obs
              candProg = overtake Car.H Car.D
              prog     = Conc obsProg candProg
              confs    = do3 4 prog S0
+         putStrLn (show (force (tree prog S0 0 0)))
          --putStrLn (show (pickbest 4 (tree prog S0 0.0 0)))
-         mapM_ (\(s,v,d) -> do putStrLn (show s)
-                               putStrLn (show (v, d))
-                               printFluents s
-                               putStrLn ""
-               ) confs
+         --mapM_ (\(s,v,d,t) -> do putStrLn (show s)
+         --                        --putStrLn (show (v, d))
+         --                        --printFluents s
+         --                        putStrLn (show t)
+         --                        putStrLn ""
+         --      ) [head confs]
          putStrLn "-------------------------------------------------------"
--}
+-- -}
 {-
          mapM_ (putStrLn . show) (map (maybe Nothing $ (\x -> Just
                ( x

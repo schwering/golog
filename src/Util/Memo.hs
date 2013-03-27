@@ -8,6 +8,7 @@
 
 module Util.Memo (memo, memoIO,
                   memoOblivious, memoObliviousIO,
+                  stableNameAndHashFirstOfTwo,
                   stableNameFirstOfThree,
                   hashStableNameFirstOfThree,
                   stableNameAndHashFirstOfThree,
@@ -103,6 +104,12 @@ memoObliviousIO k h lo hi f =
 memoOblivious :: (Eq k, ModIx h) => (a -> IO k) -> (k -> h) -> h -> h -> (a -> b) -> (a -> b)
 memoOblivious k h lo hi f = let f' = unsafePerformIO (memoObliviousIO k h lo hi f)
                             in \x -> unsafePerformIO (f' x)
+
+
+stableNameAndHashFirstOfTwo :: (a, b) -> IO (SN a, b)
+stableNameAndHashFirstOfTwo (x, y) = do x' <- makeStableName x
+                                        let h = hashStableName x'
+                                        return (SN x' h, y)
 
 
 stableNameAndHashFirstOfThree :: (a, b, c) -> IO (SN a, b, c)

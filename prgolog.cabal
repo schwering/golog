@@ -26,13 +26,15 @@ Library
     C-Sources:       src/RSTC/obs.c
                      src/Util/native_pso.c
     Build-Depends:   array, base, containers, random
-    GHC-Options:     -Wall
+    GHC-Options:     -Wall -rtsopts
+    GHC-Prof-Options:-prof -auto-all
 
 Executable Main
     Hs-Source-Dirs: main
     Main-Is:         Main.hs
     Build-Depends:   base, prgolog
-    GHC-Options:     -Wall
+    GHC-Options:     -Wall -rtsopts
+    GHC-Prof-Options:-prof -auto-all
 
 Executable Test
     Hs-Source-Dirs:  test

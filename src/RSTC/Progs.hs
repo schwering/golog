@@ -14,7 +14,6 @@ import Util.NativePSO
 
 import Data.Maybe
 import System.IO.Unsafe
-import Unsafe.Coerce
 
 interpol :: (Fractional a, Ord a) => (a -> a) -> a -> a -> a -> Maybe a
 interpol f lo hi goal
@@ -24,18 +23,13 @@ interpol f lo hi goal
    | otherwise                     = Nothing
 
 
---picknum :: (Double, Double) -> (Double -> (Reward, Depth)) -> Double
---picknum bounds val = pso 10 m n defaultParams bounds (Max (fst . val))
---XXX TODO val has now type (Double -> v) for some Ord v
-picknum :: Ord v => (Double, Double) -> (Double -> v) -> Double
-picknum bounds val = pso 10 m n defaultParams bounds (Max f)
-   where f = \x -> fst (unsafeCoerce (val x))
-         m = 10
+picknum :: (Double, Double) -> (Double -> (Reward, Depth)) -> Double
+picknum bounds val = pso 10 m n defaultParams bounds (Max (fst . val))
+--picknum :: Ord v => (Double, Double) -> (Double -> v) -> Double
+--picknum bounds val = pso 10 m n defaultParams bounds (Max f)
+   where m = 10
          n = 1
-
-
-pickaccel :: Ord v => (Car, Car) -> ((Car, Car, Double) -> v) -> (Car, Car, Double)
-pickaccel (b, c) val = undefined
+--         f = \x -> fst (unsafeCoerce (val x))
 
 
 act :: a -> Prog a
@@ -74,7 +68,7 @@ follow :: Car -> Car -> Prog (Prim Double)
 follow b c =
    atomic (
       act (Start b "follow") `Seq`
-      test (\s -> lane b s == lane c s) `Seq`
+      test (\s -> lane s b == lane s c) `Seq`
       test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
       test (\s -> (CloseBehind `elem` (ntgCats (BAT.ntg s b c)))) `Seq`
       actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b))
@@ -87,7 +81,7 @@ tailgate :: Car -> Car -> Prog (Prim Double)
 tailgate b c =
    atomic (
       act (Start b "tailgate") `Seq`
-      test (\s -> lane b s == lane c s) `Seq`
+      test (\s -> lane s b == lane s c) `Seq`
       test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
       test (\s -> any (`elem` (ntgCats (BAT.ntg s b c))) [VeryCloseBehind, CloseBehind]) `Seq`
       actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b))
@@ -100,11 +94,11 @@ pass :: Car -> Car -> Prog (Prim Double)
 pass b c =
    atomic (
       act (Start b "pass") `Seq`
-      test (\s -> lane b s /= lane c s) `Seq`
+      test (\s -> lane s b /= lane s c) `Seq`
       test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
       test (\s -> isConverging (BAT.ttc s) b c)
    ) `Seq` (
-      Star (Pick (picknum (0.95, 1.2)) 1 (\q -> act (Accel b q)))
+      Star (Pick (value lookahead) (picknum (0.95, 1.2)) (\q -> act (Accel b q)))
    ) `Seq` atomic (
       test (\s -> BAT.ntg s b c <= 0) `Seq`
       act (End b "pass") 
@@ -113,24 +107,28 @@ pass b c =
 
 overtake :: Car -> Car -> Prog (Prim Double)
 overtake b c =
-   atomic (
-      act (Start b "overtake") `Seq`
-      test (\s -> lane b s == lane c s) `Seq`
-      ptest "huhu1" `Seq`
-      test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
-      ptest "huhu2" `Seq`
+   --atomic (
+      --act (Start b "overtake") `Seq`
+      --test (\s -> lane s b == lane s c) `Seq`
+      --ptest "huhu1" `Seq`
+      --test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
+      --ptest "huhu2" `Seq`
       --test (\s -> isConverging (BAT.ttc s) b c) `Seq`
-      ptest "huhu3"
-   ) `Seq` (
+      --ptest "huhu3"
+      --Nil
+   --) `Seq` (
       (
-         act (LaneChange b LeftLane) `Seq`
-         test (\s -> BAT.ntg s b c < 0) `Seq`
-         act (LaneChange b RightLane)
-      ) `Conc` (
-         Star (Pick (picknum (0.9, 1.5)) 1 (\q -> act (Accel b q)))
+         --act (LaneChange b LeftLane) `Seq`
+         --test (\s -> BAT.ntg s b c < 0) `Seq`
+         --act (LaneChange b RightLane)
+      --) `Conc` (
+         --Star (Pick (value lookahead) (picknum (0.9, 1.5)) (\q -> act (Accel b q)))
+         Star (Pick (valueByQuality b c 4)
+                    (\val -> fromMaybe 1 (interpolate (0.9, 1.5) 0 (fromMaybe 100 . val)))
+                    (\q -> act (Accel b (q))))
       )
-   ) `Seq` atomic (
-      test (\s -> BAT.ntg s b c < 0) `Seq`
-      act (End b "overtake") 
-   )
+   --) `Seq` atomic (
+      --test (\s -> BAT.ntg s b c < 0) `Seq`
+      --act (End b "overtake") 
+   --)
 
