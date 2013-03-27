@@ -34,6 +34,7 @@ instance Show a => Show (BAT.Prim a) where
    show BAT.NoOp = "NoOp"
    show (BAT.Start b s) = "Start " ++ (show b) ++ " " ++ s
    show (BAT.End b s) = "End " ++ (show b) ++ " " ++ s
+   show (BAT.Msg s) = "Msg " ++ s
 
 instance Show Finality where
    show Final = "Final"
@@ -58,7 +59,7 @@ instance Show a => Show (Prog a) where
    show Nil = "nil"
 
 instance Show a => Show (Sit a) where
-   show = show . sit2list
+   show = show . BAT.sit2list
 
 instance ShowPart b => Show (Tree a b) where
    show = showTree 0 0
@@ -72,11 +73,11 @@ instance ShowPart a => ShowPart (PseudoAtom a) where
 instance ShowPart a => ShowPart (Prog a) where
 
 instance Show a => ShowPart (Sit a) where
-   showPart n s = show (drop n (sit2list s))
+   showPart n s = show (drop n (BAT.sit2list s))
 
 instance ShowPart a => ShowPart (Conf a) where
    showPart n (s,r,d,f) = "("++ showPart n s ++", "++ show r ++", "++ show d ++", "++ show f ++")"
-   partSize (s,_,_,_) = length (sit2list s)
+   partSize (s,_,_,_) = length (BAT.sit2list s)
 
 
 showTree :: ShowPart b => Int -> Int -> Tree a b -> String
@@ -86,11 +87,6 @@ showTree n m (Leaf x) = (replicate (2*n) ' ') ++ "Leaf " ++ showPart m x ++ "\n"
 showTree n m (Parent x t) = (replicate (2*n) ' ') ++ "Parent " ++ showPart m x ++ "\n" ++ (showTree (n+1) (partSize x) t)
 showTree n m (Branch t1 t2) = (replicate (2*n) ' ') ++ "Branch\n" ++ (showTree (n+1) m t1) ++ (showTree (n+1) m t2)
 showTree n _ (Sprout _ _ _) = (replicate (2*n) ' ') ++ "Sprout g, <unknown tree>\n"
-
-
-sit2list :: Sit a -> [a]
-sit2list S0 = []
-sit2list (Do a s) = (sit2list s) ++ [a]
 
 
 {-
@@ -221,14 +217,13 @@ main =
              candProg = overtake Car.H Car.D
              prog     = Conc obsProg candProg
              confs    = do3 4 prog S0
-         putStrLn (show (force (tree prog S0 0 0)))
-         --putStrLn (show (pickbest 4 (tree prog S0 0.0 0)))
-         --mapM_ (\(s,v,d,t) -> do putStrLn (show s)
-         --                        --putStrLn (show (v, d))
-         --                        --printFluents s
-         --                        putStrLn (show t)
-         --                        putStrLn ""
-         --      ) [head confs]
+--         putStrLn (show (force (tree prog S0 0 0)))
+         mapM_ (\(s,v,d,t) -> do putStrLn (show s)
+                                 putStrLn (show (v, d))
+                                 printFluents s
+                                 --putStrLn (show t)
+                                 putStrLn ""
+               ) confs
          putStrLn "-------------------------------------------------------"
 -- -}
 {-

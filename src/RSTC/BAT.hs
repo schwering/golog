@@ -23,6 +23,7 @@ data Prim a = Wait (Time a)
             | NoOp
             | Start Car String
             | End Car String
+            | Msg String
 
 data NTGCat = VeryFarBehind
             | FarBehind
@@ -61,6 +62,7 @@ instance (RealFloat a, Show a) => BAT (Prim a) where
    poss NoOp                 _ = True
    poss (Start _ _)          _ = True
    poss (End _ _)            _ = True
+   poss (Msg _)              _ = True
 
    reward (Wait _)         _                = 0
    reward (Accel _ _)      _                = -0.01
@@ -73,6 +75,7 @@ instance (RealFloat a, Show a) => BAT (Prim a) where
    reward (Start _ _)      s                = max 0 (1000 - 2 * (fromIntegral (sitlen s)))
    reward (End _ _)        (Do (Match _) s) = 2 * (fromIntegral (sitlen s))
    reward (End _ _)        _                = 0
+   reward (Msg _)          _                = 0
 
 
 lookahead :: Depth
@@ -82,6 +85,11 @@ lookahead = 3
 sitlen :: Sit a -> Int
 sitlen (Do _ s) = 1 + (sitlen s)
 sitlen S0       = 0
+
+
+sit2list :: Sit a -> [a]
+sit2list S0 = []
+sit2list (Do a s) = (sit2list s) ++ [a]
 
 
 {-
@@ -111,20 +119,40 @@ valueByQuality b c l t = val (best def max' cut l t)
          cut (_,                 _, _, _)     = False
          def      = (S0, 0, 0, Nonfinal)
          max' x y = case (val x, val y) of
-                         (Just x', Just y') -> if abs x' <= abs y' then x else y
-                         (Just _, Nothing)  -> x
-                         _                  -> y
+                         -- The first case avoids that after Prematch actions
+                         -- subsequent actions are evaluated (which could be
+                         -- very expense if the lookahead leads the next pick
+                         -- operator to being evaluated -> combinatorial
+                         -- explosion).
+                         (Just x', _)       | abs x' > 0      -> x
+                         (Just x', Just y') | abs x' > abs y' -> x
+                                            | otherwise       -> y
+                         (Just _, Nothing)                    -> x
+                         _                                    -> y
 
 
 interpolate :: (Fractional a, Fractional b, Real b, Show a, Show b) =>
              (a, a) -> b -> (a -> b) -> Maybe a
+interpolate (lo, hi) y f = let r = (y - (f lo)) / ((f hi) - (f lo))
+                           in if 0 <= r && r <= 1
+                              --then debug' (show lo ++ " ... " ++ show hi ++ " : " ++ show (f lo) ++ " ... " ++ show (f hi) ++ " : " ++ show r ++ " : ") $ Just (lo + (realToFrac r) * (hi - lo))
+                              then Just (lo + (realToFrac r) * (hi - lo))
+                              else Nothing
+{-
 interpolate (lo, hi) y f = case compare (f lo) (f hi) of
    GT -> interpolate (lo, hi) (-y) (negate . f)
-   EQ -> if f lo == y then Just lo else Nothing
-   _  -> debug' ("f " ++ show lo ++ " = " ++ show (f lo) ++ " -> y* = " ++ show y ++ " -> " ++ "f " ++ show hi ++ " = " ++ show (f hi)) $ if f lo <= y && y <= f hi
+   {-
+   GT -> debug' ("GT: f " ++ show lo ++ " = " ++ show (f lo) ++ " -> y* = " ++ show y ++ " -> " ++ "f " ++ show hi ++ " = " ++ show (f hi)) $ if f lo >= y && y >= f hi
          then let r  = (y - (f lo)) / ((f hi) - (f lo))
               in Just (lo + (realToFrac r) * (hi - lo))
          else Nothing
+   -}
+   LT -> debug' ("LT: f " ++ show lo ++ " = " ++ show (f lo) ++ " -> y* = " ++ show y ++ " -> " ++ "f " ++ show hi ++ " = " ++ show (f hi)) $ if f lo <= y && y <= f hi
+         then let r  = (y - (f lo)) / ((f hi) - (f lo))
+              in Just (lo + (realToFrac r) * (hi - lo))
+         else Nothing
+   _  -> if f lo == y then Just lo else Nothing
+-}
 
 
 
