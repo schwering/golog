@@ -1,6 +1,6 @@
--- | Golog programs based on the RSTC action theory.
-
 {-# LANGUAGE MultiParamTypeClasses #-}
+
+-- | Golog programs based on the RSTC action theory.
 
 module RSTC.Progs where
 
@@ -110,21 +110,17 @@ overtake b c =
    atomic (
       act (Start b "overtake") `Seq`
       test (\s -> lane s b == lane s c) `Seq`
-      ptest "huhu1" `Seq`
-      test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
-      ptest "huhu2" `Seq`
-      --test (\s -> isConverging (BAT.ttc s) b c) `Seq`
-      ptest "huhu3"
-      --Nil
+      test (\s -> isFollowing (BAT.ntg s) b c)
+      --test (\s -> isConverging (BAT.ttc s) b c)
    ) `Seq` (
       (
-         act (LaneChange b LeftLane) `Seq`
+         Nil `Seq`-- act (LaneChange b LeftLane) `Seq`
          test (\s -> BAT.ntg s b c < 0) `Seq`
          act (LaneChange b RightLane)
       ) `Conc` (
          --Star (Pick (value lookahead) (picknum (0.9, 1.5)) (\q -> act (Accel b q)))
-         Star (Pick (valueByQuality b c 4)
-                    (\val -> fromMaybe 1 (interpolate (0.9, 1.5) 0 (fromMaybe 100 . val)))
+         Star (Pick (valueByQuality b c lookahead)
+                    (\val -> fromMaybe 1 (interpolate (0.5, 2.5) 0 (fromMaybe 100 . val)))
                     (\q -> (act (Accel b q))))
                     --(\q -> (act (Accel b (q)) `Seq` (actf (\s -> Msg (show (sitlen s)))))))
       )

@@ -183,6 +183,12 @@ static bool klatschtgleich2(FILE *fp, int sockfd, int n_agents, bool do_sleep)
                 }
             }
         }
+        for (i = 0; i < NAGENTS; ++i) {
+            if (r.info[i].present) {
+                const char *lane = (r.info[i].y <= 0.0) ? "RightLane" : "LeftLane";
+                printf("lane('%s') = %s\n", r.info[i].agent, lane);
+            }
+        }
         printf("%.2lf =< confidence working=%d, finished=%d, failed=%d =< %.2lf\n",
                 min_conf(&state, 0), state.sources[0].working, state.sources[0].finished, state.sources[0].failed, max_conf(&state, 0));
     }

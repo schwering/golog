@@ -1,8 +1,8 @@
+{-# LANGUAGE ForeignFunctionInterface #-}
+
 -- | Partical swarm optimization implemented in C.
 --
 -- See the @native_pso.c@ file for details.
-
-{-# LANGUAGE ForeignFunctionInterface #-}
 
 module Util.NativePSO (Params(..), Objective(..), Optimum,
                        defaultParams, pso) where

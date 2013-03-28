@@ -1,9 +1,9 @@
+{-# LANGUAGE ExistentialQuantification #-}
+
 -- | Basic action theory based on relative temporal measures.
 --
 -- The two measures are net time gap (NTG) and time to collision (TTC).
 -- The successor state axioms (SSAs) use the 'RSTC.Theorems' module.
-
-{-# LANGUAGE ExistentialQuantification #-}
 
 module RSTC.BAT where
 
@@ -79,7 +79,7 @@ instance (RealFloat a, Show a) => BAT (Prim a) where
 
 
 lookahead :: Depth
-lookahead = 3
+lookahead = 6
 
 
 sitlen :: Sit a -> Int
@@ -109,7 +109,7 @@ quality' b c e s = if b /= c && lane s b == O.lane e b && lane s c == O.lane e c
                    else Nothing
 
 
-valueByQuality :: RealFloat a => Car -> Car -> Depth -> SitTree (Prim a) -> Maybe a
+valueByQuality :: RealFloat a => Car -> Car -> Depth -> SitTree Grown (Prim a) -> Maybe a
 valueByQuality b c l t = val (best def max' cut l t)
    where val (Do (Prematch e) s, _, _, _)     = quality' b c e s
          val (_,                 _, _, _)     = Nothing
@@ -135,7 +135,6 @@ interpolate :: (Fractional a, Fractional b, Real b, Show a, Show b) =>
              (a, a) -> b -> (a -> b) -> Maybe a
 interpolate (lo, hi) y f = let r = (y - (f lo)) / ((f hi) - (f lo))
                            in if 0 <= r && r <= 1
-                              --then debug' (show lo ++ " ... " ++ show hi ++ " : " ++ show (f lo) ++ " ... " ++ show (f hi) ++ " : " ++ show r ++ " : ") $ Just (lo + (realToFrac r) * (hi - lo))
                               then Just (lo + (realToFrac r) * (hi - lo))
                               else Nothing
 {-
@@ -159,16 +158,14 @@ interpolate (lo, hi) y f = case compare (f lo) (f hi) of
 match :: (RealFloat a, O.Obs a b, Show a) => b -> Sit (Prim a) -> Bool
 match e s = let ntg_ttc = [(b, c, ntg s b c, O.ntg e b c,
                                   ttc s b c, O.ttc e b c) | b <- cars, c <- cars]
-                ntgs  = [(ntg1, ntg2)
-                           | (b, c, ntg1, ntg2, _, _) <- ntg_ttc, b /= c]
-                ttcs  = [(ttc1, ttc2, relVeloc' ntg1 ttc1, relVeloc' ntg2 ttc2)
-                           | (b, c, ntg1, ntg2, ttc1, ttc2) <- ntg_ttc, b < c]
+                ntgs  = [(ntg1, ntg2) | (b, c, ntg1, ntg2, _, _) <- ntg_ttc, b /= c]
+                ttcs  = [(ttc1, ttc2, relVeloc' ntg1 ttc1, relVeloc' ntg2 ttc2) | (b, c, ntg1, ntg2, ttc1, ttc2) <- ntg_ttc, b < c]
                 lanes = [(lane s b, O.lane e b) | b <- cars]
             in all (\(l1, l2) -> l1 == l2) lanes &&
                all (\(ntg1, ntg2) -> haveCommon (ntgCats ntg1)
                                                 (ntgCats ntg2)) ntgs &&
-               all (\(ttc1, rv1, ttc2, rv2) -> haveCommon (ttcCats ttc1 rv1)
-                                                          (ttcCats ttc2 rv2)) ttcs
+                all (\(ttc1, rv1, ttc2, rv2) -> haveCommon (ttcCats ttc1 rv1)
+                                                           (ttcCats ttc2 rv2)) ttcs
    where haveCommon (x:xs) (y:ys) | x < y     = haveCommon xs (y:ys)
                                   | y < x     = haveCommon (x:xs) ys
                                   | otherwise = True

@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 
@@ -61,7 +62,7 @@ instance Show a => Show (Prog a) where
 instance Show a => Show (Sit a) where
    show = show . BAT.sit2list
 
-instance ShowPart b => Show (Tree a b) where
+instance ShowPart c => Show (Tree a b c) where
    show = showTree 0 0
 
 instance ShowPart Double where
@@ -80,7 +81,7 @@ instance ShowPart a => ShowPart (Conf a) where
    partSize (s,_,_,_) = length (BAT.sit2list s)
 
 
-showTree :: ShowPart b => Int -> Int -> Tree a b -> String
+showTree :: ShowPart c => Int -> Int -> Tree a b c -> String
 showTree n _ _ | n > 100 = (replicate (2*n) ' ') ++ "...\n"
 showTree n _ Empty = (replicate (2*n) ' ') ++ "Empty\n"
 showTree n m (Leaf x) = (replicate (2*n) ' ') ++ "Leaf " ++ showPart m x ++ "\n"
@@ -131,6 +132,7 @@ printFluents :: (RealFloat a, PrintfArg a) => Sit (BAT.Prim a) -> IO ()
 printFluents s = do _ <- printf "start = %.2f\n" (BAT.start s)
                     mapM_ (\(b,c) -> printf "ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntg s b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
                     mapM_ (\(b,c) -> printf "ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttc s b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
+                    mapM_ (\b -> printf "lane %s = %s\n" (show b) (show (BAT.lane s b))) Car.cars
                     --putStrLn ("start = " ++ show (BAT.start s))
                     --mapM_ (\(b,c) -> putStrLn ("ntg " ++ show b ++ " " ++ show c ++ " = " ++ show (BAT.ntg s b c))) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
                     --mapM_ (\(b,c) -> putStrLn ("ttc " ++ show b ++ " " ++ show c ++ " = " ++ show (BAT.ttc s b c))) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
@@ -163,7 +165,8 @@ nextObsTtc S0                   _ _ = Nothing
 
 
 main :: IO ()
-main =
+main = do
+{-
    let   a = PseudoAtom (Atom (Prim A))
          b = PseudoAtom (Atom (Prim B))
          c = PseudoAtom (Atom (Prim C))
@@ -180,32 +183,30 @@ main =
          --p = Star(a)
          t1 = tree p1 S0 0.0 0
          t2 = tree p2 S0 0.0 0
-   in do
-         putStrLn ((show . cutoff 2) t2)
-         putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 3) (trans 0 t2))
-         putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 3) (trans 1 t2))
-         putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 3) (trans 2 t2))
-         putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 3) (trans 3 t2))
-         putStrLn "-------------------------------------------------------\n"
-         putStrLn ((show . cutoff 10) t1)
-         putStrLn "-------------------------------------------------------\n"
-         putStrLn (maybe "nothing" (show . cutoff 10) (trans 100000 t1))
-         putStrLn "-------------------------------------------------------\n"
-         mapM_ (\i -> putStrLn (show i ++ ": " ++ show (do1 i p2 S0))) [0..9]
-         putStrLn "-------------------------------------------------------"
-         mapM_ (\i -> putStrLn ("Pick one: " ++ show i ++ ": " ++ show (do1 i (p3 i) S0))) [0..5]
-         putStrLn "-------------------------------------------------------"
-         mapM_ (\i -> putStrLn ("Pick seq: " ++ show i ++ ": " ++ show (do1 i (p4 i) S0))) [0..5]
-         putStrLn "-------------------------------------------------------"
-         mapM_ (\i -> putStrLn ("Pick nested: " ++ show i ++ ": " ++ show (do1 i (p5 i) S0))) [0..5]
-         putStrLn "-------------------------------------------------------"
-         mapM_ (\i -> putStrLn ("Pick nested 2: " ++ show i ++ ": " ++ show (do1 i (p6 i) S0))) [0..5]
-         putStrLn "-------------------------------------------------------"
-{-
+   putStrLn ((show . cutoff 2) t2)
+   putStrLn "-------------------------------------------------------\n"
+   putStrLn (maybe "nothing" (show . cutoff 3) (trans 0 t2))
+   putStrLn "-------------------------------------------------------\n"
+   putStrLn (maybe "nothing" (show . cutoff 3) (trans 1 t2))
+   putStrLn "-------------------------------------------------------\n"
+   putStrLn (maybe "nothing" (show . cutoff 3) (trans 2 t2))
+   putStrLn "-------------------------------------------------------\n"
+   putStrLn (maybe "nothing" (show . cutoff 3) (trans 3 t2))
+   putStrLn "-------------------------------------------------------\n"
+   putStrLn ((show . cutoff 10) t1)
+   putStrLn "-------------------------------------------------------\n"
+   putStrLn (maybe "nothing" (show . cutoff 10) (trans 100000 t1))
+   putStrLn "-------------------------------------------------------\n"
+   mapM_ (\i -> putStrLn (show i ++ ": " ++ show (do1 i p2 S0))) [0..9]
+   putStrLn "-------------------------------------------------------"
+   mapM_ (\i -> putStrLn ("Pick one: " ++ show i ++ ": " ++ show (do1 i (p3 i) S0))) [0..5]
+   putStrLn "-------------------------------------------------------"
+   mapM_ (\i -> putStrLn ("Pick seq: " ++ show i ++ ": " ++ show (do1 i (p4 i) S0))) [0..5]
+   putStrLn "-------------------------------------------------------"
+   mapM_ (\i -> putStrLn ("Pick nested: " ++ show i ++ ": " ++ show (do1 i (p5 i) S0))) [0..5]
+   putStrLn "-------------------------------------------------------"
+   mapM_ (\i -> putStrLn ("Pick nested 2: " ++ show i ++ ": " ++ show (do1 i (p6 i) S0))) [0..5]
+   putStrLn "-------------------------------------------------------"
 -}
          --mapM_ (putStrLn . show) (take 30 Obs.observations)
          --putStrLn "-------------------------------------------------------"
@@ -217,8 +218,13 @@ main =
              candProg = overtake Car.H Car.D
              prog     = Conc obsProg candProg
              confs    = do3 4 prog S0
+             partOfObs (BAT.Wait _)     = True
+             partOfObs (BAT.Prematch _) = True
+             partOfObs (BAT.Match _)    = True
+             partOfObs _                = False
 --         putStrLn (show (force (tree prog S0 0 0)))
-         mapM_ (\(s,v,d,t) -> do putStrLn (show s)
+         mapM_ (\(s,v,d,t) -> do putStrLn (show (BAT.sit2list s))
+                                 putStrLn (show (filter (not.partOfObs) (BAT.sit2list s)))
                                  putStrLn (show (v, d))
                                  printFluents s
                                  --putStrLn (show t)
