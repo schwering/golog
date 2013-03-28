@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
-
 -- | Golog programs based on the RSTC action theory.
 
 module RSTC.Progs where
@@ -13,23 +11,12 @@ import RSTC.Theorems
 import Util.NativePSO
 
 import Data.Maybe
-import System.IO.Unsafe
-
-interpol :: (Fractional a, Ord a) => (a -> a) -> a -> a -> a -> Maybe a
-interpol f lo hi goal
-   | f lo <= goal && goal <= f hi  = let m = (goal - (f lo)) / ((f hi) - (f lo))
-                                     in Just (lo + m * (hi - lo))
-   | f lo > f hi                   = interpol (\x -> -(f x)) lo hi (-goal)
-   | otherwise                     = Nothing
-
+import Debug.Trace
 
 picknum :: (Double, Double) -> (Double -> (Reward, Depth)) -> Double
 picknum bounds val = pso 10 m n defaultParams bounds (Max (fst . val))
---picknum :: Ord v => (Double, Double) -> (Double -> v) -> Double
---picknum bounds val = pso 10 m n defaultParams bounds (Max f)
    where m = 10
          n = 1
---         f = \x -> fst (unsafeCoerce (val x))
 
 
 act :: a -> Prog a
@@ -45,7 +32,7 @@ test = PseudoAtom . Atom . Test
 
 
 ptest :: String -> Prog a
-ptest s = test (\_ -> unsafePerformIO (putStrLn s >>= \_ -> return True))
+ptest s = test (const (traceStack s True))
 
 
 atomic :: Prog a -> Prog a
@@ -120,8 +107,8 @@ overtake b c =
       ) `Conc` (
          --Star (Pick (value lookahead) (picknum (0.9, 1.5)) (\q -> act (Accel b q)))
          Star (Pick (valueByQuality b c lookahead)
-                    (\val -> fromMaybe 1 (interpolate (0.5, 2.5) 0 (fromMaybe 100 . val)))
-                    (\q -> (act (Accel b q))))
+                    (\val -> fromMaybe nan (interpolate (0.7, 1.5) 0 (fromMaybe 100 . val)))
+                    (\q -> act (Accel b q)))
                     --(\q -> (act (Accel b (q)) `Seq` (actf (\s -> Msg (show (sitlen s)))))))
       )
    ) `Seq` atomic (

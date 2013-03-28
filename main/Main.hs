@@ -90,22 +90,6 @@ showTree n m (Branch t1 t2) = (replicate (2*n) ' ') ++ "Branch\n" ++ (showTree (
 showTree n _ (Sprout _ _ _) = (replicate (2*n) ' ') ++ "Sprout g, <unknown tree>\n"
 
 
-{-
-filterEmpty :: Tree v a -> Tree v a
-filterEmpty Empty          = Empty
-filterEmpty t @ (Leaf _)   = t
-filterEmpty (Parent x t1) = case filterEmpty t1
-   of Empty -> Leaf x
-      t2    -> Parent x t2
-filterEmpty (Branch t1 t2) = case (filterEmpty t1, filterEmpty t2)
-   of (Empty, Empty) -> Empty
-      (Empty, t)     -> t
-      (t, Empty)     -> t
-      (t3, t4)       -> Branch t3 t4
-filterEmpty (Sprout _ _)   = error "Main.filterEmpty: Sprout"
--}
-
-
 data Prim = A | B | C | D | E Double deriving Show
 
 instance BAT Prim where
@@ -222,11 +206,23 @@ main = do
              partOfObs (BAT.Prematch _) = True
              partOfObs (BAT.Match _)    = True
              partOfObs _                = False
+             dropObs (BAT.Wait _ : BAT.Prematch _ : x @ (BAT.Match _) : xs) = x : dropObs xs
+             dropObs (                              x                 : xs) = x : dropObs xs
+             dropObs []                                                   = []
+             newsit s q = BAT.inject 2 (BAT.Accel Car.H q) s
+             newquality s @ (Do (BAT.Prematch e) _) q = BAT.quality Car.H Car.D e (newsit s q)
+             newqualities s @ (Do (BAT.Prematch _) _) = zip ticks (map (newquality s) ticks)
+             newqualities _                           = []
+             ticks = [-2.0, -1.9 .. 2.0]
+             diffs xs = map (\(m,n) -> xs !! m - xs !! n) (zip [0 .. length xs - 2] [1 .. length xs - 1])
 --         putStrLn (show (force (tree prog S0 0 0)))
-         mapM_ (\(s,v,d,t) -> do putStrLn (show (BAT.sit2list s))
+         mapM_ (\(s,v,d,t) -> do --putStrLn (show (BAT.sit2list s))
                                  putStrLn (show (filter (not.partOfObs) (BAT.sit2list s)))
+                                 putStrLn (show (dropObs (BAT.sit2list s)))
                                  putStrLn (show (v, d))
                                  printFluents s
+                                 mapM_ (putStrLn . show) (newqualities s)
+                                 --mapM_ (putStrLn . show) (diffs (map snd (newqualities s)))
                                  --putStrLn (show t)
                                  putStrLn ""
                ) confs

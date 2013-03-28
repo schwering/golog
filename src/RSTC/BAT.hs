@@ -78,30 +78,33 @@ instance (RealFloat a, Show a) => BAT (Prim a) where
    reward (Msg _)          _                = 0
 
 
+-- | Lookahead commonly used in this BAT.
 lookahead :: Depth
 lookahead = 6
 
 
+-- | Number of actions in a situation term.
 sitlen :: Sit a -> Int
 sitlen (Do _ s) = 1 + (sitlen s)
 sitlen S0       = 0
 
 
+-- | List of actions in situation term, ordered by their occurrence.
 sit2list :: Sit a -> [a]
 sit2list S0 = []
 sit2list (Do a s) = (sit2list s) ++ [a]
 
 
-{-
-quality :: (RealFloat a, O.Obs a b) => b -> Sit (Prim a) -> a
-quality e s = let ntgs  = [(ntg s b c, O.ntg e b c) | b <- cars, c <- cars, b /= c]
-                  --ttcs  = [(ttc s b c, O.ttc e b c) | b <- cars, c <- cars, b < c]
-                  lanes = [(lane s b, O.lane e b) | b <- cars]
-            in sum (map (\(ntg1, ntg2) -> abs (ntg1 - ntg2)) ntgs) +
-               --sum (map (\(ttc1, ttc2) -> if True then abs (ttc1 - ttc2) else 0) ttcs) +
-               sum (map (\(l1, l2) -> if l1 == l2 then 0 else 1) lanes)
--}
+-- | Injects a new action 'n' actions ago in the situation term.
+inject :: Int -> a -> Sit a -> Sit a
+inject 0 a s         = Do a s
+inject n a (Do a' s) = Do a' (inject (n-1) a s)
+inject n a S0        = Do a S0
 
+
+-- | Computes the discrepancy in NTG of two cars between a observation and
+-- a situation.
+quality b c e s = ntg s b c - O.ntg e b c
 
 quality' :: (RealFloat a, O.Obs a b) => Car -> Car -> b -> Sit (Prim a) -> Maybe a
 quality' b c e s = if b /= c && lane s b == O.lane e b && lane s c == O.lane e c
@@ -109,13 +112,14 @@ quality' b c e s = if b /= c && lane s b == O.lane e b && lane s c == O.lane e c
                    else Nothing
 
 
+-- | Looks for the next Prematch action and returns the quality of this
+-- situation compared to this observation.
 valueByQuality :: RealFloat a => Car -> Car -> Depth -> SitTree Grown (Prim a) -> Maybe a
 valueByQuality b c l t = val (best def max' cut l t)
-   where val (Do (Prematch e) s, _, _, _)     = quality' b c e s
+   where val (Do (Prematch e) s, _, _, _)     = Just (quality b c e s)
          val (_,                 _, _, _)     = Nothing
          cut (_,                 _, _, Final) = True
          cut (Do (Prematch _) _, _, _, _)     = True
-         --cut (_,                 _, d, _)     = d - depth t < 
          cut (_,                 _, _, _)     = False
          def      = (S0, 0, 0, Nonfinal)
          max' x y = case (val x, val y) of
@@ -131,6 +135,10 @@ valueByQuality b c l t = val (best def max' cut l t)
                          _                                    -> y
 
 
+-- | Interpolates a linear function between two bounds.
+-- 'interpolate (lo,hi) y f' returns a 'x' such 'f x = y' holds.
+-- If there is no such 'x' between 'lo' and 'hi', 'Nothing' is returned.
+-- This computation only works if 'f' is linear.
 interpolate :: (Fractional a, Fractional b, Real b, Show a, Show b) =>
              (a, a) -> b -> (a -> b) -> Maybe a
 interpolate (lo, hi) y f = let r = (y - (f lo)) / ((f hi) - (f lo))
