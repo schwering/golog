@@ -12,6 +12,7 @@ import qualified RSTC.BAT as BAT
 import qualified RSTC.Obs as Obs
 import RSTC.Progs
 import RSTC.Theorems
+import Util.Interpolation
 
 import Data.Maybe
 import Control.Applicative
@@ -209,21 +210,74 @@ main = do
              dropObs (BAT.Wait _ : BAT.Prematch _ : x @ (BAT.Match _) : xs) = x : dropObs xs
              dropObs (                              x                 : xs) = x : dropObs xs
              dropObs []                                                   = []
-             newsit s q = BAT.inject 2 (BAT.Accel Car.H q) s
-             newquality s @ (Do (BAT.Prematch e) _) q = BAT.quality Car.H Car.D e (newsit s q)
-             newqualities s @ (Do (BAT.Prematch _) _) = zip ticks (map (newquality s) ticks)
+             newsit s q = BAT.inject 2 (BAT.Accel Car.H q) (BAT.remove 2 s)
+             newquality s @ (Do (BAT.Prematch e) _) q    = BAT.quality Car.H Car.D e (newsit s q)
+             newquality _                           _    = 100000
+             revnewquality s @ (Do (BAT.Prematch e) _) q = BAT.quality Car.D Car.H e (newsit s q)
+             revnewquality _                           _ = 100000
+             newqualities s @ (Do (BAT.Prematch _) _) = zip3 ticks (map (newquality s) ticks) (map (revnewquality s) ticks)
              newqualities _                           = []
-             ticks = [-2.0, -1.9 .. 2.0]
+             ticks = [-30.0, -29.9 .. 30.0]
              diffs xs = map (\(m,n) -> xs !! m - xs !! n) (zip [0 .. length xs - 2] [1 .. length xs - 1])
+             s0 (Do (BAT.Prematch _) (Do (BAT.Wait _) (Do (BAT.Accel _ _) s))) = Just s
+             s0 _                                                              = Nothing
+             s1 (Do (BAT.Prematch _) (Do (BAT.Wait _) s)) = Just s
+             s1 _                                         = Nothing
+             s2 (Do (BAT.Prematch _) s) = Just s
+             s2 _                       = Nothing
+             posInf = 10000000
 --         putStrLn (show (force (tree prog S0 0 0)))
          mapM_ (\(s,v,d,t) -> do --putStrLn (show (BAT.sit2list s))
                                  putStrLn (show (filter (not.partOfObs) (BAT.sit2list s)))
                                  putStrLn (show (dropObs (BAT.sit2list s)))
                                  putStrLn (show (v, d))
                                  printFluents s
-                                 mapM_ (putStrLn . show) (newqualities s)
-                                 --mapM_ (putStrLn . show) (diffs (map snd (newqualities s)))
-                                 --putStrLn (show t)
+--{-
+                                 --if BAT.start s > 17.5
+                                 if 12.5 < BAT.start s && BAT.start s < 12.7
+                                    then do
+                                             --mapM_ (putStrLn . show) (newqualities s)
+                                             putStrLn ("ntg " ++ show (BAT.ntg s Car.H Car.D))
+                                             putStrLn ("ttc " ++ show (BAT.ttc s Car.H Car.D))
+                                             putStrLn ("ntg after accel " ++ show (BAT.ntg (Do (BAT.Accel Car.H posInf) s) Car.H Car.D))
+                                             putStrLn ("ttc after accel " ++ show (BAT.ttc (Do (BAT.Accel Car.H posInf) s) Car.H Car.D))
+                                             putStrLn ("ntg after wait " ++ show (BAT.ntg (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.H Car.D))
+                                             putStrLn ("ttc after wait " ++ show (BAT.ttc (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.H Car.D))
+                                             putStrLn ("rev ntg " ++ show (BAT.ntg s Car.H Car.D))
+                                             putStrLn ("rev ttc " ++ show (BAT.ttc s Car.H Car.D))
+                                             putStrLn ("rev ntg after accel " ++ show (BAT.ntg (Do (BAT.Accel Car.H posInf) s) Car.D Car.H))
+                                             putStrLn ("rev ttc after accel " ++ show (BAT.ttc (Do (BAT.Accel Car.H posInf) s) Car.D Car.H))
+                                             putStrLn ("rev ntg after wait " ++ show (BAT.ntg (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.D Car.H))
+                                             putStrLn ("rev ttc after wait " ++ show (BAT.ttc (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.D Car.H))
+                                             putStrLn "---"
+                                             putStrLn (show ("q", "q1", "q2", "1/q1", "1/q2", "q1+q2", "1/q1 + q2", "1/q1 + 1/q2", "ntg1", "ntg2", "ttc"))
+                                             --mapM_ (putStrLn . show) (map (\(x,y,z) -> (x, y, z, 1/y, 1/z, y+z, 1/y+z, 1/y+1/z, BAT.ntg (newsit s x) Car.H Car.D, BAT.ntg (newsit s x) Car.D Car.H, BAT.ttc (newsit s x) Car.H Car.D)) (newqualities s))
+                                             mapM_ (\_ -> putStrLn (show "Ok")) (newqualities s)
+                                             putStrLn ("interpolateLin " ++ show (interpolateLin id (-2,2) 0 (newquality s)))
+                                             --putStrLn ("ntg " ++ show (BAT.ntg (newsit s posInf) Car.H Car.D)) -- wtf is that what for?
+                                             putStrLn ("reciprocal's function constant " ++ show ((newquality s) posInf))
+                                             let xInterpolateRecipLin = interpolateRecipLin id (-2,2) 0 (newquality s)
+                                             let xInterpolateRecipLinAndLin = interpolateRecipLinAndLinForZero id (-2,2) (\q -> (newquality s q, revnewquality s q))
+                                             putStrLn ("interpolateRecipLin " ++ show xInterpolateRecipLin)
+                                             putStrLn ("interpolateRecipLinAndLin " ++ show xInterpolateRecipLinAndLin)
+                                             putStrLn ("quality interpolateRecipLin " ++ show (newquality s xInterpolateRecipLin))
+                                             putStrLn ("quality interpolateRecipLinAndLin " ++ show (newquality s xInterpolateRecipLinAndLin))
+                                             putStrLn ("quality picked " ++ show (newquality s 1.703566166342949))
+                                             putStrLn ("revquality interpolateRecipLin " ++ show (revnewquality s xInterpolateRecipLin))
+                                             putStrLn ("revquality interpolateRecipLinAndLin " ++ show (revnewquality s xInterpolateRecipLinAndLin))
+                                             putStrLn ("revquality picked " ++ show (revnewquality s 1.703566166342949))
+                                             --mapM_ (putStrLn . show) (diffs (map snd (newqualities s)))
+                                             --putStrLn (show t)
+                                             putStrLn "---"
+                                             putStrLn (show (dropObs (BAT.sit2list (newsit s xInterpolateRecipLinAndLin))))
+                                             putStrLn ("ntg0 = " ++ (show (maybe (-1000) (\sit -> BAT.ntg sit Car.H Car.D) (s0 (newsit s xInterpolateRecipLin)))))
+                                             putStrLn ("ttc0 = " ++ (show (maybe (-1000) (\sit -> BAT.ttc sit Car.H Car.D) (s0 (newsit s xInterpolateRecipLin)))))
+                                             putStrLn ("ntg1 = " ++ (show (maybe (-1000) (\sit -> BAT.ntg sit Car.H Car.D) (s1 (newsit s xInterpolateRecipLin)))))
+                                             putStrLn ("ttc1 = " ++ (show (maybe (-1000) (\sit -> BAT.ttc sit Car.H Car.D) (s1 (newsit s xInterpolateRecipLin)))))
+                                             putStrLn ("ntg2 = " ++ (show (maybe (-1000) (\sit -> BAT.ntg sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
+                                             putStrLn ("ttc2 = " ++ (show (maybe (-1000) (\sit -> BAT.ttc sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
+                                    else return ()
+---}
                                  putStrLn ""
                ) confs
          putStrLn "-------------------------------------------------------"

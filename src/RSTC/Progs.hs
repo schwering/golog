@@ -8,6 +8,7 @@ import RSTC.BAT
 import qualified RSTC.BAT as BAT
 import qualified RSTC.Obs as Obs
 import RSTC.Theorems
+import Util.Interpolation
 import Util.NativePSO
 
 import Data.Maybe
@@ -101,13 +102,14 @@ overtake b c =
       --test (\s -> isConverging (BAT.ttc s) b c)
    ) `Seq` (
       (
-         Nil `Seq`-- act (LaneChange b LeftLane) `Seq`
+         act (LaneChange b LeftLane) `Seq`
          test (\s -> BAT.ntg s b c < 0) `Seq`
          act (LaneChange b RightLane)
       ) `Conc` (
          --Star (Pick (value lookahead) (picknum (0.9, 1.5)) (\q -> act (Accel b q)))
          Star (Pick (valueByQuality b c lookahead)
-                    (\val -> fromMaybe nan (interpolate (0.7, 1.5) 0 (fromMaybe 100 . val)))
+                    --(\val -> interpolateRecipLin id (0.7, 1.5) 0 (fromMaybe 100 . val))
+                    (\val -> interpolateRecipLinAndLinForZero id (0.7, 1.5) (fromMaybe (100, 100) . val))
                     (\q -> act (Accel b q)))
                     --(\q -> (act (Accel b (q)) `Seq` (actf (\s -> Msg (show (sitlen s)))))))
       )

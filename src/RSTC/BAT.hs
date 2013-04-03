@@ -80,7 +80,7 @@ instance (RealFloat a, Show a) => BAT (Prim a) where
 
 -- | Lookahead commonly used in this BAT.
 lookahead :: Depth
-lookahead = 6
+lookahead = 9
 
 
 -- | Number of actions in a situation term.
@@ -99,24 +99,27 @@ sit2list (Do a s) = (sit2list s) ++ [a]
 inject :: Int -> a -> Sit a -> Sit a
 inject 0 a s         = Do a s
 inject n a (Do a' s) = Do a' (inject (n-1) a s)
-inject n a S0        = Do a S0
+inject _ a S0        = Do a S0
+
+
+-- | Renives the action 'n' actions ago in the situation term.
+remove :: Int -> Sit a -> Sit a
+remove 0 (Do _ s) = s
+remove n (Do a s) = Do a (remove (n-1) s)
+remove _ S0       = S0
 
 
 -- | Computes the discrepancy in NTG of two cars between a observation and
 -- a situation.
+quality :: (RealFloat a, O.Obs a b) => Car -> Car -> b -> Sit (Prim a) -> a
 quality b c e s = ntg s b c - O.ntg e b c
-
-quality' :: (RealFloat a, O.Obs a b) => Car -> Car -> b -> Sit (Prim a) -> Maybe a
-quality' b c e s = if b /= c && lane s b == O.lane e b && lane s c == O.lane e c
-                   then Just (ntg s b c - O.ntg e b c)
-                   else Nothing
 
 
 -- | Looks for the next Prematch action and returns the quality of this
 -- situation compared to this observation.
-valueByQuality :: RealFloat a => Car -> Car -> Depth -> SitTree Grown (Prim a) -> Maybe a
+valueByQuality :: RealFloat a => Car -> Car -> Depth -> SitTree Grown (Prim a) -> Maybe (a, a)
 valueByQuality b c l t = val (best def max' cut l t)
-   where val (Do (Prematch e) s, _, _, _)     = Just (quality b c e s)
+   where val (Do (Prematch e) s, _, _, _)     = Just (quality b c e s, quality c b e s)
          val (_,                 _, _, _)     = Nothing
          cut (_,                 _, _, Final) = True
          cut (Do (Prematch _) _, _, _, _)     = True
@@ -128,39 +131,11 @@ valueByQuality b c l t = val (best def max' cut l t)
                          -- very expense if the lookahead leads the next pick
                          -- operator to being evaluated -> combinatorial
                          -- explosion).
-                         (Just x', _)       | abs x' > 0      -> x
-                         (Just x', Just y') | abs x' > abs y' -> x
-                                            | otherwise       -> y
-                         (Just _, Nothing)                    -> x
-                         _                                    -> y
-
-
--- | Interpolates a linear function between two bounds.
--- 'interpolate (lo,hi) y f' returns a 'x' such 'f x = y' holds.
--- If there is no such 'x' between 'lo' and 'hi', 'Nothing' is returned.
--- This computation only works if 'f' is linear.
-interpolate :: (Fractional a, Fractional b, Real b, Show a, Show b) =>
-             (a, a) -> b -> (a -> b) -> Maybe a
-interpolate (lo, hi) y f = let r = (y - (f lo)) / ((f hi) - (f lo))
-                           in if 0 <= r && r <= 1
-                              then Just (lo + (realToFrac r) * (hi - lo))
-                              else Nothing
-{-
-interpolate (lo, hi) y f = case compare (f lo) (f hi) of
-   GT -> interpolate (lo, hi) (-y) (negate . f)
-   {-
-   GT -> debug' ("GT: f " ++ show lo ++ " = " ++ show (f lo) ++ " -> y* = " ++ show y ++ " -> " ++ "f " ++ show hi ++ " = " ++ show (f hi)) $ if f lo >= y && y >= f hi
-         then let r  = (y - (f lo)) / ((f hi) - (f lo))
-              in Just (lo + (realToFrac r) * (hi - lo))
-         else Nothing
-   -}
-   LT -> debug' ("LT: f " ++ show lo ++ " = " ++ show (f lo) ++ " -> y* = " ++ show y ++ " -> " ++ "f " ++ show hi ++ " = " ++ show (f hi)) $ if f lo <= y && y <= f hi
-         then let r  = (y - (f lo)) / ((f hi) - (f lo))
-              in Just (lo + (realToFrac r) * (hi - lo))
-         else Nothing
-   _  -> if f lo == y then Just lo else Nothing
--}
-
+                         (Just (x1, x2), _)             | abs x1 > 0      && abs x2 > 0      -> x
+                         (Just (x1, x2), Just (y1, y2)) | abs x1 > abs y1 && abs x2 > abs y2 -> x
+                                                        | otherwise                          -> y
+                         (Just _,        Nothing)                                            -> x
+                         _                                                                   -> y
 
 
 match :: (RealFloat a, O.Obs a b, Show a) => b -> Sit (Prim a) -> Bool
