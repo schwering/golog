@@ -65,3 +65,11 @@ foreign import ccall unsafe "obs_ntg"
 foreign import ccall unsafe "obs_ttc"
    c_ttc :: CInt -> CInt -> CInt -> CDouble -- obs_id -> b -> c -> TTC or NaN
 
+{-
+c_next_obs = undefined
+c_time = undefined
+c_lane = undefined
+c_ntg = undefined
+c_ttc = undefined
+-}
+

@@ -109,7 +109,9 @@ overtake b c =
          --Star (Pick (value lookahead) (picknum (0.9, 1.5)) (\q -> act (Accel b q)))
          Star (Pick (valueByQuality b c lookahead)
                     --(\val -> interpolateRecipLin id (0.7, 1.5) 0 (fromMaybe 100 . val))
-                    (\val -> interpolateRecipLinAndLinForZero id (0.7, 1.5) (fromMaybe (100, 100) . val))
+                    --(\val -> interpolateRecipLinAndLinForZero id (0.7, 1.5) (fromMaybe (100, 100) . val))
+                    (\val -> 0.5 * nullAt id (canonicalizeRecip (fst . fromMaybe (nan,nan) . val) 0) +
+                             0.5 * nullAt id (canonicalize      (snd . fromMaybe (nan,nan) . val) 0))
                     (\q -> act (Accel b q)))
                     --(\q -> (act (Accel b (q)) `Seq` (actf (\s -> Msg (show (sitlen s)))))))
       )

@@ -123,6 +123,66 @@ printFluents s = do _ <- printf "start = %.2f\n" (BAT.start s)
                     --mapM_ (\(b,c) -> putStrLn ("ttc " ++ show b ++ " " ++ show c ++ " = " ++ show (BAT.ttc s b c))) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
 
 
+printFluentDiffs :: (RealFloat a, PrintfArg a) => Sit (BAT.Prim a) -> IO ()
+printFluentDiffs s @ (Do (BAT.Prematch e) _) = do mapM_ (\(b,c) -> printf "ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntgDiff s e b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
+                                                  mapM_ (\(b,c) -> printf "ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttcDiff s e b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
+                                                  mapM_ (\b -> printf "same lane %s = %s\n" (show b) (show (BAT.lane s b == Obs.lane e b))) Car.cars
+printFluentDiffs _                           = return ()
+
+
+traceCsv :: (RealFloat a, Show a) => Sit (BAT.Prim a) -> [String]
+traceCsv sit = header : map (concat . interleave delim . map show . csv) sits
+   where list  = BAT.sit2list sit
+         lists = filter (isPrematchAction . last) (map (\n -> take n list) [1..length list])
+         sits  = map BAT.list2sit lists
+         isPrematchAction (BAT.Prematch _)  = True
+         isPrematchAction _                 = False
+         header = "start" ++ delim ++
+                  concat (interleave delim (
+                     ["ntg("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
+                     ["ttc("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b < c] ++
+                     ["ntgD("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
+                     ["ttcD("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b < c]
+                  ))
+         csv s @ (Do (BAT.Prematch e) _) =
+                  [BAT.start s] ++
+                  [BAT.ntg s b c | b <- Car.cars, c <- Car.cars, b /= c] ++
+                  [BAT.ttc s b c | b <- Car.cars, c <- Car.cars, b < c] ++
+                  [BAT.ntgDiff s e b c | b <- Car.cars, c <- Car.cars, b /= c] ++
+                  [BAT.ttcDiff s e b c | b <- Car.cars, c <- Car.cars, b < c]
+
+
+gnuplot :: String -> [String]
+gnuplot csvFile =
+      ["set yrange [-2:2]"
+      ,"set xtics 1"
+      ,"set grid"
+      ,"set datafile separator \""++delim++"\""
+      ,"set key autotitle columnhead"
+      ,"plot " ++
+         concat (interleave ", " (
+            (map (\i -> plotCmd i (i-offset) 2) [offset+1..offset+absolute]) ++
+            (map (\i -> plotCmd i (i-absolute-offset) 4) [offset+absolute+1..offset+absolute+relative])
+         ))
+      ]
+   where plotCmd i lt lw = "\""++csvFile++"\" u 1:"++show i++ " w l lt "++show lt++" lw "++show lw
+         offset   = 1
+         absolute = length ([(b,c) | b <- Car.cars, c <- Car.cars, b /= c] ++
+                            [(b,c) | b <- Car.cars, c <- Car.cars, b < c])
+         relative = length ([(b,c) | b <- Car.cars, c <- Car.cars, b /= c] ++
+                            [(b,c) | b <- Car.cars, c <- Car.cars, b < c])
+
+
+delim = "\t"
+
+
+interleave :: a -> [a] -> [a]
+interleave _ []     = []
+interleave _ [x]    = [x]
+interleave y (x:xs) = x:y:interleave y xs
+
+
+
 --lastObs :: Sit (BAT.Prim a) -> (forall b. Obs.Obs a b => Maybe b)
 --lastObs (Do (BAT.Match e) s) = Just e
 --lastObs S0                   = Nothing
@@ -211,10 +271,12 @@ main = do
              dropObs (                              x                 : xs) = x : dropObs xs
              dropObs []                                                   = []
              newsit s q = BAT.inject 2 (BAT.Accel Car.H q) (BAT.remove 2 s)
-             newquality s @ (Do (BAT.Prematch e) _) q    = BAT.quality Car.H Car.D e (newsit s q)
+             newquality s @ (Do (BAT.Prematch e) _) q    = BAT.quality (newsit s q) e Car.H Car.D
              newquality _                           _    = 100000
-             revnewquality s @ (Do (BAT.Prematch e) _) q = BAT.quality Car.D Car.H e (newsit s q)
+             revnewquality s @ (Do (BAT.Prematch e) _) q = BAT.quality (newsit s q) e Car.D Car.H
              revnewquality _                           _ = 100000
+             ttcnewquality s @ (Do (BAT.Prematch e) _) q = BAT.ttcDiff (newsit s q) e Car.D Car.H
+             ttcnewquality _                           _ = 100000
              newqualities s @ (Do (BAT.Prematch _) _) = zip3 ticks (map (newquality s) ticks) (map (revnewquality s) ticks)
              newqualities _                           = []
              ticks = [-30.0, -29.9 .. 30.0]
@@ -226,60 +288,83 @@ main = do
              s2 (Do (BAT.Prematch _) s) = Just s
              s2 _                       = Nothing
              posInf = 10000000
+             isWaitAction (BAT.Wait _)          = True
+             isWaitAction _                     = False
+             isPrematchAction (BAT.Prematch _)  = True
+             isPrematchAction _                 = False
+             isMatchAction (BAT.Match _)        = True
+             isMatchAction _                    = False
+             isWait (Do a _)                    = isWaitAction a
+             isWait _                           = False
+             isPrematch (Do a _)                = isMatchAction a
+             isPrematch _                       = False
+             isMatch (Do a _)                   = isPrematchAction a
+             isMatch _                          = False
 --         putStrLn (show (force (tree prog S0 0 0)))
-         mapM_ (\(s,v,d,t) -> do --putStrLn (show (BAT.sit2list s))
-                                 putStrLn (show (filter (not.partOfObs) (BAT.sit2list s)))
-                                 putStrLn (show (dropObs (BAT.sit2list s)))
-                                 putStrLn (show (v, d))
-                                 printFluents s
---{-
-                                 --if BAT.start s > 17.5
-                                 if 12.5 < BAT.start s && BAT.start s < 12.7
-                                    then do
-                                             --mapM_ (putStrLn . show) (newqualities s)
-                                             putStrLn ("ntg " ++ show (BAT.ntg s Car.H Car.D))
-                                             putStrLn ("ttc " ++ show (BAT.ttc s Car.H Car.D))
-                                             putStrLn ("ntg after accel " ++ show (BAT.ntg (Do (BAT.Accel Car.H posInf) s) Car.H Car.D))
-                                             putStrLn ("ttc after accel " ++ show (BAT.ttc (Do (BAT.Accel Car.H posInf) s) Car.H Car.D))
-                                             putStrLn ("ntg after wait " ++ show (BAT.ntg (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.H Car.D))
-                                             putStrLn ("ttc after wait " ++ show (BAT.ttc (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.H Car.D))
-                                             putStrLn ("rev ntg " ++ show (BAT.ntg s Car.H Car.D))
-                                             putStrLn ("rev ttc " ++ show (BAT.ttc s Car.H Car.D))
-                                             putStrLn ("rev ntg after accel " ++ show (BAT.ntg (Do (BAT.Accel Car.H posInf) s) Car.D Car.H))
-                                             putStrLn ("rev ttc after accel " ++ show (BAT.ttc (Do (BAT.Accel Car.H posInf) s) Car.D Car.H))
-                                             putStrLn ("rev ntg after wait " ++ show (BAT.ntg (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.D Car.H))
-                                             putStrLn ("rev ttc after wait " ++ show (BAT.ttc (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.D Car.H))
-                                             putStrLn "---"
-                                             putStrLn (show ("q", "q1", "q2", "1/q1", "1/q2", "q1+q2", "1/q1 + q2", "1/q1 + 1/q2", "ntg1", "ntg2", "ttc"))
-                                             --mapM_ (putStrLn . show) (map (\(x,y,z) -> (x, y, z, 1/y, 1/z, y+z, 1/y+z, 1/y+1/z, BAT.ntg (newsit s x) Car.H Car.D, BAT.ntg (newsit s x) Car.D Car.H, BAT.ttc (newsit s x) Car.H Car.D)) (newqualities s))
-                                             mapM_ (\_ -> putStrLn (show "Ok")) (newqualities s)
-                                             putStrLn ("interpolateLin " ++ show (interpolateLin id (-2,2) 0 (newquality s)))
-                                             --putStrLn ("ntg " ++ show (BAT.ntg (newsit s posInf) Car.H Car.D)) -- wtf is that what for?
-                                             putStrLn ("reciprocal's function constant " ++ show ((newquality s) posInf))
-                                             let xInterpolateRecipLin = interpolateRecipLin id (-2,2) 0 (newquality s)
-                                             let xInterpolateRecipLinAndLin = interpolateRecipLinAndLinForZero id (-2,2) (\q -> (newquality s q, revnewquality s q))
-                                             putStrLn ("interpolateRecipLin " ++ show xInterpolateRecipLin)
-                                             putStrLn ("interpolateRecipLinAndLin " ++ show xInterpolateRecipLinAndLin)
-                                             putStrLn ("quality interpolateRecipLin " ++ show (newquality s xInterpolateRecipLin))
-                                             putStrLn ("quality interpolateRecipLinAndLin " ++ show (newquality s xInterpolateRecipLinAndLin))
-                                             putStrLn ("quality picked " ++ show (newquality s 1.703566166342949))
-                                             putStrLn ("revquality interpolateRecipLin " ++ show (revnewquality s xInterpolateRecipLin))
-                                             putStrLn ("revquality interpolateRecipLinAndLin " ++ show (revnewquality s xInterpolateRecipLinAndLin))
-                                             putStrLn ("revquality picked " ++ show (revnewquality s 1.703566166342949))
-                                             --mapM_ (putStrLn . show) (diffs (map snd (newqualities s)))
-                                             --putStrLn (show t)
-                                             putStrLn "---"
-                                             putStrLn (show (dropObs (BAT.sit2list (newsit s xInterpolateRecipLinAndLin))))
-                                             putStrLn ("ntg0 = " ++ (show (maybe (-1000) (\sit -> BAT.ntg sit Car.H Car.D) (s0 (newsit s xInterpolateRecipLin)))))
-                                             putStrLn ("ttc0 = " ++ (show (maybe (-1000) (\sit -> BAT.ttc sit Car.H Car.D) (s0 (newsit s xInterpolateRecipLin)))))
-                                             putStrLn ("ntg1 = " ++ (show (maybe (-1000) (\sit -> BAT.ntg sit Car.H Car.D) (s1 (newsit s xInterpolateRecipLin)))))
-                                             putStrLn ("ttc1 = " ++ (show (maybe (-1000) (\sit -> BAT.ttc sit Car.H Car.D) (s1 (newsit s xInterpolateRecipLin)))))
-                                             putStrLn ("ntg2 = " ++ (show (maybe (-1000) (\sit -> BAT.ntg sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
-                                             putStrLn ("ttc2 = " ++ (show (maybe (-1000) (\sit -> BAT.ttc sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
-                                    else return ()
----}
-                                 putStrLn ""
-               ) confs
+         mapM_ (\(s,v,d,t) ->
+            do --putStrLn (show (BAT.sit2list s))
+               if isMatch s
+                  then do  putStrLn (show (filter (not.partOfObs) (BAT.sit2list s)))
+                           putStrLn (show (dropObs (BAT.sit2list s)))
+                           putStrLn (show (v, d))
+                           printFluents s
+                           printFluentDiffs s
+                           --if BAT.start s > 17.5
+                           if False && 19.5 < BAT.start s && BAT.start s < 19.7
+                              then do
+                                       --mapM_ (putStrLn . show) (newqualities s)
+                                       putStrLn ("ntg " ++ show (BAT.ntg s Car.H Car.D))
+                                       putStrLn ("ttc " ++ show (BAT.ttc s Car.H Car.D))
+                                       putStrLn ("ntg after accel " ++ show (BAT.ntg (Do (BAT.Accel Car.H posInf) s) Car.H Car.D))
+                                       putStrLn ("ttc after accel " ++ show (BAT.ttc (Do (BAT.Accel Car.H posInf) s) Car.H Car.D))
+                                       putStrLn ("ntg after wait " ++ show (BAT.ntg (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.H Car.D))
+                                       putStrLn ("ttc after wait " ++ show (BAT.ttc (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.H Car.D))
+                                       putStrLn ("rev ntg " ++ show (BAT.ntg s Car.H Car.D))
+                                       putStrLn ("rev ttc " ++ show (BAT.ttc s Car.H Car.D))
+                                       putStrLn ("rev ntg after accel " ++ show (BAT.ntg (Do (BAT.Accel Car.H posInf) s) Car.D Car.H))
+                                       putStrLn ("rev ttc after accel " ++ show (BAT.ttc (Do (BAT.Accel Car.H posInf) s) Car.D Car.H))
+                                       putStrLn ("rev ntg after wait " ++ show (BAT.ntg (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.D Car.H))
+                                       putStrLn ("rev ttc after wait " ++ show (BAT.ttc (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.D Car.H))
+                                       putStrLn "---"
+                                       --putStrLn (show ("q", "q1", "q2", "1/q1", "1/q2", "q1+q2", "1/q1 + q2", "1/q1 + 1/q2", "ntg1", "ntg2", "ttc"))
+                                       --mapM_ (putStrLn . show) (map (\(x,y,z) -> (x, y, z, 1/y, 1/z, y+z, 1/y+z, 1/y+1/z, BAT.ntg (newsit s x) Car.H Car.D, BAT.ntg (newsit s x) Car.D Car.H, BAT.ttc (newsit s x) Car.H Car.D)) (newqualities s))
+                                       --mapM_ (\_ -> putStrLn (show "Ok")) (newqualities s)
+                                       let f   = newquality s
+                                       let cfl = canonicalize f 0
+                                       let cfr = canonicalizeRecip f 0
+                                       let g   = revnewquality s
+                                       let cgl = canonicalize g 0
+                                       let cgr = canonicalizeRecip g 0
+                                       let h   = ttcnewquality s
+                                       let chl = canonicalize h 0
+                                       let chr = canonicalizeRecip h 0
+                                       let na  = nullAt id
+                                       --putStrLn ("nullAt f lin " ++ show (na cfl) ++ "  =>  " ++ show (f (na cfl)))
+                                       putStrLn ("nullAt f rec " ++ show (na cfr) ++ "  =>  " ++ show (f (na cfr)))
+                                       putStrLn ("nullAt g lin " ++ show (na cgl) ++ "  =>  " ++ show (g (na cgl)))
+                                       putStrLn ("nullAt h lin " ++ show (na chl) ++ "  =>  " ++ show (g (na chl)))
+                                       putStrLn ("nullAt h rec " ++ show (na chr) ++ "  =>  " ++ show (g (na chr)))
+                                       putStrLn ("#q,f,g,h,f+g,f+g+h,|f|+|g|,|f|+|g|")
+                                       mapM_ (putStrLn . tail . init . show) (map (\q -> (q,f q, g q, h q, f q + g q, f q + g q + h q, abs (f q) + abs (g q), abs (f q) + abs (g q) + abs (h q))) ([na cfr - 1.0, na cfr - 0.9 .. na cgl + 1.0]))
+                                       --putStrLn ("nullAt g rec " ++ show (na cgr) ++ "  =>  " ++ show (g (na cgr)))
+                                       --mapM_ (putStrLn . show) (diffs (map snd (newqualities s)))
+                                       --putStrLn (show t)
+                                       --putStrLn "---"
+                                       --putStrLn (show (dropObs (BAT.sit2list (newsit s xInterpolateRecipLinAndLin))))
+                                       --putStrLn ("ntg0 = " ++ (show (maybe (-1000) (\sit -> BAT.ntg sit Car.H Car.D) (s0 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ttc0 = " ++ (show (maybe (-1000) (\sit -> BAT.ttc sit Car.H Car.D) (s0 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ntg1 = " ++ (show (maybe (-1000) (\sit -> BAT.ntg sit Car.H Car.D) (s1 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ttc1 = " ++ (show (maybe (-1000) (\sit -> BAT.ttc sit Car.H Car.D) (s1 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ntg2 = " ++ (show (maybe (-1000) (\sit -> BAT.ntg sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ttc2 = " ++ (show (maybe (-1000) (\sit -> BAT.ttc sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
+                              else return ()
+                           if 15.5 < BAT.start s && BAT.start s < 15.7
+                              then do writeFile "trace.csv" (unlines (traceCsv s))
+                                      writeFile "plot.sh" (unlines (gnuplot "trace.csv"))
+                              else return ()
+                           putStrLn ""
+                  else return ()
+            ) confs
          putStrLn "-------------------------------------------------------"
 -- -}
 {-

@@ -80,7 +80,7 @@ instance (RealFloat a, Show a) => BAT (Prim a) where
 
 -- | Lookahead commonly used in this BAT.
 lookahead :: Depth
-lookahead = 9
+lookahead = 5
 
 
 -- | Number of actions in a situation term.
@@ -93,6 +93,13 @@ sitlen S0       = 0
 sit2list :: Sit a -> [a]
 sit2list S0 = []
 sit2list (Do a s) = (sit2list s) ++ [a]
+
+
+-- | Situation term from the actions in list.
+list2sit :: [a] -> Sit a
+list2sit = list2sit' S0
+   where list2sit' s [] = s
+         list2sit' s (a:as) = list2sit' (Do a s) as
 
 
 -- | Injects a new action 'n' actions ago in the situation term.
@@ -109,17 +116,23 @@ remove n (Do a s) = Do a (remove (n-1) s)
 remove _ S0       = S0
 
 
--- | Computes the discrepancy in NTG of two cars between a observation and
--- a situation.
-quality :: (RealFloat a, O.Obs a b) => Car -> Car -> b -> Sit (Prim a) -> a
-quality b c e s = ntg s b c - O.ntg e b c
+ntgDiff :: (RealFloat a, O.Obs a b) => Sit (Prim a) -> b -> Car -> Car -> a
+ntgDiff s e b c = ntg s b c - O.ntg e b c
+
+
+ttcDiff :: (RealFloat a, O.Obs a b) => Sit (Prim a) -> b -> Car -> Car -> a
+ttcDiff s e b c = ttc s b c - O.ttc e b c
+
+
+quality :: (RealFloat a, O.Obs a b) => Sit (Prim a) -> b -> Car -> Car -> a
+quality = ntgDiff
 
 
 -- | Looks for the next Prematch action and returns the quality of this
 -- situation compared to this observation.
 valueByQuality :: RealFloat a => Car -> Car -> Depth -> SitTree Grown (Prim a) -> Maybe (a, a)
 valueByQuality b c l t = val (best def max' cut l t)
-   where val (Do (Prematch e) s, _, _, _)     = Just (quality b c e s, quality c b e s)
+   where val (Do (Prematch e) s, _, _, _)     = Just (quality s e b c, quality s e c b)
          val (_,                 _, _, _)     = Nothing
          cut (_,                 _, _, Final) = True
          cut (Do (Prematch _) _, _, _, _)     = True
