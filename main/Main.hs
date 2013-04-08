@@ -17,6 +17,9 @@ import Util.Interpolation
 import Data.Maybe
 import Control.Applicative
 import Text.Printf
+import GHC.Stats
+import Data.ByteString.Char8 (pack)
+-- import System.Remote.Monitoring
 
 class Show a => ShowPart a where
    showPart :: Int -> a -> String
@@ -124,8 +127,8 @@ printFluents s = do _ <- printf "start = %.2f\n" (BAT.start s)
 
 
 printFluentDiffs :: (RealFloat a, PrintfArg a) => Sit (BAT.Prim a) -> IO ()
-printFluentDiffs s @ (Do (BAT.Prematch e) _) = do mapM_ (\(b,c) -> printf "ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntgDiff s e b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
-                                                  mapM_ (\(b,c) -> printf "ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttcDiff s e b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
+printFluentDiffs s @ (Do (BAT.Prematch e) _) = do mapM_ (\(b,c) -> printf "\916ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntgDiff s e b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
+                                                  mapM_ (\(b,c) -> printf "\916ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttcDiff s e b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
                                                   mapM_ (\b -> printf "same lane %s = %s\n" (show b) (show (BAT.lane s b == Obs.lane e b))) Car.cars
 printFluentDiffs _                           = return ()
 
@@ -139,38 +142,45 @@ traceCsv sit = header : map (concat . interleave delim . map show . csv) sits
          isPrematchAction _                 = False
          header = "start" ++ delim ++
                   concat (interleave delim (
-                     ["ntg("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
-                     ["ttc("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b < c] ++
-                     ["ntgD("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
-                     ["ttcD("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b < c]
+                     ["ntg_S("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
+                     ["ttc_S("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b < c] ++
+                     ["ntg_O("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
+                     ["ttc_O("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b < c] ++
+                     ["ntg_D("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
+                     ["ttc_D("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b < c]
                   ))
          csv s @ (Do (BAT.Prematch e) _) =
                   [BAT.start s] ++
                   [BAT.ntg s b c | b <- Car.cars, c <- Car.cars, b /= c] ++
                   [BAT.ttc s b c | b <- Car.cars, c <- Car.cars, b < c] ++
+                  [Obs.ntg e b c | b <- Car.cars, c <- Car.cars, b /= c] ++
+                  [Obs.ttc e b c | b <- Car.cars, c <- Car.cars, b < c] ++
                   [BAT.ntgDiff s e b c | b <- Car.cars, c <- Car.cars, b /= c] ++
                   [BAT.ttcDiff s e b c | b <- Car.cars, c <- Car.cars, b < c]
 
 
 gnuplot :: String -> [String]
 gnuplot csvFile =
-      ["set yrange [-2:2]"
+      ["gnuplot --persist << EOF"
+      ,"set yrange [-2:2]"
       ,"set xtics 1"
       ,"set grid"
       ,"set datafile separator \""++delim++"\""
       ,"set key autotitle columnhead"
       ,"plot " ++
          concat (interleave ", " (
-            (map (\i -> plotCmd i (i-offset) 2) [offset+1..offset+absolute]) ++
-            (map (\i -> plotCmd i (i-absolute-offset) 4) [offset+absolute+1..offset+absolute+relative])
+            map (\i -> plotCmd i (i-offset) 2) [offset+1..offset+sitData] ++
+            map (\i -> plotCmd i (i-sitData-offset) 4) [offset+sitData+1..offset+sitData+obsData] ++
+            map (\i -> plotCmd i (i-obsData-sitData-offset) 8) [offset+sitData+obsData+1..offset+sitData+obsData+diffData]
          ))
+      ,"EOF"
       ]
    where plotCmd i lt lw = "\""++csvFile++"\" u 1:"++show i++ " w l lt "++show lt++" lw "++show lw
          offset   = 1
-         absolute = length ([(b,c) | b <- Car.cars, c <- Car.cars, b /= c] ++
+         sitData  = length ([(b,c) | b <- Car.cars, c <- Car.cars, b /= c] ++
                             [(b,c) | b <- Car.cars, c <- Car.cars, b < c])
-         relative = length ([(b,c) | b <- Car.cars, c <- Car.cars, b /= c] ++
-                            [(b,c) | b <- Car.cars, c <- Car.cars, b < c])
+         obsData  = sitData
+         diffData = obsData
 
 
 delim = "\t"
@@ -211,6 +221,7 @@ nextObsTtc S0                   _ _ = Nothing
 
 main :: IO ()
 main = do
+         -- _ <- forkServer (pack "localhost") 8000
 {-
    let   a = PseudoAtom (Atom (Prim A))
          b = PseudoAtom (Atom (Prim B))
@@ -268,6 +279,7 @@ main = do
              partOfObs (BAT.Match _)    = True
              partOfObs _                = False
              dropObs (BAT.Wait _ : BAT.Prematch _ : x @ (BAT.Match _) : xs) = x : dropObs xs
+             dropObs (BAT.Wait _ :                  x @ (BAT.Match _) : xs) = x : dropObs xs
              dropObs (                              x                 : xs) = x : dropObs xs
              dropObs []                                                   = []
              newsit s q = BAT.inject 2 (BAT.Accel Car.H q) (BAT.remove 2 s)
@@ -296,9 +308,9 @@ main = do
              isMatchAction _                    = False
              isWait (Do a _)                    = isWaitAction a
              isWait _                           = False
-             isPrematch (Do a _)                = isMatchAction a
+             isPrematch (Do a _)                = isPrematchAction a
              isPrematch _                       = False
-             isMatch (Do a _)                   = isPrematchAction a
+             isMatch (Do a _)                   = isMatchAction a
              isMatch _                          = False
 --         putStrLn (show (force (tree prog S0 0 0)))
          mapM_ (\(s,v,d,t) ->
@@ -326,9 +338,6 @@ main = do
                                        putStrLn ("rev ntg after wait " ++ show (BAT.ntg (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.D Car.H))
                                        putStrLn ("rev ttc after wait " ++ show (BAT.ttc (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.D Car.H))
                                        putStrLn "---"
-                                       --putStrLn (show ("q", "q1", "q2", "1/q1", "1/q2", "q1+q2", "1/q1 + q2", "1/q1 + 1/q2", "ntg1", "ntg2", "ttc"))
-                                       --mapM_ (putStrLn . show) (map (\(x,y,z) -> (x, y, z, 1/y, 1/z, y+z, 1/y+z, 1/y+1/z, BAT.ntg (newsit s x) Car.H Car.D, BAT.ntg (newsit s x) Car.D Car.H, BAT.ttc (newsit s x) Car.H Car.D)) (newqualities s))
-                                       --mapM_ (\_ -> putStrLn (show "Ok")) (newqualities s)
                                        let f   = newquality s
                                        let cfl = canonicalize f 0
                                        let cfr = canonicalizeRecip f 0
@@ -358,13 +367,17 @@ main = do
                                        --putStrLn ("ntg2 = " ++ (show (maybe (-1000) (\sit -> BAT.ntg sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
                                        --putStrLn ("ttc2 = " ++ (show (maybe (-1000) (\sit -> BAT.ttc sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
                               else return ()
-                           if 15.5 < BAT.start s && BAT.start s < 15.7
+                           if 19.5 < BAT.start s && BAT.start s < 19.7
                               then do writeFile "trace.csv" (unlines (traceCsv s))
                                       writeFile "plot.sh" (unlines (gnuplot "trace.csv"))
                               else return ()
                            putStrLn ""
                   else return ()
             ) confs
+         putStrLn "-------------------------------------------------------"
+         stats <- getGCStats
+         putStrLn "GC Stats:"
+         putStrLn (show stats)
          putStrLn "-------------------------------------------------------"
 -- -}
 {-

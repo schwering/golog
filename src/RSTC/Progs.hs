@@ -45,7 +45,8 @@ obsprog []     = Nil
 obsprog (e:es) = seq' (initAct:acts)
    where initAct = maybe Nil (act . Init) e
          acts = map (\e' -> atomic ((actf (\s -> Wait (Obs.time e' - start s)))
-                              `Seq` (act (Prematch e'))
+                              --`Seq` (act (Prematch e'))
+                              --`Seq` (test (const True))
                               `Seq` (act (Match e'))))
                     (catMaybes es)
          seq' []     = Nil
@@ -107,6 +108,7 @@ overtake b c =
          act (LaneChange b RightLane)
       ) `Conc` (
          --Star (Pick (value lookahead) (picknum (0.9, 1.5)) (\q -> act (Accel b q)))
+         {-
          Star (Pick (valueByQuality b c lookahead)
                     --(\val -> interpolateRecipLin id (0.7, 1.5) 0 (fromMaybe 100 . val))
                     --(\val -> interpolateRecipLinAndLinForZero id (0.7, 1.5) (fromMaybe (100, 100) . val))
@@ -114,10 +116,11 @@ overtake b c =
                              0.5 * nullAt id (canonicalize      (snd . fromMaybe (nan,nan) . val) 0))
                     (\q -> act (Accel b q)))
                     --(\q -> (act (Accel b (q)) `Seq` (actf (\s -> Msg (show (sitlen s)))))))
+         -}
+         Star (actf (\s -> Accel b (bestAccel s b c)))
       )
    ) `Seq` atomic (
       test (\s -> BAT.ntg s b c < 0) `Seq`
       act (End b "overtake") 
    )
-
 
