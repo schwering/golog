@@ -1,3 +1,9 @@
 .*.swp
 *.csv
 a.out
+replay
+Main.prof*
+bla.*
+bla-*
+blupp.*
+blupp-*
