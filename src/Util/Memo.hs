@@ -22,7 +22,7 @@ import Data.Bits
 import Data.Ix
 import qualified Data.Map as Map
 import qualified Data.IntMap.Strict as IntMap
-import System.IO.Unsafe(unsafePerformIO)
+import System.IO.Unsafe (unsafePerformIO)
 import System.Mem.StableName
 
 

@@ -56,9 +56,9 @@ data TTCCat = ConvergingFast
 -- Precondition and reward.
 
 instance (RealFloat a, Show a) => BAT (Prim a) where
-   poss (Wait t)             _ = not (isNaN t) && t >= 0
-   poss a @ (Accel _ q)      s = not (isNaN q) && noDupe a s
-   poss a @ (LaneChange b l) s = l /= lane s b && noDupe a s
+   poss (Wait t)             _ = t >= 0 && not (isNaN t)
+   poss a @ (Accel _ q)      s = noDupe a s && not (isNaN q)
+   poss a @ (LaneChange b l) s = noDupe a s && l /= lane s b
    poss (Init _)             _ = True
    poss (Prematch _)         _ = True
    poss (Match e)            s = match e s
@@ -345,7 +345,6 @@ memo' f = curry3 (memoOblivious stableName1of3
                                 (uncurry3 f))
 
 
---{-
 memo3 :: (Sit (Prim a) -> Car -> Car -> b) ->
           (Sit (Prim a) -> Car -> Car -> b)
 memo3 f = curry3 (memoMap stable (uncurry3 f))
@@ -362,7 +361,7 @@ memo1 :: (Sit (Prim a) -> b) ->
          (Sit (Prim a) -> b)
 memo1 f = memoMap stable f
    where stable = stableNameAndHash
----}
+
 
 {-
 memo3 :: (Sit (Prim a) -> Car -> Car -> a) ->
@@ -377,6 +376,13 @@ memo2 :: (Sit (Prim a) -> Car -> Lane) ->
 memo2 f = curry (memoIntMap stable hash (uncurry f))
    where stable = stableName1of2
          hash = (\(x,y) -> x `combine` fromEnum y) . hashStableName1of2
+
+
+memo1 :: (Sit (Prim a) -> b) ->
+         (Sit (Prim a) -> b)
+memo1 f = memoMap stable hash f
+   where stable = stableName
+         hash = hashStableName
 -}
 
 nan :: RealFloat a => a

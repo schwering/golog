@@ -314,8 +314,8 @@ main = do
              isMatch _                          = False
 --         putStrLn (show (force (tree prog S0 0 0)))
          mapM_ (\(s,v,d,t) ->
-            do --putStrLn (show (BAT.sit2list s))
-               if isMatch s
+            do putStrLn (show (BAT.sit2list s))
+               if False && isMatch s
                   then do  putStrLn (show (filter (not.partOfObs) (BAT.sit2list s)))
                            putStrLn (show (dropObs (BAT.sit2list s)))
                            putStrLn (show (v, d))
