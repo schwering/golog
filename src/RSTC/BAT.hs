@@ -12,7 +12,7 @@ import Interpreter.Golog
 import qualified RSTC.Obs as O
 import RSTC.Theorems
 import Util.Interpolation
-import Util.Memo
+import Util.MemoCache
 
 import Data.List
 import Data.Maybe
@@ -258,7 +258,7 @@ noDupe _ _ = error "RSTC.BAT.noDupe: neither Accel nor LaneChange"
 -- | SSA for starting time of situation.
 -- This is the memoizing function.
 start :: RealFloat a => Sit (Prim a) -> Time a
-start = memo1 start'
+start = memo1 1 start'
 
 
 -- | SSA for starting time of situation.
@@ -272,7 +272,8 @@ start' S0              = 0
 -- | SSA for lane.
 -- This is the memoizing function.
 lane :: RealFloat a => Sit (Prim a) -> Car -> Lane
-lane = memo2 lane'
+--lane = memo2 lane'
+lane = lane'
 
 
 -- | SSA for lane.
@@ -288,7 +289,7 @@ lane' S0                      _          = RightLane
 -- Situation argument is first for better currying inside the SSAs.
 -- This is the memoizing function.
 ntg :: RealFloat a => Sit (Prim a) -> Car -> Car -> NTG a
-ntg = memo3 ntg'
+ntg = memo3 1 ntg'
 
 
 -- | SSA of NTG. For Accel actions, transitivity is tried.
@@ -312,7 +313,7 @@ ntg' S0                 _ _          = nan
 -- Situation argument is first for better currying inside the SSAs.
 -- This is the memoizing function.
 ttc :: RealFloat a => Sit (Prim a) -> Car -> Car -> TTC a
-ttc = memo3 ttc'
+ttc = memo3 2 ttc'
 
 
 -- | SSA of TTC. For Accel actions, transitivity is tried.
@@ -336,6 +337,7 @@ ttc' (Do _        s)    b c          = ttc s b c
 ttc' S0                 _ _          = nan
 
 
+{-
 memo' :: (Sit (Prim a) -> Car -> Car -> b) ->
          (Sit (Prim a) -> Car -> Car -> b)
 memo' f = curry3 (memoOblivious stableName1of3
@@ -361,7 +363,7 @@ memo1 :: (Sit (Prim a) -> b) ->
          (Sit (Prim a) -> b)
 memo1 f = memoMap stable f
    where stable = stableNameAndHash
-
+-}
 
 {-
 memo3 :: (Sit (Prim a) -> Car -> Car -> a) ->

@@ -50,7 +50,7 @@ pso seed m n params bounds (Max f) =
 
 
 foreign import ccall "wrapper"
-  wrap :: (CDouble -> CDouble) -> IO (FunPtr (CDouble -> CDouble))
+   wrap :: (CDouble -> CDouble) -> IO (FunPtr (CDouble -> CDouble))
 
 
 foreign import ccall "pso"

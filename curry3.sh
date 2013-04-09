@@ -12,17 +12,27 @@ then
         exit 1
 fi
 
-rm -f "$func.csv"
-for f in Main.prof-*
+if [ -z "$callid" ]
+then
+        out="$func"
+else
+        out="$func-$callid"
+fi
+
+rm -f "$out.csv"
+for i in $(seq 1 100)
 do
-        i=$(echo "$f" | sed -e 's/Main.prof-//g')
-        if [ -z "$callid" ]
+        f="Main.prof-$i"
+        if [ -f "$f" ]
         then
-                n=$(grep " $func " "$f" | awk '{SUM += $4} END {print SUM}')
-        else
-                n=$(grep " $func " "$f" | grep " $callid " | awk '{SUM += $4} END {print SUM}')
+                if [ -z "$callid" ]
+                then
+                        n=$(grep " $func " "$f" | awk '{SUM += $4} END {print SUM}')
+                else
+                        n=$(grep " $func " "$f" | grep " $callid " | awk '{SUM += $4} END {print SUM}')
+                fi
+                echo "$i;$n" >> $out.csv
         fi
-        echo "$i;$n" >> $func.csv
 done
 
 gnuplot --persist << EOF
@@ -30,9 +40,9 @@ set xtics 1
 set grid
 set datafile separator ";"
 set terminal png size 1024,768
-set output "$func.png"
-plot "$func.csv" u 1:2 w l lt 1 lw 2
+set output "$out.png"
+plot "$out.csv" u 1:2 w l lt 1 lw 2
 set terminal wxt
-plot "$func.csv" u 1:2 w l lt 1 lw 2
+plot "$out.csv" u 1:2 w l lt 1 lw 2
 EOF
 
