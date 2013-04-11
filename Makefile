@@ -1,8 +1,8 @@
 all: dist replay
 	cabal build
 
-dist:
-	cabal configure
+dist: prgolog.cabal
+	cabal configure --enable-library-profiling --enable-executable-profiling
 
 replay: src/replay.c
 	cc -Wall -o replay src/replay.c
@@ -12,4 +12,5 @@ doc:
 
 clean:
 	rm -rf dist
+	rm -f replay
 

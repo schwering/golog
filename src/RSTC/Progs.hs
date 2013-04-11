@@ -1,7 +1,5 @@
 -- | Golog programs based on the RSTC action theory.
 
-{-# LANGUAGE MultiParamTypeClasses #-}
-
 module RSTC.Progs where
 
 import RSTC.Car
@@ -10,32 +8,16 @@ import RSTC.BAT
 import qualified RSTC.BAT as BAT
 import qualified RSTC.Obs as Obs
 import RSTC.Theorems
+import Util.Interpolation
 import Util.NativePSO
 
 import Data.Maybe
-import System.IO.Unsafe
-import Unsafe.Coerce
+import Debug.Trace
 
-interpol :: (Fractional a, Ord a) => (a -> a) -> a -> a -> a -> Maybe a
-interpol f lo hi goal
-   | f lo <= goal && goal <= f hi  = let m = (goal - (f lo)) / ((f hi) - (f lo))
-                                     in Just (lo + m * (hi - lo))
-   | f lo > f hi                   = interpol (\x -> -(f x)) lo hi (-goal)
-   | otherwise                     = Nothing
-
-
---picknum :: (Double, Double) -> (Double -> (Reward, Depth)) -> Double
---picknum bounds val = pso 10 m n defaultParams bounds (Max (fst . val))
---XXX TODO val has now type (Double -> v) for some Ord v
-picknum :: Ord v => (Double, Double) -> (Double -> v) -> Double
-picknum bounds val = pso 10 m n defaultParams bounds (Max f)
-   where f = \x -> fst (unsafeCoerce (val x))
-         m = 10
+picknum :: (Double, Double) -> (Double -> (Reward, Depth)) -> Double
+picknum bounds val = pso 10 m n defaultParams bounds (Max (fst . val))
+   where m = 10
          n = 1
-
-
-pickaccel :: Ord v => (Car, Car) -> ((Car, Car, Double) -> v) -> (Car, Car, Double)
-pickaccel (b, c) val = undefined
 
 
 act :: a -> Prog a
@@ -51,7 +33,7 @@ test = PseudoAtom . Atom . Test
 
 
 ptest :: String -> Prog a
-ptest s = test (\_ -> unsafePerformIO (putStrLn s >>= \_ -> return True))
+ptest s = test (const (traceStack s True))
 
 
 atomic :: Prog a -> Prog a
@@ -63,7 +45,8 @@ obsprog []     = Nil
 obsprog (e:es) = seq' (initAct:acts)
    where initAct = maybe Nil (act . Init) e
          acts = map (\e' -> atomic ((actf (\s -> Wait (Obs.time e' - start s)))
-                              `Seq` (act (Prematch e'))
+                              --`Seq` (act (Prematch e'))
+                              --`Seq` (test (const True))
                               `Seq` (act (Match e'))))
                     (catMaybes es)
          seq' []     = Nil
@@ -74,7 +57,7 @@ follow :: Car -> Car -> Prog (Prim Double)
 follow b c =
    atomic (
       act (Start b "follow") `Seq`
-      test (\s -> lane b s == lane c s) `Seq`
+      test (\s -> lane s b == lane s c) `Seq`
       test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
       test (\s -> (CloseBehind `elem` (ntgCats (BAT.ntg s b c)))) `Seq`
       actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b))
@@ -87,7 +70,7 @@ tailgate :: Car -> Car -> Prog (Prim Double)
 tailgate b c =
    atomic (
       act (Start b "tailgate") `Seq`
-      test (\s -> lane b s == lane c s) `Seq`
+      test (\s -> lane s b == lane s c) `Seq`
       test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
       test (\s -> any (`elem` (ntgCats (BAT.ntg s b c))) [VeryCloseBehind, CloseBehind]) `Seq`
       actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b))
@@ -100,11 +83,11 @@ pass :: Car -> Car -> Prog (Prim Double)
 pass b c =
    atomic (
       act (Start b "pass") `Seq`
-      test (\s -> lane b s /= lane c s) `Seq`
+      test (\s -> lane s b /= lane s c) `Seq`
       test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
       test (\s -> isConverging (BAT.ttc s) b c)
    ) `Seq` (
-      Star (Pick (picknum (0.95, 1.2)) 1 (\q -> act (Accel b q)))
+      Star (Pick (value lookahead) (picknum (0.95, 1.2)) (\q -> act (Accel b q)))
    ) `Seq` atomic (
       test (\s -> BAT.ntg s b c <= 0) `Seq`
       act (End b "pass") 
@@ -115,29 +98,29 @@ overtake :: Car -> Car -> Prog (Prim Double)
 overtake b c =
    atomic (
       act (Start b "overtake") `Seq`
-      test (\s -> lane b s == lane c s) `Seq`
-      ptest "huhu1" `Seq`
-      test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
-      ptest "huhu2" `Seq`
-      --test (\s -> isConverging (BAT.ttc s) b c) `Seq`
-      ptest "huhu3"
+      test (\s -> lane s b == lane s c) `Seq`
+      test (\s -> isFollowing (BAT.ntg s) b c)
+      --test (\s -> isConverging (BAT.ttc s) b c)
    ) `Seq` (
       (
          act (LaneChange b LeftLane) `Seq`
          test (\s -> BAT.ntg s b c < 0) `Seq`
          act (LaneChange b RightLane)
       ) `Conc` (
-         Star (Pick (picknum (0.9, 1.5)) 1 (\q -> act (Accel b q)))
+         --Star (Pick (value lookahead) (picknum (0.9, 1.5)) (\q -> act (Accel b q)))
+         {-
+         Star (Pick (valueByQuality b c lookahead)
+                    --(\val -> interpolateRecipLin id (0.7, 1.5) 0 (fromMaybe 100 . val))
+                    --(\val -> interpolateRecipLinAndLinForZero id (0.7, 1.5) (fromMaybe (100, 100) . val))
+                    (\val -> 0.5 * nullAt id (canonicalizeRecip (fst . fromMaybe (nan,nan) . val) 0) +
+                             0.5 * nullAt id (canonicalize      (snd . fromMaybe (nan,nan) . val) 0))
+                    (\q -> act (Accel b q)))
+                    --(\q -> (act (Accel b (q)) `Seq` (actf (\s -> Msg (show (sitlen s)))))))
+         -}
+         Star (actf (\s -> Accel b (bestAccel s b c)))
       )
    ) `Seq` atomic (
       test (\s -> BAT.ntg s b c < 0) `Seq`
       act (End b "overtake") 
    )
-
-
-accelf :: Car -> Car -> Sit (Prim Double) -> Prim Double
-accelf b c s = undefined
-   where s' = Do (Wait ((time e') - (start s)) s
-         e  = lastObs s
-         e' = next e
 

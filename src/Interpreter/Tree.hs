@@ -1,81 +1,81 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 -- | Tree container.
 
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE Rank2Types #-}
-
-module Interpreter.Tree (Tree(..), Depth, OptiF,
+module Interpreter.Tree (Tree(..), Depth, ValF, OptiF, Grown, Ungrown,
                          Functor(..), Foldable(..),
                          branch, force, lmap, best) where
 
 import Prelude hiding (foldl, foldr, max)
 import Data.Foldable
-import Data.Typeable
 
 type Depth = Int
+type ValF a v = Tree Grown a a -> v
 type OptiF u v = (u -> v) -> u
-type ValF a v w = w -> Tree a -> v
 
-data Tree a where
-   Empty  :: Tree a
-   Leaf   :: a -> Tree a
-   Parent :: a -> Tree a -> Tree a
-   Branch :: Tree a -> Tree a -> Tree a
-   Sprout :: Typeable w => w -> (forall v. Ord v => OptiF u v) -> (u -> Tree a) -> Tree a
+data Grown
+data Ungrown
 
-
-instance Functor Tree where
-   fmap _ Empty                 = Empty
-   fmap f (Leaf x)              = Leaf (f x)
-   fmap f (Parent x t)          = Parent (f x) (fmap f t)
-   fmap f (Branch t1 t2)        = Branch (fmap f t1) (fmap f t2)
-   fmap f (Sprout treat opti t) = Sprout treat opti (\x -> fmap f (t x))
+data Tree a b c where
+   Empty  :: Tree a b c
+   Leaf   :: c -> Tree a b c
+   Parent :: c -> Tree a b c -> Tree a b c
+   Branch :: Tree a b c -> Tree a b c -> Tree a b c
+   Sprout :: Ord v => ValF b v -> OptiF u v -> (u -> Tree Ungrown b c) -> Tree Ungrown b c
 
 
-instance Foldable Tree where
-   foldl _ z Empty            = z
-   foldl f z (Leaf x)         = f z x
-   foldl f z (Parent x t)     = foldl f (f z x) t
-   foldl f z (Branch t1 t2)   = foldl f (foldl f z t1) t2
-   foldl _ _ (Sprout _ _ _)   = error "Tree.foldr: Sprout"
-
-   foldr _ z Empty            = z
-   foldr f z (Leaf x)         = f x z
-   foldr f z (Parent x t)     = f x (foldr f z t)
-   foldr f z (Branch t1 t2)   = foldr f (foldr f z t2) t1
-   foldr _ _ (Sprout _ _ _)   = error "Tree.foldr: Sprout"
+instance Functor (Tree a b) where
+   fmap _ Empty               = Empty
+   fmap f (Leaf x)            = Leaf (f x)
+   fmap f (Parent x t)        = Parent (f x) (fmap f t)
+   fmap f (Branch t1 t2)      = Branch (fmap f t1) (fmap f t2)
+   fmap f (Sprout val opti t) = Sprout val opti (\x -> fmap f (t x))
 
 
-branch :: Tree a -> Tree a -> Tree a
+instance Foldable (Tree Grown b) where
+   foldl _ z Empty          = z
+   foldl f z (Leaf x)       = f z x
+   foldl f z (Parent x t)   = foldl f (f z x) t
+   foldl f z (Branch t1 t2) = foldl f (foldl f z t1) t2
+
+   foldr _ z Empty          = z
+   foldr f z (Leaf x)       = f x z
+   foldr f z (Parent x t)   = f x (foldr f z t)
+   foldr f z (Branch t1 t2) = foldr f (foldr f z t2) t1
+
+
+branch :: Tree a b c -> Tree a b c -> Tree a b c
+branch Empty Empty = Empty
 branch Empty t     = t
 branch t     Empty = t
 branch t1    t2    = Branch t1 t2
 
 
-force :: (Ord v) => (forall w. Typeable w => ValF a v w) -> Tree a -> Tree a
-force _   t @ Empty             = t
-force _   t @ (Leaf _)          = t
-force val (Parent x t)          = Parent x (force val t)
-force val (Branch t1 t2)        = Branch (force val t1) (force val t2)
-force val (Sprout treat opti t) = force val (t (opti val'))
-   where val' x = val treat (force val (t x))
+force :: Tree a b b -> Tree Grown b b
+force Empty               = Empty
+force (Leaf x)            = Leaf x
+force (Parent x t)        = Parent x (force t)
+force (Branch t1 t2)      = branch (force t1) (force t2)
+force (Sprout val opti t) = force (t (opti (val . force . t)))
 
 
-lmap :: (a -> Tree b) -> Tree a -> Tree b
-lmap _ Empty                 = Empty
-lmap f (Leaf x)              = f x
-lmap f (Branch t1 t2)        = Branch (lmap f t1) (lmap f t2)
-lmap f (Sprout treat opti t) = Sprout treat opti (\x -> lmap f (t x))
-lmap _ (Parent _ _)          = error "Tree.lmap: Parent"
+lmap :: (c -> Tree a b d) -> Tree a b c -> Tree a b d
+lmap _ Empty               = Empty
+lmap f (Leaf x)            = f x
+lmap f (Branch t1 t2)      = branch (lmap f t1) (lmap f t2)
+lmap f (Sprout val opti t) = Sprout val opti (\x -> lmap f (t x))
+lmap _ (Parent _ _)        = error "Tree.lmap: Parent"
 
 
-best :: a -> (a -> a -> a) -> (a -> Bool) -> Depth -> Tree a -> a
-best def _   _   _ Empty                      = def
-best def max cut l (Parent x t) | l == 0      = x
-                                | cut x       = max x (best def max cut (l-1) t)
-                                | l > 0       = best def max cut (l-1) t
-                                | otherwise   = error "Tree.best: l < 0"
-best def max cut l (Branch t1 t2)             = max (best def max cut l t1)
-                                                    (best def max cut l t2)
-best _   _   _   _ (Leaf x)                   = x
-best _   _   _   _ (Sprout _ _ _)             = error "Tree.best: Sprout"
+best :: c -> (c -> c -> c) -> (c -> Bool) -> Depth -> Tree Grown b c -> c
+best def _   _   _ Empty                    = def
+best def max cut l (Parent x t) | l == 0    = x
+                                | cut x     = max x (best def max cut (l-1) t)
+                                | l > 0     = best def max cut (l-1) t
+                                | otherwise = error "Tree.best: l < 0"
+best def max cut l (Branch t1 t2)           = max (best def max cut l t1)
+                                                  (best def max cut l t2)
+best _   _   _   _ (Leaf x)                 = x
 

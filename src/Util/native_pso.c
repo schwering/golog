@@ -95,7 +95,7 @@ inline static double rand_next_float_in_range(double lo, double hi, random_t *r)
 
 #define MAX_PARTICLES 100
 
-typedef double (objective_t)(double);
+typedef double (*objective_t)(double);
 
 struct particle {
 	double x;  /* Current position. */

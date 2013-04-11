@@ -1,9 +1,10 @@
--- | Observation interface.
-
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
+
+-- | Observation interface.
 
 module RSTC.Obs where
 
@@ -12,8 +13,7 @@ import RSTC.Theorems
 
 import Foreign.C
 
-
-class (RealFloat a) => Obs a b | b -> a where
+class RealFloat a => Obs a b | b -> a where
    next :: b -> Maybe b
    time :: b -> Time a
    ntg  :: b -> Car -> Car -> NTG a
@@ -21,8 +21,13 @@ class (RealFloat a) => Obs a b | b -> a where
    lane :: b -> Car -> Lane
 
 
-type ObsId = Int
+data Wrapper a = forall b. Obs a b => Wrapper b
 
+wrap :: Obs a b => b -> Wrapper a
+wrap e = Wrapper e
+
+
+type ObsId = Int
 
 instance Obs Double ObsId where
    next e     = getObs (succ e)
@@ -64,4 +69,12 @@ foreign import ccall unsafe "obs_ntg"
 
 foreign import ccall unsafe "obs_ttc"
    c_ttc :: CInt -> CInt -> CInt -> CDouble -- obs_id -> b -> c -> TTC or NaN
+
+{-
+c_next_obs = undefined
+c_time = undefined
+c_lane = undefined
+c_ntg = undefined
+c_ttc = undefined
+-}
 

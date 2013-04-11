@@ -1,4 +1,10 @@
 dist
 .*.swp
+*.csv
+a.out
 replay
-logs
+Main.prof*
+bla.*
+bla-*
+blupp.*
+blupp-*

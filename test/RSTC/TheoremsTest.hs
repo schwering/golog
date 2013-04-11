@@ -21,7 +21,7 @@ type Map a = [(Car, Info a)]
 instance Arbitrary Car where
    arbitrary = oneof (map return cars)
 
-instance (Arbitrary a) => Arbitrary (Info a) where
+instance Arbitrary a => Arbitrary (Info a) where
    arbitrary = liftM2 (\v x -> Info v x) arbitrary arbitrary
    shrink (Info v x) = [ Info v' x | v' <- shrink v ]
                     ++ [ Info v x' | x' <- shrink x ]

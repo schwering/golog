@@ -1,3 +1,6 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 -- | Partical swarm optimization.
 --
 -- Disclaimer: this implementation sucks (I think) in terms of speed, quality of
@@ -20,9 +23,6 @@
 -- Mercury's destructive modes are really good to avoid this kind of stuff.)
 --
 -- For a much faster implementation see 'Util.NativePSO'.
-
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module Util.PSO (IterationCount, ParticleCount, Params(..), Bounds,
                  Objective(..), Optimum, VectorSpace, Vector1d(..),

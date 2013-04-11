@@ -49,7 +49,7 @@ orTrans f g b d = let viaCars    = [c | c <- cars, c /= b, c /= d]
 
 -- | Symmetry of NTG.
 ntgSymm :: RealFloat a => NTGF a -> TTCF a -> Car -> Car -> NTG a
-ntgSymm ntg ttc b c = -1 / (1 - (ntg b c) / (ttc b c)) * (ntg b c)
+ntgSymm ntg ttc b c = -1 / (1 - ntg b c / ttc b c) * ntg b c
 
 
 -- | Symmetry of TTC.
@@ -59,35 +59,35 @@ ttcSymm _ ttc b c = ttc c b
 
 -- | Transitivity of NTG. The `via car is the third Car argument!
 ntgTrans :: RealFloat a => NTGF a -> TTCF a -> Car -> Car -> Car -> NTG a
-ntgTrans ntg ttc b c d = (ntg b c) + (1 - (ntg b c) / (ttc b c)) * (ntg c d)
+ntgTrans ntg ttc b c d = ntg b c + (1 - ntg b c / ttc b c) * ntg c d
 
 
 -- | Transitivity of TTC. The `via car is the third Car argument!
 ttcTrans :: RealFloat a => NTGF a -> TTCF a -> Car -> Car -> Car -> TTC a
-ttcTrans ntg ttc b c d = lambda1 * (ttc b c) + lambda2 * (ttc c d)
-   where lambda1 = (ttc c d) * (ntg b c) / denom
-         lambda2 = ((ttc b c) * (ntg c d) - (ntg b c) * (ntg c d)) / denom
-         denom   = (ntg c d) * (ttc b c) + (ttc c d) * (ntg b c) - (ntg c d) * (ntg b c)
+ttcTrans ntg ttc b c d = lambda1 * ttc b c + lambda2 * ttc c d
+   where lambda1 = ttc c d * ntg b c / denom
+         lambda2 = (ttc b c * ntg c d - ntg b c * ntg c d) / denom
+         denom   = ntg c d * ttc b c + ttc c d * ntg b c - ntg c d * ntg b c
 
 
 -- | Temporal evolution of NTG.
 tntg :: RealFloat a => NTGF a -> TTCF a -> Time a -> Car -> Car -> NTG a
-tntg ntg ttc t b c = (ntg b c) - t * (ntg b c) / (ttc b c)
+tntg ntg ttc t b c = ntg b c - t * ntg b c / ttc b c
 
 
 -- | Temporal evolution of TTC.
 tttc :: RealFloat a => NTGF a -> TTCF a -> Time a -> Car -> Car -> TTC a
-tttc _ ttc t b c = (ttc b c) - t
+tttc _ ttc t b c = ttc b c - t
 
 
 -- | Effect of acceleration of the first driver on NTG.
 antg1 :: RealFloat a => NTGF a -> TTCF a -> Accel a -> Car -> Car -> NTG a
-antg1 ntg _ q b c = 1 / q * (ntg b c)
+antg1 ntg _ q b c = 1 / q * ntg b c
 
 
 -- | Effect of acceleration of the first driver on TTC.
 attc1 :: RealFloat a => NTGF a -> TTCF a -> Accel a -> Car -> Car -> TTC a
-attc1 ntg ttc q b c = (1 / ((q-1) * (ttc b c) / (ntg b c) + 1) * (ttc b c))
+attc1 ntg ttc q b c = 1 / ((q-1) * ttc b c / ntg b c + 1) * ttc b c
 
 
 -- | Effect of acceleration of the second driver on NTG.
@@ -97,7 +97,7 @@ antg2 ntg _ _ b c = ntg b c
 
 -- | Effect of acceleration of the second driver on TTC.
 attc2 :: RealFloat a => NTGF a -> TTCF a -> Accel a -> Car -> Car -> TTC a
-attc2 ntg ttc q b c = (1 / ((1-q) * (ttc b c) / (ntg b c) + q) * (ttc b c))
+attc2 ntg ttc q b c = 1 / ((1-q) * ttc b c / ntg b c + q) * ttc b c
 
 
 ----------
@@ -106,7 +106,7 @@ attc2 ntg ttc q b c = (1 / ((1-q) * (ttc b c) / (ntg b c) + q) * (ttc b c))
 
 -- | Ratio v(b) / v(c) where b is the first and c the second 'Car'.
 relVeloc :: RealFloat a => NTGF a -> TTCF a -> Car -> Car -> a
-relVeloc ntg ttc b c = 1 / (1 - (ntg b c) / (ttc b c))
+relVeloc ntg ttc b c = 1 / (1 - ntg b c / ttc b c)
 
 
 -- | Ratio v(b) / v(c) where b is the first and c the second 'Car'.
