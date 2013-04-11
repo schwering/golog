@@ -127,19 +127,19 @@ printFluents s = do _ <- printf "start = %.2f\n" (BAT.start s)
 
 
 printFluentDiffs :: (RealFloat a, PrintfArg a) => Sit (BAT.Prim a) -> IO ()
-printFluentDiffs s @ (Do (BAT.Prematch e) _) = do mapM_ (\(b,c) -> printf "\916ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntgDiff s e b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
-                                                  mapM_ (\(b,c) -> printf "\916ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttcDiff s e b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
-                                                  mapM_ (\b -> printf "same lane %s = %s\n" (show b) (show (BAT.lane s b == Obs.lane e b))) Car.cars
-printFluentDiffs _                           = return ()
+printFluentDiffs s @ (Do (BAT.Match e) _) = do mapM_ (\(b,c) -> printf "\916ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntgDiff s e b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
+                                               mapM_ (\(b,c) -> printf "\916ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttcDiff s e b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
+                                               mapM_ (\b -> printf "same lane %s = %s\n" (show b) (show (BAT.lane s b == Obs.lane e b))) Car.cars
+printFluentDiffs _                        = return ()
 
 
 traceCsv :: (RealFloat a, Show a) => Sit (BAT.Prim a) -> [String]
 traceCsv sit = header : map (concat . interleave delim . map show . csv) sits
    where list  = BAT.sit2list sit
-         lists = filter (isPrematchAction . last) (map (\n -> take n list) [1..length list])
+         lists = filter (isMatchAction . last) (map (\n -> take n list) [1..length list])
          sits  = map BAT.list2sit lists
-         isPrematchAction (BAT.Prematch _)  = True
-         isPrematchAction _                 = False
+         isMatchAction (BAT.Match _)  = True
+         isMatchAction _M             = False
          header = "start" ++ delim ++
                   concat (interleave delim (
                      ["ntg_S("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
@@ -149,7 +149,7 @@ traceCsv sit = header : map (concat . interleave delim . map show . csv) sits
                      ["ntg_D("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
                      ["ttc_D("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b < c]
                   ))
-         csv s @ (Do (BAT.Prematch e) _) =
+         csv s @ (Do (BAT.Match e) _) =
                   [BAT.start s] ++
                   [BAT.ntg s b c | b <- Car.cars, c <- Car.cars, b /= c] ++
                   [BAT.ttc s b c | b <- Car.cars, c <- Car.cars, b < c] ++
@@ -162,6 +162,7 @@ traceCsv sit = header : map (concat . interleave delim . map show . csv) sits
 gnuplot :: String -> [String]
 gnuplot csvFile =
       ["gnuplot --persist << EOF"
+      ,"set terminal qt"
       ,"set yrange [-2:2]"
       ,"set xtics 1"
       ,"set grid"
@@ -314,8 +315,8 @@ main = do
              isMatch _                          = False
 --         putStrLn (show (force (tree prog S0 0 0)))
          mapM_ (\(s,v,d,t) ->
-            do putStrLn (show (BAT.sit2list s))
-               if False && isMatch s
+            do --putStrLn (show (BAT.sit2list s))
+               if isMatch s
                   then do  putStrLn (show (filter (not.partOfObs) (BAT.sit2list s)))
                            putStrLn (show (dropObs (BAT.sit2list s)))
                            putStrLn (show (v, d))
