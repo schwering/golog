@@ -13,6 +13,7 @@ import qualified RSTC.Obs as Obs
 import RSTC.Progs
 import RSTC.Theorems
 import Util.Interpolation
+import qualified Util.MemoCache
 
 import Data.Maybe
 import Control.Applicative
@@ -139,7 +140,7 @@ traceCsv sit = header : map (concat . interleave delim . map show . csv) sits
          lists = filter (isMatchAction . last) (map (\n -> take n list) [1..length list])
          sits  = map BAT.list2sit lists
          isMatchAction (BAT.Match _)  = True
-         isMatchAction _M             = False
+         isMatchAction _              = False
          header = "start" ++ delim ++
                   concat (interleave delim (
                      ["ntg_S("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
@@ -379,6 +380,10 @@ main = do
          stats <- getGCStats
          putStrLn "GC Stats:"
          putStrLn (show stats)
+         putStrLn "-------------------------------------------------------"
+         timeCost <- Util.MemoCache.timeCost
+         ticksCost <- Util.MemoCache.ticksCost
+         putStrLn ("Caching time cost: " ++ show timeCost ++ " s, " ++ show ticksCost ++ " ticks")
          putStrLn "-------------------------------------------------------"
 -- -}
 {-

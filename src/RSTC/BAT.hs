@@ -258,7 +258,8 @@ noDupe _ _ = error "RSTC.BAT.noDupe: neither Accel nor LaneChange"
 -- | SSA for starting time of situation.
 -- This is the memoizing function.
 start :: RealFloat a => Sit (Prim a) -> Time a
-start = memo1 1 start'
+--start = memo1 1 start'
+start = start'
 
 
 -- | SSA for starting time of situation.

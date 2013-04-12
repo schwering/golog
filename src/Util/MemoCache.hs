@@ -3,6 +3,7 @@
 module Util.MemoCache where
 
 import Foreign.C
+import Foreign.C.Types
 import Foreign.Ptr
 import Foreign.StablePtr
 import System.IO.Unsafe (unsafePerformIO)
@@ -49,6 +50,14 @@ c2e :: Enum a => CInt -> a
 c2e = toEnum . fromIntegral
 
 
+timeCost :: IO Double
+timeCost = c_time_cost >>= \cost -> return (realToFrac cost)
+
+
+ticksCost :: IO Integer
+ticksCost = c_ticks_cost >>= \cost -> return (fromIntegral cost)
+
+
 foreign import ccall "wrapper"
    wrap1 :: (StablePtr a -> CDouble) ->
             IO (FunPtr (StablePtr a -> CDouble))
@@ -73,4 +82,10 @@ foreign import ccall "lru_cache2"
 foreign import ccall "lru_cache3"
    c_memo3 :: CacheId -> FunPtr (StablePtr a -> CInt -> CInt -> CDouble) ->
               StablePtr a -> CInt -> CInt -> IO CDouble
+
+foreign import ccall "memo_cache_time_cost"
+   c_time_cost :: IO CDouble
+
+foreign import ccall "memo_cache_ticks_cost"
+   c_ticks_cost :: IO CULong
 

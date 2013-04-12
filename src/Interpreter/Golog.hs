@@ -29,8 +29,6 @@ module Interpreter.Golog (Sit(S0, Do), Reward, Depth, MaxiF, Finality(..),
                           trans, do1, do2, do3,
                           sit, rew, depth, final, value) where
 
---module Interpreter.Golog where
-
 import Interpreter.Tree
 import Prelude hiding (max)
 
