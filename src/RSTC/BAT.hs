@@ -73,7 +73,9 @@ instance (RealFloat a, Show a) => BAT (Prim a) where
    reward (LaneChange _ _) _                = -0.01
    reward (Init _)         _                = 0
    reward (Prematch _)     _                = 0
-   reward (Match _)        _                = 1
+   reward (Match e)        s                = 1 - sum ntgDiffs / genericLength ntgDiffs
+      where ntgDiffs = map realToFrac [abs (ntgDiff s e b c) | b <- cars, c <- cars, b /= c]
+            ttcDiffs = map realToFrac [abs (signum (ttc s b c) - signum (O.ttc e b c)) | b <- cars, c <- cars, b < c]
    reward Abort            _                = 0
    reward NoOp             _                = 0
    reward (Start _ _)      s                = max 0 (1000 - 2 * (fromIntegral (sitlen s)))
@@ -117,7 +119,7 @@ inject n a (Do a' s) = Do a' (inject (n-1) a s)
 inject _ a S0        = Do a S0
 
 
--- | Renives the action 'n' actions ago in the situation term.
+-- | Removes the action 'n' actions ago in the situation term.
 remove :: Int -> Sit a -> Sit a
 remove 0 (Do _ s) = s
 remove n (Do a s) = Do a (remove (n-1) s)
@@ -160,15 +162,20 @@ valueByQuality b c l t = val (best def max' cut l t)
 
 
 bestAccel :: RealFloat a => Sit (Prim a) -> Car -> Car -> Accel a
-bestAccel s b c = 0.5 * nullAt id (canonicalizeRecip f 0) +
-                  0.5 * nullAt id (canonicalize      g 0)
-   where lookahead = 2
-         f q = case ss lookahead q of
-                    s @ (Do (Match e) _) -> quality s e b c
-                    _                    -> nan
-         g q = case ss lookahead q of
-                    s @ (Do (Match e) _) -> quality s e c b
-                    _                    -> nan
+bestAccel s b c = 0.5 * fx + 0.5 * gx
+--   where fx = pick (nullAt id (canonicalizeSum Recip  (f 2) (f 3) 0))
+--         gx = pick (nullAt id (canonicalizeSum Linear (g 2) (g 3) 0))
+--   where fx = let (f1, f2) = (f 2, f 3) in pick f1 f2 (nullAt id (canonicalizeSum Recip  f1 f2 0))
+--         gx = let (g1, g2) = (g 2, g 3) in pick g1 g2 (nullAt id (canonicalizeSum Linear g1 g2 0))
+   where fx = let (f1, f2) = (f 2, f 3) in pick f1 f2 (nullAt id (canonicalize Recip  f1 0))
+         gx = let (g1, g2) = (g 2, g 3) in pick g1 g2 (nullAt id (canonicalize Linear g1 0))
+         pick f1 f2 xs = case sortBy (\x y -> compare (abs (f1 x + f2 x)) (abs (f1 y + f2 y))) xs of (x:_) -> x ; [] -> nan
+         f n q = case ss n q of
+                      s @ (Do (Match e) _) -> quality s e b c
+                      _                    -> nan
+         g n q = case ss n q of
+                      s @ (Do (Match e) _) -> quality s e c b
+                      _                    -> nan
          ss n q = append2sit (Do (Accel b q) s) (obsActions s !! n)
          obsActions (Do (Match e) _)  = inits (obsActions' (O.wrap e))
          obsActions (Do (Init e)  _)  = inits (obsActions' (O.wrap e))

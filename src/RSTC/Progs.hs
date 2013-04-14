@@ -14,8 +14,8 @@ import Util.NativePSO
 import Data.Maybe
 import Debug.Trace
 
-picknum :: (Double, Double) -> (Double -> (Reward, Depth)) -> Double
-picknum bounds val = pso 10 m n defaultParams bounds (Max (fst . val))
+picknum :: (Double, Double) -> (Double -> Double) -> Double
+picknum bounds val = pso 10 m n defaultParams bounds (Max val)
    where m = 10
          n = 1
 
@@ -46,7 +46,6 @@ obsprog (e:es) = seq' (initAct:acts)
    where initAct = maybe Nil (act . Init) e
          acts = map (\e' -> atomic ((actf (\s -> Wait (Obs.time e' - start s)))
                               --`Seq` (act (Prematch e'))
-                              --`Seq` (test (const True))
                               `Seq` (act (Match e'))))
                     (catMaybes es)
          seq' []     = Nil
@@ -62,7 +61,7 @@ follow b c =
       test (\s -> (CloseBehind `elem` (ntgCats (BAT.ntg s b c)))) `Seq`
       actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b))
    ) `Seq`
-   --Pick (picknum (0, 2)) 1 (\q -> act (Accel b q)) `Seq`
+   --Pick (\val -> picknum (0, 2) (fst.val)) 1 (\q -> act (Accel b q)) `Seq`
    act (End b "follow")
 
 
@@ -75,7 +74,7 @@ tailgate b c =
       test (\s -> any (`elem` (ntgCats (BAT.ntg s b c))) [VeryCloseBehind, CloseBehind]) `Seq`
       actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b))
    ) `Seq`
-   --Pick (picknum (0, 2)) 1 (\q -> act (Accel b q)) `Seq`
+   --Pick (\val -> picknum (0, 2) (fst.val)) 1 (\q -> act (Accel b q)) `Seq`
    act (End b "tailgate")
 
 
@@ -87,7 +86,7 @@ pass b c =
       test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
       test (\s -> isConverging (BAT.ttc s) b c)
    ) `Seq` (
-      Star (Pick (value lookahead) (picknum (0.95, 1.2)) (\q -> act (Accel b q)))
+      Star (Pick (fst . value lookahead) (picknum (0.95, 1.2)) (\q -> act (Accel b q)))
    ) `Seq` atomic (
       test (\s -> BAT.ntg s b c <= 0) `Seq`
       act (End b "pass") 
@@ -107,7 +106,7 @@ overtake b c =
          test (\s -> BAT.ntg s b c < 0) `Seq`
          act (LaneChange b RightLane)
       ) `Conc` (
-         --Star (Pick (value lookahead) (picknum (0.9, 1.5)) (\q -> act (Accel b q)))
+         --Star (Pick (fst . value lookahead) (picknum (0.9, 1.5)) (\q -> act (Accel b q)))
          {-
          Star (Pick (valueByQuality b c lookahead)
                     --(\val -> interpolateRecipLin id (0.7, 1.5) 0 (fromMaybe 100 . val))
@@ -117,6 +116,7 @@ overtake b c =
                     (\q -> act (Accel b q)))
                     --(\q -> (act (Accel b (q)) `Seq` (actf (\s -> Msg (show (sitlen s)))))))
          -}
+         --Star (actf (\s -> Accel b (bestAccel s b c)))
          Star (actf (\s -> Accel b (bestAccel s b c)))
       )
    ) `Seq` atomic (

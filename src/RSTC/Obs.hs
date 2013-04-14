@@ -54,7 +54,6 @@ getObs :: ObsId -> Maybe ObsId
 getObs e = case c_next_obs (e2c e) of 1 -> Just e
                                       _ -> Nothing
 
-
 foreign import ccall unsafe "obs_next"
    c_next_obs :: CInt -> CInt -- obs_id -> success
 
@@ -69,12 +68,4 @@ foreign import ccall unsafe "obs_ntg"
 
 foreign import ccall unsafe "obs_ttc"
    c_ttc :: CInt -> CInt -> CInt -> CDouble -- obs_id -> b -> c -> TTC or NaN
-
-{-
-c_next_obs = undefined
-c_time = undefined
-c_lane = undefined
-c_ntg = undefined
-c_ttc = undefined
--}
 

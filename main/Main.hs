@@ -15,6 +15,7 @@ import RSTC.Theorems
 import Util.Interpolation
 import qualified Util.MemoCache
 
+import Data.List (sortBy)
 import Data.Maybe
 import Control.Applicative
 import Text.Printf
@@ -118,13 +119,25 @@ instance BAT Prim where
 
 
 printFluents :: (RealFloat a, PrintfArg a) => Sit (BAT.Prim a) -> IO ()
-printFluents s = do _ <- printf "start = %.2f\n" (BAT.start s)
-                    mapM_ (\(b,c) -> printf "ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntg s b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
-                    mapM_ (\(b,c) -> printf "ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttc s b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
-                    mapM_ (\b -> printf "lane %s = %s\n" (show b) (show (BAT.lane s b))) Car.cars
-                    --putStrLn ("start = " ++ show (BAT.start s))
-                    --mapM_ (\(b,c) -> putStrLn ("ntg " ++ show b ++ " " ++ show c ++ " = " ++ show (BAT.ntg s b c))) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
-                    --mapM_ (\(b,c) -> putStrLn ("ttc " ++ show b ++ " " ++ show c ++ " = " ++ show (BAT.ttc s b c))) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
+printFluents s @ (Do (BAT.Match e) _) =
+   do printf "start = %.2f\n" (BAT.start s)
+      mapM_ (\(b,c) -> do printf "ntg %s %s = %6.2f\t" (show b) (show c) (BAT.ntg s b c)
+                          printf "\916ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntgDiff s e b c)
+            ) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
+      mapM_ (\(b,c) -> do printf "ttc %s %s = %6.2f\t" (show b) (show c) (BAT.ttc s b c)
+                          printf "\916ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttcDiff s e b c)
+            ) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
+      mapM_ (\b -> do printf "lane %s = %s\t" (show b) (show (BAT.lane s b))
+                      printf "same %s = %s\n" (show b) (show (BAT.lane s b == Obs.lane e b))
+            ) Car.cars
+printFluents s =
+   do printf "start = %.2f\n" (BAT.start s)
+      mapM_ (\(b,c) -> do printf "ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntg s b c)
+            ) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
+      mapM_ (\(b,c) -> do printf "ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttc s b c)
+            ) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
+      mapM_ (\b -> do printf "lane %s = %s\n" (show b) (show (BAT.lane s b))
+            ) Car.cars
 
 
 printFluentDiffs :: (RealFloat a, PrintfArg a) => Sit (BAT.Prim a) -> IO ()
@@ -163,18 +176,23 @@ traceCsv sit = header : map (concat . interleave delim . map show . csv) sits
 gnuplot :: String -> [String]
 gnuplot csvFile =
       ["gnuplot --persist << EOF"
-      ,"set terminal qt"
       ,"set yrange [-2:2]"
       ,"set xtics 1"
       ,"set grid"
       ,"set datafile separator \""++delim++"\""
       ,"set key autotitle columnhead"
+      ,"set terminal png size 1280,1024"
+      ,"set output \"trace-$(date +%Y-%m-%d_%H-%M-%S).png\""
+      ,"set terminal png"
       ,"plot " ++
          concat (interleave ", " (
             map (\i -> plotCmd i (i-offset) 2) [offset+1..offset+sitData] ++
             map (\i -> plotCmd i (i-sitData-offset) 4) [offset+sitData+1..offset+sitData+obsData] ++
             map (\i -> plotCmd i (i-obsData-sitData-offset) 8) [offset+sitData+obsData+1..offset+sitData+obsData+diffData]
          ))
+      --,"set terminal qt"
+      ,"set terminal wxt"
+      ,"replot"
       ,"EOF"
       ]
    where plotCmd i lt lw = "\""++csvFile++"\" u 1:"++show i++ " w l lt "++show lt++" lw "++show lw
@@ -322,7 +340,6 @@ main = do
                            putStrLn (show (dropObs (BAT.sit2list s)))
                            putStrLn (show (v, d))
                            printFluents s
-                           printFluentDiffs s
                            --if BAT.start s > 17.5
                            if False && 19.5 < BAT.start s && BAT.start s < 19.7
                               then do
@@ -341,22 +358,23 @@ main = do
                                        putStrLn ("rev ttc after wait " ++ show (BAT.ttc (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.D Car.H))
                                        putStrLn "---"
                                        let f   = newquality s
-                                       let cfl = canonicalize f 0
-                                       let cfr = canonicalizeRecip f 0
+                                       let cfl = canonicalize Linear f 0
+                                       let cfr = canonicalize Recip f 0
                                        let g   = revnewquality s
-                                       let cgl = canonicalize g 0
-                                       let cgr = canonicalizeRecip g 0
+                                       let cgl = canonicalize Linear g 0
+                                       let cgr = canonicalize Recip g 0
                                        let h   = ttcnewquality s
-                                       let chl = canonicalize h 0
-                                       let chr = canonicalizeRecip h 0
+                                       let chl = canonicalize Linear h 0
+                                       let chr = canonicalize Recip h 0
                                        let na  = nullAt id
-                                       --putStrLn ("nullAt f lin " ++ show (na cfl) ++ "  =>  " ++ show (f (na cfl)))
-                                       putStrLn ("nullAt f rec " ++ show (na cfr) ++ "  =>  " ++ show (f (na cfr)))
-                                       putStrLn ("nullAt g lin " ++ show (na cgl) ++ "  =>  " ++ show (g (na cgl)))
-                                       putStrLn ("nullAt h lin " ++ show (na chl) ++ "  =>  " ++ show (g (na chl)))
-                                       putStrLn ("nullAt h rec " ++ show (na chr) ++ "  =>  " ++ show (g (na chr)))
+                                       let pick = head . sortBy (compare.abs) 
+                                       --putStrLn ("nullAt f lin " ++ show (na cfl) ++ "  =>  " ++ show (map f (na cfl)))
+                                       putStrLn ("nullAt f rec " ++ show (na cfr) ++ "  =>  " ++ show (map f (na cfr)))
+                                       putStrLn ("nullAt g lin " ++ show (na cgl) ++ "  =>  " ++ show (map g (na cgl)))
+                                       putStrLn ("nullAt h lin " ++ show (na chl) ++ "  =>  " ++ show (map g (na chl)))
+                                       putStrLn ("nullAt h rec " ++ show (na chr) ++ "  =>  " ++ show (map g (na chr)))
                                        putStrLn ("#q,f,g,h,f+g,f+g+h,|f|+|g|,|f|+|g|")
-                                       mapM_ (putStrLn . tail . init . show) (map (\q -> (q,f q, g q, h q, f q + g q, f q + g q + h q, abs (f q) + abs (g q), abs (f q) + abs (g q) + abs (h q))) ([na cfr - 1.0, na cfr - 0.9 .. na cgl + 1.0]))
+                                       mapM_ (putStrLn . tail . init . show) (map (\q -> (q,f q, g q, h q, f q + g q, f q + g q + h q, abs (f q) + abs (g q), abs (f q) + abs (g q) + abs (h q))) ([pick (na cfr) - 1.0, pick (na cfr) - 0.9 .. pick (na cgl) + 1.0]))
                                        --putStrLn ("nullAt g rec " ++ show (na cgr) ++ "  =>  " ++ show (g (na cgr)))
                                        --mapM_ (putStrLn . show) (diffs (map snd (newqualities s)))
                                        --putStrLn (show t)

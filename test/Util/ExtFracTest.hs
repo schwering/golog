@@ -12,19 +12,19 @@ import Test.QuickCheck.Modifiers
 import Control.Monad (liftM)
 
 instance Arbitrary a => Arbitrary (ExtFrac a) where
-   arbitrary = do
-      n <- choose (0, 9) :: Gen Int
-      x <- arbitrary :: a
-      return $ case n of
-                    0 -> NegInf
-                    1 -> PosInf
-                    2 -> NaN
-                    _ -> Val x
+   arbitrary = frequency [(1, return NaN), (3, return NegInf), (3, return PosInf), (9, liftM Val arbitrary)]
+   shrink (Val x) = NaN : NegInf : PosInf : [ Val x' | x' <- shrink x ]
+   shrink _       = []
 
-prop_mult :: Rational -> Rational -> Bool
-prop_mult NaN _ = NaN
-prop_mult _ NaN = NaN
-prop_mult (Val x) (Val y) | x /= 0 && y /= 0 = Val (x / y)
+{-
+prop_mult :: ExtFrac Double -> ExtFrac Double -> Bool
+prop_mult x @ NaN       y                               = x * y == NaN
+prop_mult y             x @ NaN                         = x * y == NaN
+prop_mult x @ (Val x')  y @ (Val y') | x' /= 0 && y' /= 0 = x * y == Val (x' * y')
+                                     | x' > 0  && y' == 0 = x * y == PosInf
+                                     | x' < 0  && y' == 0 = x * y == NegInf
+                                     | x' == 0 && y' == 0 = x * y == NaN
+-}
 
 runTests :: IO Bool
 runTests = $quickCheckAll

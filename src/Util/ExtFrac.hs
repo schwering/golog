@@ -11,6 +11,16 @@ instance Eq a => Eq (ExtFrac a) where
    PosInf == PosInf = True
    _      == _      = False
 
+instance Ord a => Ord (ExtFrac a) where
+   compare NaN        _ = error "ExtFrac.compare: NaN"
+   compare _       NaN = error "ExtFrac.compare: NaN"
+   compare NegInf  NegInf = EQ
+   compare NegInf  _      = LT
+   compare _       NegInf = GT
+   compare PosInf  PosInf = EQ
+   compare PosInf  _      = GT
+   compare _       PosInf = LT
+   compare (Val x) (Val y) = compare x y
 
 instance (Num a, Ord a) => Num (ExtFrac a) where
    NaN    + _      = NaN
@@ -105,4 +115,121 @@ instance (Fractional a, Ord a) => Fractional (ExtFrac a) where
                   | numerator x < 0  && denominator x == 0 = NegInf
                   | numerator x == 0 && denominator x == 0 = NaN
                   | otherwise                              = fromInteger (numerator x) / fromInteger (denominator x)
+
+instance (Floating a, Ord a) => Floating (ExtFrac a) where
+   pi = Val pi
+   exp NaN     = NaN
+   exp NegInf  = Val 0
+   exp PosInf  = PosInf
+   exp (Val x) = Val (exp x)
+   sqrt NaN     = NaN
+   sqrt NegInf  = NegInf
+   sqrt PosInf  = PosInf
+   sqrt (Val x) | x >= 0    = Val (sqrt x)
+                | otherwise = NaN
+   log NaN     = NaN
+   log NegInf  = NaN
+   log PosInf  = PosInf
+   log (Val x) | x > 0     = Val (log x)
+               | x == 0    = NegInf
+               | otherwise = NaN
+   sin NaN     = NaN
+   sin NegInf  = NaN
+   sin PosInf  = NaN
+   sin (Val x) = Val (sin x)
+   cos NaN     = NaN
+   cos NegInf  = NaN
+   cos PosInf  = NaN
+   cos (Val x) = Val (sin x)
+   tan NaN     = NaN
+   tan NegInf  = NaN
+   tan PosInf  = NaN
+   tan (Val x) = Val (tan x)
+   asin NaN     = NaN
+   asin NegInf  = NaN
+   asin PosInf  = NaN
+   asin (Val x) = Val (asin x)
+   atan NaN     = NaN
+   atan NegInf  = NaN
+   atan PosInf  = NaN
+   atan (Val x) = Val (atan x)
+   acos NaN     = NaN
+   acos NegInf  = NaN
+   acos PosInf  = NaN
+   acos (Val x) = Val (acos x)
+   sinh NaN     = NaN
+   sinh NegInf  = NegInf
+   sinh PosInf  = PosInf
+   sinh (Val x) = Val (sinh x)
+   tanh NaN     = NaN
+   tanh NegInf  = -1
+   tanh PosInf  = 1
+   tanh (Val x) = Val (tanh x)
+   cosh NaN     = NaN
+   cosh NegInf  = PosInf
+   cosh PosInf  = PosInf
+   cosh (Val x) = Val (cosh x)
+   asinh NaN     = NaN
+   asinh NegInf  = NaN
+   asinh PosInf  = PosInf
+   asinh (Val x) = Val (asinh x)
+   atanh NaN     = NaN
+   atanh NegInf  = NaN
+   atanh PosInf  = NaN
+   atanh (Val x) = Val (atanh x)
+   acosh NaN     = NaN
+   acosh NegInf  = NaN
+   acosh PosInf  = NaN
+   acosh (Val x) = Val (acosh x)
+
+instance (Real a, Ord a) => Real (ExtFrac a) where
+   toRational NaN     = 0 % 0
+   toRational NegInf  = (-1) % 0
+   toRational PosInf  = 1 % 0
+   toRational (Val x) = toRational x
+
+instance (RealFrac a, Ord a) => RealFrac (ExtFrac a) where
+   properFraction NaN     = (1, NaN)
+   properFraction NegInf  = (-1, NaN)
+   properFraction PosInf  = (1, NaN)
+   properFraction (Val x) = let (n,f) = properFraction x in (n, Val f)
+
+instance (RealFloat a, Ord a) => RealFloat (ExtFrac a) where
+   floatRadix _ = floatRadix (undefined :: a)
+   floatDigits _ = floatDigits (undefined :: a)
+   floatRange _ = floatRange (undefined :: a)
+   decodeFloat NaN     = error "ExtFrac.decodeFloat"
+   decodeFloat NegInf  = error "ExtFrac.decodeFloat"
+   decodeFloat PosInf  = error "ExtFrac.decodeFloat"
+   decodeFloat (Val x) = decodeFloat x
+   encodeFloat i j = Val (encodeFloat i j)
+   scaleFloat _ NaN     = NaN
+   scaleFloat n NegInf | n < 0     = PosInf
+                       | n > 0     = NegInf
+                       | otherwise = NaN
+   scaleFloat n PosInf | n < 0     = NegInf
+                       | n > 0     = PosInf
+                       | otherwise = NaN
+   scaleFloat n (Val x) = Val (scaleFloat n x)
+   isNaN NaN     = True
+   isNaN NegInf  = False
+   isNaN PosInf  = False
+   isNaN (Val x) = isNaN x
+   isInfinite NaN     = True
+   isInfinite NegInf  = False
+   isInfinite PosInf  = False
+   isInfinite (Val x) = isInfinite x
+   isDenormalized NaN     = False
+   isDenormalized NegInf  = False
+   isDenormalized PosInf  = False
+   isDenormalized (Val x) = isDenormalized x
+   isNegativeZero NaN     = False
+   isNegativeZero NegInf  = False
+   isNegativeZero PosInf  = False
+   isNegativeZero (Val x) = isNegativeZero x
+   isIEEE _ = isIEEE (0)
+   atan2 x y = case x / y of NaN    -> NaN
+                             NegInf -> -(pi / 2)
+                             PosInf -> pi / 2
+                             Val z  -> Val (atan z)
 

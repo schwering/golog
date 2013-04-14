@@ -33,9 +33,8 @@ type TTCF a = Car -> Car -> a
 -- for which the transitive measure is non-NaN and non-infinity. When there is
 -- none, but there is an infinity, infinity is returned. Otherwise NaN is
 -- returned.
-orTrans :: RealFloat a => (Car -> Car -> a) ->
-                            (Car -> Car -> Car -> a) ->
-                            Car -> Car -> a
+orTrans :: RealFloat a => (Car -> Car -> a) -> (Car -> Car -> Car -> a) ->
+                          Car -> Car -> a
 orTrans f g b d = let viaCars    = [c | c <- cars, c /= b, c /= d]
                       direct     = f b d
                       transitive = map (\c -> g b c d) viaCars
@@ -44,7 +43,6 @@ orTrans f g b d = let viaCars    = [c | c <- cars, c /= b, c /= d]
                          | isInfinite x = nonNaN x xs
                          | otherwise    = x
          nonNaN y []                    = y
-
 
 
 -- | Symmetry of NTG.
