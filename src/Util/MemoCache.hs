@@ -83,6 +83,7 @@ foreign import ccall "lru_cache3"
    c_memo3 :: CacheId -> FunPtr (StablePtr a -> CInt -> CInt -> CDouble) ->
               StablePtr a -> CInt -> CInt -> IO CDouble
 
+
 foreign import ccall "memo_cache_time_cost"
    c_time_cost :: IO CDouble
 

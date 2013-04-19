@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Util.InterpolationTest where
 
-import Util.ExtFrac
+--import Util.ExtFrac
 import Util.Interpolation
 
 import Control.Monad
@@ -13,12 +13,14 @@ import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Modifiers
 
+{-
 type ExtRational = ExtFrac Rational
 
 instance Arbitrary a => Arbitrary (ExtFrac a) where
    arbitrary = frequency [(1, return NaN), (3, return NegInf), (3, return PosInf), (9, liftM Val arbitrary)]
    shrink (Val x) = NaN : NegInf : PosInf : [ Val x' | x' <- shrink x ]
    shrink _       = []
+-}
 
 --prop_interpol_lin :: ExtRational -> ExtRational -> ExtRational -> Bool
 prop_interpol_lin :: Double -> Double -> Double -> Bool

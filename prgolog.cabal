@@ -19,12 +19,9 @@ Library
                      RSTC.Obs
                      RSTC.Progs
                      RSTC.Theorems
-                     Util.ExtFrac
                      Util.Interpolation
-                     Util.Memo
                      Util.MemoCache
                      Util.NativePSO
-                     Util.PSO
     Other-Modules:
     C-Sources:       src/RSTC/obs.c
                      src/Util/memo_cache.c

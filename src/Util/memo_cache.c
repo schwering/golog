@@ -26,6 +26,7 @@ static clock_t ticks = 0;
 	const clock_t c_end = end.tms_stime + end.tms_cstime; \
 	ticks += c_end - c_start;
 
+
 double lru_cache1(int z, func1_t f, HsStablePtr a)
 {
 	typedef unsigned long long date_t;

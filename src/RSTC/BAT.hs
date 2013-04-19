@@ -345,56 +345,6 @@ ttc' (Do _        s)    b c          = ttc s b c
 ttc' S0                 _ _          = nan
 
 
-{-
-memo' :: (Sit (Prim a) -> Car -> Car -> b) ->
-         (Sit (Prim a) -> Car -> Car -> b)
-memo' f = curry3 (memoOblivious stableName1of3
-                                hashStableName1of3
-                                (0,    minBound::Car, minBound::Car)
-                                (2617, maxBound::Car, maxBound::Car)
-                                (uncurry3 f))
-
-
-memo3 :: (Sit (Prim a) -> Car -> Car -> b) ->
-          (Sit (Prim a) -> Car -> Car -> b)
-memo3 f = curry3 (memoMap stable (uncurry3 f))
-   where stable = stableNameAndHash1of3
-
-
-memo2 :: (Sit (Prim a) -> Car -> b) ->
-         (Sit (Prim a) -> Car -> b)
-memo2 f = curry (memoMap stable (uncurry f))
-   where stable = stableNameAndHash1of2
-
-
-memo1 :: (Sit (Prim a) -> b) ->
-         (Sit (Prim a) -> b)
-memo1 f = memoMap stable f
-   where stable = stableNameAndHash
--}
-
-{-
-memo3 :: (Sit (Prim a) -> Car -> Car -> a) ->
-          (Sit (Prim a) -> Car -> Car -> a)
-memo3 f = curry3 (memoIntMap stable hash (uncurry3 f))
-   where stable = stableName1of3
-         hash = (\(x,y,z) -> x `combine` fromEnum y `combine` fromEnum z) . hashStableName1of3
-
-
-memo2 :: (Sit (Prim a) -> Car -> Lane) ->
-         (Sit (Prim a) -> Car -> Lane)
-memo2 f = curry (memoIntMap stable hash (uncurry f))
-   where stable = stableName1of2
-         hash = (\(x,y) -> x `combine` fromEnum y) . hashStableName1of2
-
-
-memo1 :: (Sit (Prim a) -> b) ->
-         (Sit (Prim a) -> b)
-memo1 f = memoMap stable hash f
-   where stable = stableName
-         hash = hashStableName
--}
-
 nan :: RealFloat a => a
 nan = (0 /) $! 0
 

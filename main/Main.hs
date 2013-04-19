@@ -113,38 +113,41 @@ instance BAT Prim where
    reward (E x) _ = max 0 (-x*x+100)
 
 
--- Ist eh falsch, doch nicht von value!
--- Achso, doch, ist ja value 0. Ich Flachpfeife.
---depth t = snd (value 0 t)
-
-
 printFluents :: (RealFloat a, PrintfArg a) => Sit (BAT.Prim a) -> IO ()
 printFluents s @ (Do (BAT.Match e) _) =
    do printf "start = %.2f\n" (BAT.start s)
-      mapM_ (\(b,c) -> do printf "ntg %s %s = %6.2f\t" (show b) (show c) (BAT.ntg s b c)
-                          printf "\916ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntgDiff s e b c)
+      mapM_ (\(b,c) -> do printf "ntg %s %s:   model: %8.2f   obs: %8.2f   \916: %8.2f\n"
+                              (show b) (show c)
+                              (BAT.ntg s b c)
+                              (Obs.ntg e b c)
+                              (BAT.ntgDiff s e b c)
             ) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
-      mapM_ (\(b,c) -> do printf "ttc %s %s = %6.2f\t" (show b) (show c) (BAT.ttc s b c)
-                          printf "\916ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttcDiff s e b c)
+      mapM_ (\(b,c) -> do printf "ttc %s %s:   model: %8.2f   obs: %8.2f   \916: %8.2f\n"
+                              (show b) (show c)
+                              (BAT.ttc s b c)
+                              (Obs.ttc e b c)
+                              (BAT.ttcDiff s e b c)
             ) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
-      mapM_ (\b -> do printf "lane %s = %s\t" (show b) (show (BAT.lane s b))
-                      printf "same %s = %s\n" (show b) (show (BAT.lane s b == Obs.lane e b))
+      mapM_ (\b -> do printf "lane %s:    model:    %.5s   obs:    %.5s   \916: %8d\n"
+                              (show b)
+                              (show (BAT.lane s b))
+                              (show (Obs.lane e b))
+                              (if BAT.lane s b == Obs.lane e b then 0 :: Int else 1)
             ) Car.cars
 printFluents s =
    do printf "start = %.2f\n" (BAT.start s)
-      mapM_ (\(b,c) -> do printf "ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntg s b c)
+      mapM_ (\(b,c) -> do printf "ntg %s %s:   model: %8.2f\n"
+                              (show b) (show c)
+                              (BAT.ntg s b c)
             ) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
-      mapM_ (\(b,c) -> do printf "ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttc s b c)
+      mapM_ (\(b,c) -> do printf "ttc %s %s:   model: %8.2f\n"
+                              (show b) (show c)
+                              (BAT.ttc s b c)
             ) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
-      mapM_ (\b -> do printf "lane %s = %s\n" (show b) (show (BAT.lane s b))
+      mapM_ (\b -> do printf "lane %s:    model:    %.5s\n"
+                              (show b)
+                              (show (BAT.lane s b))
             ) Car.cars
-
-
-printFluentDiffs :: (RealFloat a, PrintfArg a) => Sit (BAT.Prim a) -> IO ()
-printFluentDiffs s @ (Do (BAT.Match e) _) = do mapM_ (\(b,c) -> printf "\916ntg %s %s = %6.2f\n" (show b) (show c) (BAT.ntgDiff s e b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
-                                               mapM_ (\(b,c) -> printf "\916ttc %s %s = %6.2f\n" (show b) (show c) (BAT.ttcDiff s e b c)) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
-                                               mapM_ (\b -> printf "same lane %s = %s\n" (show b) (show (BAT.lane s b == Obs.lane e b))) Car.cars
-printFluentDiffs _                        = return ()
 
 
 traceCsv :: (RealFloat a, Show a) => Sit (BAT.Prim a) -> [String]
