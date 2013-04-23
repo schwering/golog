@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-} 
 {-# LANGUAGE Rank2Types #-}
 
 -- | Golog interpreter with decision theory and concurrency.
@@ -21,10 +22,10 @@
 --
 -- \[1\] http:\/\/www.aaai.org\/ocs\/index.php\/WS\/AAAIW12\/paper\/view\/5281
 
-module Interpreter.Golog (Sit(S0, Do), Reward, Depth, MaxiF, Finality(..),
+module Interpreter.Golog (BAT(..),
+                          Reward, Depth, OptiF, Finality(..),
                           Atom(..), PseudoAtom(..), Prog(..),
                           Conf, SitTree, Grown, Ungrown,
-                          BAT(..),
                           force, best, isFinal, tree,
                           trans, do1, do2, do3,
                           sit, rew, depth, final, value) where
@@ -32,12 +33,18 @@ module Interpreter.Golog (Sit(S0, Do), Reward, Depth, MaxiF, Finality(..),
 import Interpreter.Tree
 import Prelude hiding (max)
 
-data Sit a = S0
-           | Do a (Sit a)
-
 type Reward = Double
 
-type MaxiF u v = OptiF u v
+class BAT a where
+   data Sit a :: *
+   s0         :: Sit a
+   do_        :: a -> Sit a -> Sit a
+   poss       :: a -> Sit a -> Bool
+   reward     :: a -> Sit a -> Reward
+
+type Conf a = (Sit a, Reward, Depth, Finality)
+type SitTree a b = Tree a (Conf b) (Conf b)
+
 
 data Atom a = Prim a
             | PrimF (Sit a -> a)
@@ -51,20 +58,12 @@ data Prog a where
    Nondet     :: Prog a -> Prog a -> Prog a
    Conc       :: Prog a -> Prog a -> Prog a
    Star       :: Prog a -> Prog a
-   Pick       :: Ord v => (SitTree Grown a -> v) -> MaxiF u v -> (u -> Prog a) -> Prog a
+   Pick       :: Ord v => (SitTree Grown a -> v) -> OptiF u v -> (u -> Prog a) -> Prog a
    PseudoAtom :: PseudoAtom a -> Prog a
    Nil        :: Prog a
 
 data Finality = Final
               | Nonfinal
-
-type Conf a = (Sit a, Reward, Depth, Finality)
-type SitTree a b = Tree a (Conf b) (Conf b)
-
-
-class BAT a where
-   poss   :: a -> Sit a -> Bool
-   reward :: a -> Sit a -> Reward
 
 
 -- | Computes the next pseudo-atomic actions and the remainders.
@@ -137,7 +136,7 @@ next' p = lmap h (next p)
 tree :: BAT a => Prog a -> Sit a -> Reward -> Depth -> SitTree Ungrown a
 tree p s r d = let f = if final' p then Final else Nonfinal
                in Parent (s, r, d, f) (lmap transAtom (next' p))
-   where transAtom (Prim a, p')  | poss a s  = let s' = Do a s
+   where transAtom (Prim a, p')  | poss a s  = let s' = do_ a s
                                                    r' = r + (reward a s)
                                                    d' = d + 1
                                                in tree p' s' r' d'
@@ -160,12 +159,12 @@ tree p s r d = let f = if final' p then Final else Nonfinal
 --
 -- This function expects that 'Sprout' nodes have been resolved already (e.g.,
 -- using 'pickbest'). Otherwise 'Sprout's yield errors.
-value :: Depth -> SitTree Grown a -> (Reward, Depth)
+value :: BAT a => Depth -> SitTree Grown a -> (Reward, Depth)
 value l t = val (best def max fnl l t)
    where val (_, r, d, _) = (r, d)
          fnl (_, _, _, f) = isFinal f
          max              = maxBy (cmpBy val)
-         def              = (S0, 0, 0, Nonfinal)
+         def              = (s0, 0, 0, Nonfinal)
 
 
 -- | Transitions to the next best configuration is there one.
@@ -176,7 +175,7 @@ value l t = val (best def max fnl l t)
 --
 -- The lookahead argument specifies the search depth up to which value is
 -- computed.
-trans :: Depth -> SitTree Grown a -> Maybe (SitTree Grown a)
+trans :: BAT a => Depth -> SitTree Grown a -> Maybe (SitTree Grown a)
 trans l (Parent (_, v, d, f) t) | not (isFinal f)    = trans' t
                                 | (v, d) < value l t = trans' t
                                 | otherwise          = Nothing
@@ -262,7 +261,7 @@ do1 l p s = do2 l (force (tree p s 0 0))
 --
 -- The lookahead argument specifies the search depth up to which value is
 -- computed.
-do2 :: Depth -> SitTree Grown a -> Maybe (Sit a, Reward, Depth)
+do2 :: BAT a => Depth -> SitTree Grown a -> Maybe (Sit a, Reward, Depth)
 do2 l t | final t   = Just (sit t, rew t, depth t)
         | otherwise = trans l t >>= do2 l
 
@@ -271,7 +270,7 @@ do3 :: BAT a => Depth -> Prog a -> Sit a -> [(Sit a, Reward, Depth, SitTree Grow
 do3 l p s = do4 l (force (tree p s 0 0))
 
 
-do4 :: Depth -> SitTree Grown a -> [(Sit a, Reward, Depth, SitTree Grown a)]
+do4 :: BAT a => Depth -> SitTree Grown a -> [(Sit a, Reward, Depth, SitTree Grown a)]
 do4 l t | final t   = [(sit t, rew t, depth t, t)]
         | otherwise = case trans l t of
                            Nothing -> []

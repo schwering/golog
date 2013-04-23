@@ -1,4 +1,6 @@
+{-# LANGUAGE TypeFamilies #-} 
 {-# LANGUAGE TemplateHaskell #-}
+
 module Interpreter.GologTest where
 
 import Interpreter.Golog
@@ -7,6 +9,8 @@ import Test.QuickCheck.All
 data Prim = A | B | C | D deriving (Eq, Show)
 
 instance BAT Prim where
+   data Sit Prim = S0 | Do Prim (Sit Prim)
+
    poss D _ = False
    poss _ _ = True
 

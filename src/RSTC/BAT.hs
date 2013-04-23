@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-} 
 {-# LANGUAGE ExistentialQuantification #-}
 
 -- | Basic action theory based on relative temporal measures.
@@ -56,6 +57,11 @@ data TTCCat = ConvergingFast
 -- Precondition and reward.
 
 instance (RealFloat a, Show a) => BAT (Prim a) where
+   data Sit (Prim a) = S0 | Do (Prim a) (Sit (Prim a))
+
+   s0  = S0
+   do_ = Do
+
    poss (Wait t)             _ = t >= 0 && not (isNaN t)
    poss a @ (Accel _ q)      s = noDupe a s && not (isNaN q)
    poss a @ (LaneChange b l) s = noDupe a s && l /= lane s b
@@ -90,37 +96,37 @@ lookahead = 5
 
 
 -- | Number of actions in a situation term.
-sitlen :: Sit a -> Int
+sitlen :: Sit (Prim a) -> Int
 sitlen (Do _ s) = 1 + (sitlen s)
 sitlen S0       = 0
 
 
 -- | List of actions in situation term, ordered by their occurrence.
-sit2list :: Sit a -> [a]
+sit2list :: Sit (Prim a) -> [Prim a]
 sit2list S0 = []
 sit2list (Do a s) = (sit2list s) ++ [a]
 
 
 -- | Situation term from the actions in list.
-list2sit :: [a] -> Sit a
+list2sit :: [Prim a] -> Sit (Prim a)
 list2sit = append2sit S0
 
 
 -- | Appends list of actions in given order to situation term as new actions.
-append2sit :: Sit a -> [a] -> Sit a
+append2sit :: Sit (Prim a) -> [Prim a] -> Sit (Prim a)
 append2sit s [] = s
 append2sit s (a:as) = append2sit (Do a s) as
 
 
 -- | Injects a new action 'n' actions ago in the situation term.
-inject :: Int -> a -> Sit a -> Sit a
+inject :: Int -> (Prim a) -> Sit (Prim a) -> Sit (Prim a)
 inject 0 a s         = Do a s
 inject n a (Do a' s) = Do a' (inject (n-1) a s)
 inject _ a S0        = Do a S0
 
 
 -- | Removes the action 'n' actions ago in the situation term.
-remove :: Int -> Sit a -> Sit a
+remove :: Int -> Sit (Prim a) -> Sit (Prim a)
 remove 0 (Do _ s) = s
 remove n (Do a s) = Do a (remove (n-1) s)
 remove _ S0       = S0

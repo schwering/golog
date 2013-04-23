@@ -8,7 +8,7 @@ import RSTC.BAT
 import qualified RSTC.BAT as BAT
 import qualified RSTC.Obs as Obs
 import RSTC.Theorems
-import Util.Interpolation
+--import Util.Interpolation
 import Util.NativePSO
 
 import Data.Maybe

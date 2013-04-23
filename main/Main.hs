@@ -8,7 +8,7 @@ import qualified RSTC.Car as Car
 import Interpreter.Golog
 import Interpreter.Tree
 import Interpreter.TreeUtil
-import qualified RSTC.BAT as BAT
+import RSTC.BAT
 import qualified RSTC.Obs as Obs
 import RSTC.Progs
 import RSTC.Theorems
@@ -30,18 +30,18 @@ class Show a => ShowPart a where
    showPart _ = show
    partSize _ = 0
 
-instance Show a => Show (BAT.Prim a) where
-   show (BAT.Wait t) = "Wait " ++ (show t)
-   show (BAT.Accel b q) = "Accel " ++ (show b) ++ " " ++ (show q)
-   show (BAT.LaneChange b l) = "LaneChange " ++ (show b) ++ " " ++ (show l)
-   show (BAT.Init e) = "Init " ++ (show (Obs.time e))
-   show (BAT.Prematch e) = "Prematch " ++ (show (Obs.time e))
-   show (BAT.Match e) = "Match " ++ (show (Obs.time e))
-   show BAT.Abort = "Abort"
-   show BAT.NoOp = "NoOp"
-   show (BAT.Start b s) = "Start " ++ (show b) ++ " " ++ s
-   show (BAT.End b s) = "End " ++ (show b) ++ " " ++ s
-   show (BAT.Msg s) = "Msg " ++ s
+instance Show a => Show (Prim a) where
+   show (Wait t) = "Wait " ++ (show t)
+   show (Accel b q) = "Accel " ++ (show b) ++ " " ++ (show q)
+   show (LaneChange b l) = "LaneChange " ++ (show b) ++ " " ++ (show l)
+   show (Init e) = "Init " ++ (show (Obs.time e))
+   show (Prematch e) = "Prematch " ++ (show (Obs.time e))
+   show (Match e) = "Match " ++ (show (Obs.time e))
+   show Abort = "Abort"
+   show NoOp = "NoOp"
+   show (Start b s) = "Start " ++ (show b) ++ " " ++ s
+   show (End b s) = "End " ++ (show b) ++ " " ++ s
+   show (Msg s) = "Msg " ++ s
 
 instance Show Finality where
    show Final = "Final"
@@ -65,26 +65,26 @@ instance Show a => Show (Prog a) where
    show (PseudoAtom p) = "PseudoAtom(" ++ (show p) ++ ")"
    show Nil = "nil"
 
-instance Show a => Show (Sit a) where
-   show = show . BAT.sit2list
+instance Show a => Show (Sit (Prim a)) where
+   show = show . sit2list
 
 instance ShowPart c => Show (Tree a b c) where
    show = showTree 0 0
 
 instance ShowPart Double where
-instance ShowPart Prim where
-instance ShowPart a => ShowPart (BAT.Prim a) where
+--instance ShowPart Prim where
+instance ShowPart a => ShowPart (Prim a) where
 instance ShowPart Finality where
 instance ShowPart a => ShowPart (Atom a) where
 instance ShowPart a => ShowPart (PseudoAtom a) where
 instance ShowPart a => ShowPart (Prog a) where
 
-instance Show a => ShowPart (Sit a) where
-   showPart n s = show (drop n (BAT.sit2list s))
+instance Show a => ShowPart (Sit (Prim a)) where
+   showPart n s = show (drop n (sit2list s))
 
-instance ShowPart a => ShowPart (Conf a) where
+instance ShowPart a => ShowPart (Conf (Prim a)) where
    showPart n (s,r,d,f) = "("++ showPart n s ++", "++ show r ++", "++ show d ++", "++ show f ++")"
-   partSize (s,_,_,_) = length (BAT.sit2list s)
+   partSize (s,_,_,_) = length (sit2list s)
 
 
 showTree :: ShowPart c => Int -> Int -> Tree a b c -> String
@@ -96,6 +96,7 @@ showTree n m (Branch t1 t2) = (replicate (2*n) ' ') ++ "Branch\n" ++ (showTree (
 showTree n _ (Sprout _ _ _) = (replicate (2*n) ' ') ++ "Sprout g, <unknown tree>\n"
 
 
+{-
 data Prim = A | B | C | D | E Double deriving Show
 
 instance BAT Prim where
@@ -111,51 +112,52 @@ instance BAT Prim where
    reward D s = case s of Do D _ -> 3
                           _      -> 0
    reward (E x) _ = max 0 (-x*x+100)
+-}
 
 
-printFluents :: (RealFloat a, PrintfArg a) => Sit (BAT.Prim a) -> IO ()
-printFluents s @ (Do (BAT.Match e) _) =
-   do printf "start = %.2f\n" (BAT.start s)
+printFluents :: (RealFloat a, PrintfArg a) => Sit (Prim a) -> IO ()
+printFluents s @ (Do (Match e) _) =
+   do printf "start = %.2f\n" (start s)
       mapM_ (\(b,c) -> do printf "ntg %s %s:   model: %8.2f   obs: %8.2f   \916: %8.2f\n"
                               (show b) (show c)
-                              (BAT.ntg s b c)
+                              (ntg s b c)
                               (Obs.ntg e b c)
-                              (BAT.ntgDiff s e b c)
+                              (ntgDiff s e b c)
             ) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
       mapM_ (\(b,c) -> do printf "ttc %s %s:   model: %8.2f   obs: %8.2f   \916: %8.2f\n"
                               (show b) (show c)
-                              (BAT.ttc s b c)
+                              (ttc s b c)
                               (Obs.ttc e b c)
-                              (BAT.ttcDiff s e b c)
+                              (ttcDiff s e b c)
             ) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
       mapM_ (\b -> do printf "lane %s:    model:    %.5s   obs:    %.5s   \916: %8d\n"
                               (show b)
-                              (show (BAT.lane s b))
+                              (show (lane s b))
                               (show (Obs.lane e b))
-                              (if BAT.lane s b == Obs.lane e b then 0 :: Int else 1)
+                              (if lane s b == Obs.lane e b then 0 :: Int else 1)
             ) Car.cars
 printFluents s =
-   do printf "start = %.2f\n" (BAT.start s)
+   do printf "start = %.2f\n" (start s)
       mapM_ (\(b,c) -> do printf "ntg %s %s:   model: %8.2f\n"
                               (show b) (show c)
-                              (BAT.ntg s b c)
+                              (ntg s b c)
             ) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
       mapM_ (\(b,c) -> do printf "ttc %s %s:   model: %8.2f\n"
                               (show b) (show c)
-                              (BAT.ttc s b c)
+                              (ttc s b c)
             ) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
       mapM_ (\b -> do printf "lane %s:    model:    %.5s\n"
                               (show b)
-                              (show (BAT.lane s b))
+                              (show (lane s b))
             ) Car.cars
 
 
-traceCsv :: (RealFloat a, Show a) => Sit (BAT.Prim a) -> [String]
+traceCsv :: (RealFloat a, Show a) => Sit (Prim a) -> [String]
 traceCsv sit = header : map (concat . interleave delim . map show . csv) sits
-   where list  = BAT.sit2list sit
+   where list  = sit2list sit
          lists = filter (isMatchAction . last) (map (\n -> take n list) [1..length list])
-         sits  = map BAT.list2sit lists
-         isMatchAction (BAT.Match _)  = True
+         sits  = map list2sit lists
+         isMatchAction (Match _)  = True
          isMatchAction _              = False
          header = "start" ++ delim ++
                   concat (interleave delim (
@@ -166,14 +168,14 @@ traceCsv sit = header : map (concat . interleave delim . map show . csv) sits
                      ["ntg_D("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
                      ["ttc_D("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b < c]
                   ))
-         csv s @ (Do (BAT.Match e) _) =
-                  [BAT.start s] ++
-                  [BAT.ntg s b c | b <- Car.cars, c <- Car.cars, b /= c] ++
-                  [BAT.ttc s b c | b <- Car.cars, c <- Car.cars, b < c] ++
+         csv s @ (Do (Match e) _) =
+                  [start s] ++
+                  [ntg s b c | b <- Car.cars, c <- Car.cars, b /= c] ++
+                  [ttc s b c | b <- Car.cars, c <- Car.cars, b < c] ++
                   [Obs.ntg e b c | b <- Car.cars, c <- Car.cars, b /= c] ++
                   [Obs.ttc e b c | b <- Car.cars, c <- Car.cars, b < c] ++
-                  [BAT.ntgDiff s e b c | b <- Car.cars, c <- Car.cars, b /= c] ++
-                  [BAT.ttcDiff s e b c | b <- Car.cars, c <- Car.cars, b < c]
+                  [ntgDiff s e b c | b <- Car.cars, c <- Car.cars, b /= c] ++
+                  [ttcDiff s e b c | b <- Car.cars, c <- Car.cars, b < c]
 
 
 gnuplot :: String -> [String]
@@ -216,29 +218,29 @@ interleave y (x:xs) = x:y:interleave y xs
 
 
 
---lastObs :: Sit (BAT.Prim a) -> (forall b. Obs.Obs a b => Maybe b)
---lastObs (Do (BAT.Match e) s) = Just e
+--lastObs :: Sit (Prim a) -> (forall b. Obs.Obs a b => Maybe b)
+--lastObs (Do (Match e) s) = Just e
 --lastObs S0                   = Nothing
 
 
---nextObs :: Obs.Obs a b => Sit (BAT.Prim a) -> Maybe b
+--nextObs :: Obs.Obs a b => Sit (Prim a) -> Maybe b
 --nextObs s = case lastObs s of Just e -> Obs.next e
 --                              _      -> Nothing
 --nextObs = fmap Obs.next . lastObs
 
---nextObsNtg :: Sit (BAT.Prim a) -> Car.Car -> Car.Car -> a
---nextObsNtg (Do (BAT.Match e) s) = Obs.ntg (fromJust (Obs.next e))
+--nextObsNtg :: Sit (Prim a) -> Car.Car -> Car.Car -> a
+--nextObsNtg (Do (Match e) s) = Obs.ntg (fromJust (Obs.next e))
 
 
-nextObsNtg :: Sit (BAT.Prim a) -> Car.Car -> Car.Car -> Maybe (NTG a)
-nextObsNtg (Do (BAT.Match e) s) b c = case Obs.next e of Just e' -> Just (Obs.ntg e' b c)
-                                                         _       -> Nothing
+nextObsNtg :: Sit (Prim a) -> Car.Car -> Car.Car -> Maybe (NTG a)
+nextObsNtg (Do (Match e) s) b c = case Obs.next e of Just e' -> Just (Obs.ntg e' b c)
+                                                     _       -> Nothing
 nextObsNtg S0                   _ _ = Nothing
 
 
-nextObsTtc :: Sit (BAT.Prim a) -> Car.Car -> Car.Car -> Maybe (NTG a)
-nextObsTtc (Do (BAT.Match e) s) b c = case Obs.next e of Just e' -> Just (Obs.ttc e' b c)
-                                                         _       -> Nothing
+nextObsTtc :: Sit (Prim a) -> Car.Car -> Car.Car -> Maybe (NTG a)
+nextObsTtc (Do (Match e) s) b c = case Obs.next e of Just e' -> Just (Obs.ttc e' b c)
+                                                     _       -> Nothing
 nextObsTtc S0                   _ _ = Nothing
 
 
@@ -297,37 +299,37 @@ main = do
              candProg = overtake Car.H Car.D
              prog     = Conc obsProg candProg
              confs    = do3 4 prog S0
-             partOfObs (BAT.Wait _)     = True
-             partOfObs (BAT.Prematch _) = True
-             partOfObs (BAT.Match _)    = True
+             partOfObs (Wait _)     = True
+             partOfObs (Prematch _) = True
+             partOfObs (Match _)    = True
              partOfObs _                = False
-             dropObs (BAT.Wait _ : BAT.Prematch _ : x @ (BAT.Match _) : xs) = x : dropObs xs
-             dropObs (BAT.Wait _ :                  x @ (BAT.Match _) : xs) = x : dropObs xs
+             dropObs (Wait _ : Prematch _ : x @ (Match _) : xs) = x : dropObs xs
+             dropObs (Wait _ :                  x @ (Match _) : xs) = x : dropObs xs
              dropObs (                              x                 : xs) = x : dropObs xs
              dropObs []                                                   = []
-             newsit s q = BAT.inject 2 (BAT.Accel Car.H q) (BAT.remove 2 s)
-             newquality s @ (Do (BAT.Prematch e) _) q    = BAT.quality (newsit s q) e Car.H Car.D
+             newsit s q = inject 2 (Accel Car.H q) (remove 2 s)
+             newquality s @ (Do (Prematch e) _) q    = quality (newsit s q) e Car.H Car.D
              newquality _                           _    = 100000
-             revnewquality s @ (Do (BAT.Prematch e) _) q = BAT.quality (newsit s q) e Car.D Car.H
+             revnewquality s @ (Do (Prematch e) _) q = quality (newsit s q) e Car.D Car.H
              revnewquality _                           _ = 100000
-             ttcnewquality s @ (Do (BAT.Prematch e) _) q = BAT.ttcDiff (newsit s q) e Car.D Car.H
+             ttcnewquality s @ (Do (Prematch e) _) q = ttcDiff (newsit s q) e Car.D Car.H
              ttcnewquality _                           _ = 100000
-             newqualities s @ (Do (BAT.Prematch _) _) = zip3 ticks (map (newquality s) ticks) (map (revnewquality s) ticks)
+             newqualities s @ (Do (Prematch _) _) = zip3 ticks (map (newquality s) ticks) (map (revnewquality s) ticks)
              newqualities _                           = []
              ticks = [-30.0, -29.9 .. 30.0]
              diffs xs = map (\(m,n) -> xs !! m - xs !! n) (zip [0 .. length xs - 2] [1 .. length xs - 1])
-             s0 (Do (BAT.Prematch _) (Do (BAT.Wait _) (Do (BAT.Accel _ _) s))) = Just s
+             s0 (Do (Prematch _) (Do (Wait _) (Do (Accel _ _) s))) = Just s
              s0 _                                                              = Nothing
-             s1 (Do (BAT.Prematch _) (Do (BAT.Wait _) s)) = Just s
+             s1 (Do (Prematch _) (Do (Wait _) s)) = Just s
              s1 _                                         = Nothing
-             s2 (Do (BAT.Prematch _) s) = Just s
+             s2 (Do (Prematch _) s) = Just s
              s2 _                       = Nothing
              posInf = 10000000
-             isWaitAction (BAT.Wait _)          = True
+             isWaitAction (Wait _)          = True
              isWaitAction _                     = False
-             isPrematchAction (BAT.Prematch _)  = True
+             isPrematchAction (Prematch _)  = True
              isPrematchAction _                 = False
-             isMatchAction (BAT.Match _)        = True
+             isMatchAction (Match _)        = True
              isMatchAction _                    = False
              isWait (Do a _)                    = isWaitAction a
              isWait _                           = False
@@ -337,28 +339,28 @@ main = do
              isMatch _                          = False
 --         putStrLn (show (force (tree prog S0 0 0)))
          mapM_ (\(s,v,d,t) ->
-            do --putStrLn (show (BAT.sit2list s))
+            do --putStrLn (show (sit2list s))
                if isMatch s
-                  then do  putStrLn (show (filter (not.partOfObs) (BAT.sit2list s)))
-                           putStrLn (show (dropObs (BAT.sit2list s)))
+                  then do  putStrLn (show (filter (not.partOfObs) (sit2list s)))
+                           putStrLn (show (dropObs (sit2list s)))
                            putStrLn (show (v, d))
                            printFluents s
-                           --if BAT.start s > 17.5
-                           if False && 19.5 < BAT.start s && BAT.start s < 19.7
+                           --if start s > 17.5
+                           if False && 19.5 < start s && start s < 19.7
                               then do
                                        --mapM_ (putStrLn . show) (newqualities s)
-                                       putStrLn ("ntg " ++ show (BAT.ntg s Car.H Car.D))
-                                       putStrLn ("ttc " ++ show (BAT.ttc s Car.H Car.D))
-                                       putStrLn ("ntg after accel " ++ show (BAT.ntg (Do (BAT.Accel Car.H posInf) s) Car.H Car.D))
-                                       putStrLn ("ttc after accel " ++ show (BAT.ttc (Do (BAT.Accel Car.H posInf) s) Car.H Car.D))
-                                       putStrLn ("ntg after wait " ++ show (BAT.ntg (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.H Car.D))
-                                       putStrLn ("ttc after wait " ++ show (BAT.ttc (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.H Car.D))
-                                       putStrLn ("rev ntg " ++ show (BAT.ntg s Car.H Car.D))
-                                       putStrLn ("rev ttc " ++ show (BAT.ttc s Car.H Car.D))
-                                       putStrLn ("rev ntg after accel " ++ show (BAT.ntg (Do (BAT.Accel Car.H posInf) s) Car.D Car.H))
-                                       putStrLn ("rev ttc after accel " ++ show (BAT.ttc (Do (BAT.Accel Car.H posInf) s) Car.D Car.H))
-                                       putStrLn ("rev ntg after wait " ++ show (BAT.ntg (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.D Car.H))
-                                       putStrLn ("rev ttc after wait " ++ show (BAT.ttc (Do (BAT.Wait 0.5) (Do (BAT.Accel Car.H posInf) s)) Car.D Car.H))
+                                       putStrLn ("ntg " ++ show (ntg s Car.H Car.D))
+                                       putStrLn ("ttc " ++ show (ttc s Car.H Car.D))
+                                       putStrLn ("ntg after accel " ++ show (ntg (Do (Accel Car.H posInf) s) Car.H Car.D))
+                                       putStrLn ("ttc after accel " ++ show (ttc (Do (Accel Car.H posInf) s) Car.H Car.D))
+                                       putStrLn ("ntg after wait " ++ show (ntg (Do (Wait 0.5) (Do (Accel Car.H posInf) s)) Car.H Car.D))
+                                       putStrLn ("ttc after wait " ++ show (ttc (Do (Wait 0.5) (Do (Accel Car.H posInf) s)) Car.H Car.D))
+                                       putStrLn ("rev ntg " ++ show (ntg s Car.H Car.D))
+                                       putStrLn ("rev ttc " ++ show (ttc s Car.H Car.D))
+                                       putStrLn ("rev ntg after accel " ++ show (ntg (Do (Accel Car.H posInf) s) Car.D Car.H))
+                                       putStrLn ("rev ttc after accel " ++ show (ttc (Do (Accel Car.H posInf) s) Car.D Car.H))
+                                       putStrLn ("rev ntg after wait " ++ show (ntg (Do (Wait 0.5) (Do (Accel Car.H posInf) s)) Car.D Car.H))
+                                       putStrLn ("rev ttc after wait " ++ show (ttc (Do (Wait 0.5) (Do (Accel Car.H posInf) s)) Car.D Car.H))
                                        putStrLn "---"
                                        let f   = newquality s
                                        let cfl = canonicalize Linear f 0
@@ -382,15 +384,15 @@ main = do
                                        --mapM_ (putStrLn . show) (diffs (map snd (newqualities s)))
                                        --putStrLn (show t)
                                        --putStrLn "---"
-                                       --putStrLn (show (dropObs (BAT.sit2list (newsit s xInterpolateRecipLinAndLin))))
-                                       --putStrLn ("ntg0 = " ++ (show (maybe (-1000) (\sit -> BAT.ntg sit Car.H Car.D) (s0 (newsit s xInterpolateRecipLin)))))
-                                       --putStrLn ("ttc0 = " ++ (show (maybe (-1000) (\sit -> BAT.ttc sit Car.H Car.D) (s0 (newsit s xInterpolateRecipLin)))))
-                                       --putStrLn ("ntg1 = " ++ (show (maybe (-1000) (\sit -> BAT.ntg sit Car.H Car.D) (s1 (newsit s xInterpolateRecipLin)))))
-                                       --putStrLn ("ttc1 = " ++ (show (maybe (-1000) (\sit -> BAT.ttc sit Car.H Car.D) (s1 (newsit s xInterpolateRecipLin)))))
-                                       --putStrLn ("ntg2 = " ++ (show (maybe (-1000) (\sit -> BAT.ntg sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
-                                       --putStrLn ("ttc2 = " ++ (show (maybe (-1000) (\sit -> BAT.ttc sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn (show (dropObs (sit2list (newsit s xInterpolateRecipLinAndLin))))
+                                       --putStrLn ("ntg0 = " ++ (show (maybe (-1000) (\sit -> ntg sit Car.H Car.D) (s0 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ttc0 = " ++ (show (maybe (-1000) (\sit -> ttc sit Car.H Car.D) (s0 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ntg1 = " ++ (show (maybe (-1000) (\sit -> ntg sit Car.H Car.D) (s1 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ttc1 = " ++ (show (maybe (-1000) (\sit -> ttc sit Car.H Car.D) (s1 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ntg2 = " ++ (show (maybe (-1000) (\sit -> ntg sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ttc2 = " ++ (show (maybe (-1000) (\sit -> ttc sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
                               else return ()
-                           if 19.5 < BAT.start s && BAT.start s < 19.7
+                           if 19.5 < start s && start s < 19.7
                               then do writeFile "trace.csv" (unlines (traceCsv s))
                                       writeFile "plot.sh" (unlines (gnuplot "trace.csv"))
                               else return ()
