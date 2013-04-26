@@ -1,0 +1,6 @@
+1. Is replay configured correctly?
+   The number of cars must be n:
+     $ ./replay -n logs/logfile
+2. Is src/RSTC/Cars.hs configured correctly?
+   'cars' must be the cars that occur in the observations.
+

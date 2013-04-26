@@ -6,7 +6,7 @@ module RSTC.Progs where
 
 import RSTC.Car
 import Interpreter.Golog
-import RSTC.BAT.Progression
+import RSTC.BAT.Regression
 import qualified RSTC.Obs as Obs
 import RSTC.Theorems
 import Util.NativePSO

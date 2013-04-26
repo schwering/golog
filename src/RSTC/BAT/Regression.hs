@@ -9,7 +9,8 @@ module RSTC.BAT.Regression (Prim(..), NTGCat(..), TTCCat(..), State(..),
                             Sit(..),
                             lookahead, ntgDiff, ttcDiff, quality, match,
                             bestAccel, ntgCats, ttcCats, nan,
-                            history, sit2list, list2sit, inject, remove) where
+                            history, sit2list, list2sit, predsit,
+                            inject, remove) where
 
 import RSTC.Car
 import RSTC.BAT.Base
@@ -81,4 +82,7 @@ instance RealFloat a => TransformableState a where
 
    histlen S0       = 0
    histlen (Do _ s) = 1 + (histlen s)
+
+   predsit S0       = error "RSTC.BAT.Regression.subsit: S0"
+   predsit (Do _ s) = s
 

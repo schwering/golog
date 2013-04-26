@@ -8,7 +8,7 @@ import RSTC.Car
 import Interpreter.Golog
 import Interpreter.Tree
 import Interpreter.TreeUtil
-import RSTC.BAT.Progression
+import RSTC.BAT.Regression
 import qualified RSTC.Obs as Obs
 import RSTC.Progs
 import RSTC.Theorems
@@ -154,12 +154,15 @@ printFluents s = case reverse (sit2list s)
 
 
 traceCsv :: Sit (Prim Double) -> [String]
-traceCsv sit = header : map (concat . interleave delim . map show . csv) sits
-   where list  = sit2list sit
-         lists = filter (isMatchAction . last) (map (\n -> take n list) [1..length list])
-         sits  = map list2sit lists
-         isMatchAction (Match _)  = True
-         isMatchAction _          = False
+traceCsv sit = header : (reverse (map (concat . interleave delim . map show . csv) (subsits sit)))
+   where subsits s = case history s of Match _ : _ -> s : subsits (predsit s)
+                                       _ : _       -> subsits (predsit s)
+                                       _           -> []
+         --list  = sit2list sit
+         --lists = filter (isMatchAction . last) (map (\n -> take n list) [1..length list])
+         --sits  = map list2sit lists
+         --isMatchAction (Match _)  = True
+         --isMatchAction _          = False
          header = "time" ++ delim ++
                   concat (interleave delim (
                      ["ntg_S("++show b++","++show c++")" | b <- cars, c <- cars, b /= c] ++
@@ -391,8 +394,8 @@ main = do
                                        --putStrLn ("ttc2 = " ++ (show (maybe (-1000) (\sit -> ttc sit H D) (s2 (newsit s xInterpolateRecipLin)))))
                               else return ()
 -}
-                           if 19.5 <= time s && time s < 19.7 ||
-                              29.0 <= time s && time s < 29.5
+                           if False && 19.5 <= time s && time s < 19.7 ||
+                              True && 29.0 <= time s && time s < 29.5
                               then do writeFile "trace.csv" (unlines (traceCsv s))
                                       writeFile "plot.sh" (unlines (gnuplot "trace.csv"))
                               else return ()

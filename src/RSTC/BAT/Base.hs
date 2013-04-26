@@ -79,11 +79,13 @@ class (State a, BAT (Prim a)) => TransformableState a where
    sitlen   :: Sit (Prim a) -> Int
    sit2list :: Sit (Prim a) -> [Prim a]
    list2sit :: [Prim a] -> Sit (Prim a)
+   predsit  :: Sit (Prim a) -> Sit (Prim a)
 
    histlen  = length . history
    sitlen   = length . sit2list
    sit2list = reverse . history
    list2sit = append2sit s0
+   predsit  = list2sit . tail . sit2list
 
 
 -- | Appends list of actions in given order to situation term as new actions.
