@@ -170,7 +170,7 @@ traceCsv sit = header : map (concat . interleave delim . map show . csv) sits
                      ["ttc_D("++show b++","++show c++")" | b <- cars, c <- cars, b < c]
                   ))
          csv s =
-            case reverse (sit2list s)
+            case history s
             of Match e : _ ->
                   [time s] ++
                   [ntg s b c | b <- cars, c <- cars, b /= c] ++
@@ -333,8 +333,8 @@ main = do
              s2 _                       = Nothing
              posInf = 10000000
 -}
-             isMatch s = case reverse (sit2list s) of Match _ : _ -> True
-                                                      __          -> False
+             isMatch s = case history s of Match _ : _ -> True
+                                           _           -> False
 --         putStrLn (show (force (tree prog S0 0 0)))
          mapM_ (\(s,v,d,t) ->
             do --putStrLn (show (sit2list s))
