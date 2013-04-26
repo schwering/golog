@@ -2,7 +2,10 @@
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleInstances #-}
 
--- | Tree container.
+-- | Binary trees whose elements can be stored in leaves or inner nodes.
+-- Trees can be fully grown or not. Ungrown trees can contain sprouts which
+-- are represent tree functions of some element; this element is picked
+-- according to an optimization and evaluation function by 'force'.
 
 module Interpreter.Tree (Tree(..), Depth, ValF, OptiF, Grown, Ungrown,
                          Functor(..), Foldable(..),

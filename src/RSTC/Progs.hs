@@ -1,14 +1,14 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 -- | Golog programs based on the RSTC action theory.
 
 module RSTC.Progs where
 
 import RSTC.Car
 import Interpreter.Golog
-import RSTC.BAT
-import qualified RSTC.BAT as BAT
+import RSTC.BAT.Progression
 import qualified RSTC.Obs as Obs
 import RSTC.Theorems
---import Util.Interpolation
 import Util.NativePSO
 
 import Data.Maybe
@@ -40,11 +40,11 @@ atomic :: Prog a -> Prog a
 atomic = PseudoAtom . Complex
 
 
-obsprog :: (Obs.Obs a b) => [Maybe b] -> Prog (Prim a)
+obsprog :: (Obs.Obs Double b) => [Maybe b] -> Prog (Prim Double)
 obsprog []     = Nil
 obsprog (e:es) = seq' (initAct:acts)
    where initAct = maybe Nil (act . Init) e
-         acts = map (\e' -> atomic ((actf (\s -> Wait (Obs.time e' - start s)))
+         acts = map (\e' -> atomic ((actf (\s -> Wait (Obs.time e' - time s)))
                               --`Seq` (act (Prematch e'))
                               `Seq` (act (Match e'))))
                     (catMaybes es)
@@ -57,9 +57,9 @@ follow b c =
    atomic (
       act (Start b "follow") `Seq`
       test (\s -> lane s b == lane s c) `Seq`
-      test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
-      test (\s -> (CloseBehind `elem` (ntgCats (BAT.ntg s b c)))) `Seq`
-      actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b))
+      test (\s -> isFollowing (ntg s) b c) `Seq`
+      test (\s -> (CloseBehind `elem` (ntgCats (ntg s b c)))) `Seq`
+      actf (\s -> Accel b (relVeloc (ntg s) (ttc s) c b))
    ) `Seq`
    --Pick (\val -> picknum (0, 2) (fst.val)) 1 (\q -> act (Accel b q)) `Seq`
    act (End b "follow")
@@ -70,12 +70,29 @@ tailgate b c =
    atomic (
       act (Start b "tailgate") `Seq`
       test (\s -> lane s b == lane s c) `Seq`
-      test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
-      test (\s -> any (`elem` (ntgCats (BAT.ntg s b c))) [VeryCloseBehind, CloseBehind]) `Seq`
-      actf (\s -> Accel b (relVeloc (BAT.ntg s) (BAT.ttc s) c b))
+      test (\s -> isFollowing (ntg s) b c) `Seq`
+      test (\s -> any (`elem` (ntgCats (ntg s b c))) [VeryCloseBehind, CloseBehind]) `Seq`
+      actf (\s -> Accel b (relVeloc (ntg s) (ttc s) c b))
    ) `Seq`
    --Pick (\val -> picknum (0, 2) (fst.val)) 1 (\q -> act (Accel b q)) `Seq`
    act (End b "tailgate")
+
+
+{-
+pass :: Car -> Car -> Prog (Prim Double)
+pass b c =
+   atomic (
+      act (Start b "pass") `Seq`
+      test (\s -> lane s b /= lane s c) `Seq`
+      test (\s -> isFollowing (ntg s) b c) `Seq`
+      test (\s -> isConverging (ttc s) b c)
+   ) `Seq` (
+      Star (Pick (fst . value lookahead) (picknum (0.95, 1.2)) (\q -> act (Accel b q)))
+   ) `Seq` atomic (
+      test (\s -> ntg s b c <= 0) `Seq`
+      act (End b "pass") 
+   )
+-}
 
 
 pass :: Car -> Car -> Prog (Prim Double)
@@ -83,12 +100,11 @@ pass b c =
    atomic (
       act (Start b "pass") `Seq`
       test (\s -> lane s b /= lane s c) `Seq`
-      test (\s -> isFollowing (BAT.ntg s) b c) `Seq`
-      test (\s -> isConverging (BAT.ttc s) b c)
+      test (\s -> isFollowing (ntg s) b c)
    ) `Seq` (
-      Star (Pick (fst . value lookahead) (picknum (0.95, 1.2)) (\q -> act (Accel b q)))
+      Star (actf (\s -> Accel b (bestAccel s b c)))
    ) `Seq` atomic (
-      test (\s -> BAT.ntg s b c <= 0) `Seq`
+      test (\s -> ntg s b c < 0) `Seq`
       act (End b "pass") 
    )
 
@@ -98,12 +114,12 @@ overtake b c =
    atomic (
       act (Start b "overtake") `Seq`
       test (\s -> lane s b == lane s c) `Seq`
-      test (\s -> isFollowing (BAT.ntg s) b c)
-      --test (\s -> isConverging (BAT.ttc s) b c)
+      test (\s -> isFollowing (ntg s) b c)
+      --test (\s -> isConverging (ttc s) b c)
    ) `Seq` (
       (
          act (LaneChange b LeftLane) `Seq`
-         test (\s -> BAT.ntg s b c < 0) `Seq`
+         test (\s -> ntg s b c < 0) `Seq`
          act (LaneChange b RightLane)
       ) `Conc` (
          --Star (Pick (fst . value lookahead) (picknum (0.9, 1.5)) (\q -> act (Accel b q)))
@@ -120,7 +136,7 @@ overtake b c =
          Star (actf (\s -> Accel b (bestAccel s b c)))
       )
    ) `Seq` atomic (
-      test (\s -> BAT.ntg s b c < 0) `Seq`
+      test (\s -> ntg s b c < 0) `Seq`
       act (End b "overtake") 
    )
 

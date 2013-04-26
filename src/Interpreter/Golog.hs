@@ -7,7 +7,7 @@
 -- interleaving are resolved by opting for the choice that leads to the highest
 -- rewarded situation.
 --
--- The semantics is based on [paper], but not that close to the formal
+-- The semantics is based on [1], but not that close to the formal
 -- definition:
 --
 -- * Programs are decomposed into a next atomic action and the respective
@@ -16,9 +16,7 @@
 --
 -- * The tree of reachable situations is constructed (lazily). This is done by
 --   decomposing the program, executing the next atomic action, and continuing
---   this recursively for the remaining program.
---   In this tree final configurations are represented as leaves.
---   This is done by 'tree'.
+--   this recursively for the remaining program in 'tree'.
 --
 -- \[1\] http:\/\/www.aaai.org\/ocs\/index.php\/WS\/AAAIW12\/paper\/view\/5281
 

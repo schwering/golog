@@ -4,11 +4,11 @@
 
 module Main (main) where
 
-import qualified RSTC.Car as Car
+import RSTC.Car
 import Interpreter.Golog
 import Interpreter.Tree
 import Interpreter.TreeUtil
-import RSTC.BAT
+import RSTC.BAT.Progression
 import qualified RSTC.Obs as Obs
 import RSTC.Progs
 import RSTC.Theorems
@@ -65,7 +65,7 @@ instance Show a => Show (Prog a) where
    show (PseudoAtom p) = "PseudoAtom(" ++ (show p) ++ ")"
    show Nil = "nil"
 
-instance Show a => Show (Sit (Prim a)) where
+instance Show (Sit (Prim Double)) where
    show = show . sit2list
 
 instance ShowPart c => Show (Tree a b c) where
@@ -79,10 +79,10 @@ instance ShowPart a => ShowPart (Atom a) where
 instance ShowPart a => ShowPart (PseudoAtom a) where
 instance ShowPart a => ShowPart (Prog a) where
 
-instance Show a => ShowPart (Sit (Prim a)) where
+instance ShowPart (Sit (Prim Double)) where
    showPart n s = show (drop n (sit2list s))
 
-instance ShowPart a => ShowPart (Conf (Prim a)) where
+instance ShowPart (Conf (Prim Double)) where
    showPart n (s,r,d,f) = "("++ showPart n s ++", "++ show r ++", "++ show d ++", "++ show f ++")"
    partSize (s,_,_,_) = length (sit2list s)
 
@@ -115,67 +115,70 @@ instance BAT Prim where
 -}
 
 
-printFluents :: (RealFloat a, PrintfArg a) => Sit (Prim a) -> IO ()
-printFluents s @ (Do (Match e) _) =
-   do printf "start = %.2f\n" (start s)
-      mapM_ (\(b,c) -> do printf "ntg %s %s:   model: %8.2f   obs: %8.2f   \916: %8.2f\n"
-                              (show b) (show c)
-                              (ntg s b c)
-                              (Obs.ntg e b c)
-                              (ntgDiff s e b c)
-            ) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
-      mapM_ (\(b,c) -> do printf "ttc %s %s:   model: %8.2f   obs: %8.2f   \916: %8.2f\n"
-                              (show b) (show c)
-                              (ttc s b c)
-                              (Obs.ttc e b c)
-                              (ttcDiff s e b c)
-            ) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
-      mapM_ (\b -> do printf "lane %s:    model:    %.5s   obs:    %.5s   \916: %8d\n"
-                              (show b)
-                              (show (lane s b))
-                              (show (Obs.lane e b))
-                              (if lane s b == Obs.lane e b then 0 :: Int else 1)
-            ) Car.cars
-printFluents s =
-   do printf "start = %.2f\n" (start s)
-      mapM_ (\(b,c) -> do printf "ntg %s %s:   model: %8.2f\n"
-                              (show b) (show c)
-                              (ntg s b c)
-            ) [(b,c) | b <- Car.cars, c <- Car.cars, b /= c]
-      mapM_ (\(b,c) -> do printf "ttc %s %s:   model: %8.2f\n"
-                              (show b) (show c)
-                              (ttc s b c)
-            ) [(b,c) | b <- Car.cars, c <- Car.cars, b < c]
-      mapM_ (\b -> do printf "lane %s:    model:    %.5s\n"
-                              (show b)
-                              (show (lane s b))
-            ) Car.cars
+printFluents :: Sit (Prim Double) -> IO ()
+printFluents s = case reverse (sit2list s)
+   of Match e : _ ->
+         do printf "time = %.2f\n" (time s)
+            mapM_ (\(b,c) -> do printf "ntg %s %s:   model: %8.2f   obs: %8.2f   \916: %8.2f\n"
+                                    (show b) (show c)
+                                    (ntg s b c)
+                                    (Obs.ntg e b c)
+                                    (ntgDiff s e b c)
+                  ) [(b,c) | b <- cars, c <- cars, b /= c]
+            mapM_ (\(b,c) -> do printf "ttc %s %s:   model: %8.2f   obs: %8.2f   \916: %8.2f\n"
+                                    (show b) (show c)
+                                    (ttc s b c)
+                                    (Obs.ttc e b c)
+                                    (ttcDiff s e b c)
+                  ) [(b,c) | b <- cars, c <- cars, b < c]
+            mapM_ (\b -> do printf "lane %s:    model:    %.5s   obs:    %.5s   \916: %8d\n"
+                                    (show b)
+                                    (show (lane s b))
+                                    (show (Obs.lane e b))
+                                    (if lane s b == Obs.lane e b then 0 :: Int else 1)
+                  ) cars
+      _ ->
+         do printf "time = %.2f\n" (time s)
+            mapM_ (\(b,c) -> do printf "ntg %s %s:   model: %8.2f\n"
+                                    (show b) (show c)
+                                    (ntg s b c)
+                  ) [(b,c) | b <- cars, c <- cars, b /= c]
+            mapM_ (\(b,c) -> do printf "ttc %s %s:   model: %8.2f\n"
+                                    (show b) (show c)
+                                    (ttc s b c)
+                  ) [(b,c) | b <- cars, c <- cars, b < c]
+            mapM_ (\b -> do printf "lane %s:    model:    %.5s\n"
+                                    (show b)
+                                    (show (lane s b))
+                  ) cars
 
 
-traceCsv :: (RealFloat a, Show a) => Sit (Prim a) -> [String]
+traceCsv :: Sit (Prim Double) -> [String]
 traceCsv sit = header : map (concat . interleave delim . map show . csv) sits
    where list  = sit2list sit
          lists = filter (isMatchAction . last) (map (\n -> take n list) [1..length list])
          sits  = map list2sit lists
          isMatchAction (Match _)  = True
-         isMatchAction _              = False
-         header = "start" ++ delim ++
+         isMatchAction _          = False
+         header = "time" ++ delim ++
                   concat (interleave delim (
-                     ["ntg_S("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
-                     ["ttc_S("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b < c] ++
-                     ["ntg_O("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
-                     ["ttc_O("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b < c] ++
-                     ["ntg_D("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b /= c] ++
-                     ["ttc_D("++show b++","++show c++")" | b <- Car.cars, c <- Car.cars, b < c]
+                     ["ntg_S("++show b++","++show c++")" | b <- cars, c <- cars, b /= c] ++
+                     ["ttc_S("++show b++","++show c++")" | b <- cars, c <- cars, b < c] ++
+                     ["ntg_O("++show b++","++show c++")" | b <- cars, c <- cars, b /= c] ++
+                     ["ttc_O("++show b++","++show c++")" | b <- cars, c <- cars, b < c] ++
+                     ["ntg_D("++show b++","++show c++")" | b <- cars, c <- cars, b /= c] ++
+                     ["ttc_D("++show b++","++show c++")" | b <- cars, c <- cars, b < c]
                   ))
-         csv s @ (Do (Match e) _) =
-                  [start s] ++
-                  [ntg s b c | b <- Car.cars, c <- Car.cars, b /= c] ++
-                  [ttc s b c | b <- Car.cars, c <- Car.cars, b < c] ++
-                  [Obs.ntg e b c | b <- Car.cars, c <- Car.cars, b /= c] ++
-                  [Obs.ttc e b c | b <- Car.cars, c <- Car.cars, b < c] ++
-                  [ntgDiff s e b c | b <- Car.cars, c <- Car.cars, b /= c] ++
-                  [ttcDiff s e b c | b <- Car.cars, c <- Car.cars, b < c]
+         csv s =
+            case reverse (sit2list s)
+            of Match e : _ ->
+                  [time s] ++
+                  [ntg s b c | b <- cars, c <- cars, b /= c] ++
+                  [ttc s b c | b <- cars, c <- cars, b < c] ++
+                  [Obs.ntg e b c | b <- cars, c <- cars, b /= c] ++
+                  [Obs.ttc e b c | b <- cars, c <- cars, b < c] ++
+                  [ntgDiff s e b c | b <- cars, c <- cars, b /= c] ++
+                  [ttcDiff s e b c | b <- cars, c <- cars, b < c]
 
 
 gnuplot :: String -> [String]
@@ -193,7 +196,7 @@ gnuplot csvFile =
          concat (interleave ", " (
             map (\i -> plotCmd i (i-offset) 2) [offset+1..offset+sitData] ++
             map (\i -> plotCmd i (i-sitData-offset) 4) [offset+sitData+1..offset+sitData+obsData] ++
-            map (\i -> plotCmd i (i-obsData-sitData-offset) 8) [offset+sitData+obsData+1..offset+sitData+obsData+diffData]
+            []-- map (\i -> plotCmd i (i-obsData-sitData-offset) 8) [offset+sitData+obsData+1..offset+sitData+obsData+diffData]
          ))
       --,"set terminal qt"
       ,"set terminal wxt"
@@ -202,8 +205,8 @@ gnuplot csvFile =
       ]
    where plotCmd i lt lw = "\""++csvFile++"\" u 1:"++show i++ " w l lt "++show lt++" lw "++show lw
          offset   = 1
-         sitData  = length ([(b,c) | b <- Car.cars, c <- Car.cars, b /= c] ++
-                            [(b,c) | b <- Car.cars, c <- Car.cars, b < c])
+         sitData  = length ([(b,c) | b <- cars, c <- cars, b /= c] ++
+                            [(b,c) | b <- cars, c <- cars, b < c])
          obsData  = sitData
          diffData = obsData
 
@@ -217,6 +220,7 @@ interleave _ [x]    = [x]
 interleave y (x:xs) = x:y:interleave y xs
 
 
+{-
 
 --lastObs :: Sit (Prim a) -> (forall b. Obs.Obs a b => Maybe b)
 --lastObs (Do (Match e) s) = Just e
@@ -228,20 +232,21 @@ interleave y (x:xs) = x:y:interleave y xs
 --                              _      -> Nothing
 --nextObs = fmap Obs.next . lastObs
 
---nextObsNtg :: Sit (Prim a) -> Car.Car -> Car.Car -> a
+--nextObsNtg :: Sit (Prim a) -> Car -> Car -> a
 --nextObsNtg (Do (Match e) s) = Obs.ntg (fromJust (Obs.next e))
 
 
-nextObsNtg :: Sit (Prim a) -> Car.Car -> Car.Car -> Maybe (NTG a)
+nextObsNtg :: Sit (Prim a) -> Car -> Car -> Maybe (NTG a)
 nextObsNtg (Do (Match e) s) b c = case Obs.next e of Just e' -> Just (Obs.ntg e' b c)
                                                      _       -> Nothing
 nextObsNtg S0                   _ _ = Nothing
 
 
-nextObsTtc :: Sit (Prim a) -> Car.Car -> Car.Car -> Maybe (NTG a)
+nextObsTtc :: Sit (Prim a) -> Car -> Car -> Maybe (NTG a)
 nextObsTtc (Do (Match e) s) b c = case Obs.next e of Just e' -> Just (Obs.ttc e' b c)
                                                      _       -> Nothing
 nextObsTtc S0                   _ _ = Nothing
+-}
 
 
 main :: IO ()
@@ -296,26 +301,28 @@ main = do
 -- {-
          let obs      = take 100 Obs.observations
              obsProg  = obsprog obs
-             candProg = overtake Car.H Car.D
-             prog     = Conc obsProg candProg
-             confs    = do3 4 prog S0
+             --candProg = overtake H D
+             candProg = pass D B `Conc` overtake H B
+             prog     = obsProg `Conc` candProg
+             confs    = do3 4 prog s0
              partOfObs (Wait _)     = True
              partOfObs (Prematch _) = True
              partOfObs (Match _)    = True
              partOfObs _                = False
              dropObs (Wait _ : Prematch _ : x @ (Match _) : xs) = x : dropObs xs
-             dropObs (Wait _ :                  x @ (Match _) : xs) = x : dropObs xs
-             dropObs (                              x                 : xs) = x : dropObs xs
-             dropObs []                                                   = []
-             newsit s q = inject 2 (Accel Car.H q) (remove 2 s)
-             newquality s @ (Do (Prematch e) _) q    = quality (newsit s q) e Car.H Car.D
-             newquality _                           _    = 100000
-             revnewquality s @ (Do (Prematch e) _) q = quality (newsit s q) e Car.D Car.H
-             revnewquality _                           _ = 100000
-             ttcnewquality s @ (Do (Prematch e) _) q = ttcDiff (newsit s q) e Car.D Car.H
-             ttcnewquality _                           _ = 100000
-             newqualities s @ (Do (Prematch _) _) = zip3 ticks (map (newquality s) ticks) (map (revnewquality s) ticks)
-             newqualities _                           = []
+             dropObs (Wait _ :              x @ (Match _) : xs) = x : dropObs xs
+             dropObs (                      x             : xs) = x : dropObs xs
+             dropObs []                                         = []
+             newsit s q = inject 2 (Accel H q) (remove 2 s)
+{-
+             newquality s @ (Do (Prematch e) _) q    = quality (newsit s q) e H D
+             newquality _                       _    = 100000
+             revnewquality s @ (Do (Prematch e) _) q = quality (newsit s q) e D H
+             revnewquality _                       _ = 100000
+             ttcnewquality s @ (Do (Prematch e) _) q = ttcDiff (newsit s q) e D H
+             ttcnewquality _                       _ = 100000
+             newqualities s @ (Do (Prematch _) _)    = zip3 ticks (map (newquality s) ticks) (map (revnewquality s) ticks)
+             newqualities _                          = []
              ticks = [-30.0, -29.9 .. 30.0]
              diffs xs = map (\(m,n) -> xs !! m - xs !! n) (zip [0 .. length xs - 2] [1 .. length xs - 1])
              s0 (Do (Prematch _) (Do (Wait _) (Do (Accel _ _) s))) = Just s
@@ -325,18 +332,9 @@ main = do
              s2 (Do (Prematch _) s) = Just s
              s2 _                       = Nothing
              posInf = 10000000
-             isWaitAction (Wait _)          = True
-             isWaitAction _                     = False
-             isPrematchAction (Prematch _)  = True
-             isPrematchAction _                 = False
-             isMatchAction (Match _)        = True
-             isMatchAction _                    = False
-             isWait (Do a _)                    = isWaitAction a
-             isWait _                           = False
-             isPrematch (Do a _)                = isPrematchAction a
-             isPrematch _                       = False
-             isMatch (Do a _)                   = isMatchAction a
-             isMatch _                          = False
+-}
+             isMatch s = case reverse (sit2list s) of Match _ : _ -> True
+                                                      __          -> False
 --         putStrLn (show (force (tree prog S0 0 0)))
          mapM_ (\(s,v,d,t) ->
             do --putStrLn (show (sit2list s))
@@ -345,22 +343,22 @@ main = do
                            putStrLn (show (dropObs (sit2list s)))
                            putStrLn (show (v, d))
                            printFluents s
-                           --if start s > 17.5
-                           if False && 19.5 < start s && start s < 19.7
+{-
+                           if False && 19.5 < time s && time s < 19.7
                               then do
                                        --mapM_ (putStrLn . show) (newqualities s)
-                                       putStrLn ("ntg " ++ show (ntg s Car.H Car.D))
-                                       putStrLn ("ttc " ++ show (ttc s Car.H Car.D))
-                                       putStrLn ("ntg after accel " ++ show (ntg (Do (Accel Car.H posInf) s) Car.H Car.D))
-                                       putStrLn ("ttc after accel " ++ show (ttc (Do (Accel Car.H posInf) s) Car.H Car.D))
-                                       putStrLn ("ntg after wait " ++ show (ntg (Do (Wait 0.5) (Do (Accel Car.H posInf) s)) Car.H Car.D))
-                                       putStrLn ("ttc after wait " ++ show (ttc (Do (Wait 0.5) (Do (Accel Car.H posInf) s)) Car.H Car.D))
-                                       putStrLn ("rev ntg " ++ show (ntg s Car.H Car.D))
-                                       putStrLn ("rev ttc " ++ show (ttc s Car.H Car.D))
-                                       putStrLn ("rev ntg after accel " ++ show (ntg (Do (Accel Car.H posInf) s) Car.D Car.H))
-                                       putStrLn ("rev ttc after accel " ++ show (ttc (Do (Accel Car.H posInf) s) Car.D Car.H))
-                                       putStrLn ("rev ntg after wait " ++ show (ntg (Do (Wait 0.5) (Do (Accel Car.H posInf) s)) Car.D Car.H))
-                                       putStrLn ("rev ttc after wait " ++ show (ttc (Do (Wait 0.5) (Do (Accel Car.H posInf) s)) Car.D Car.H))
+                                       putStrLn ("ntg " ++ show (ntg s H D))
+                                       putStrLn ("ttc " ++ show (ttc s H D))
+                                       putStrLn ("ntg after accel " ++ show (ntg (Do (Accel H posInf) s) H D))
+                                       putStrLn ("ttc after accel " ++ show (ttc (Do (Accel H posInf) s) H D))
+                                       putStrLn ("ntg after wait " ++ show (ntg (Do (Wait 0.5) (Do (Accel H posInf) s)) H D))
+                                       putStrLn ("ttc after wait " ++ show (ttc (Do (Wait 0.5) (Do (Accel H posInf) s)) H D))
+                                       putStrLn ("rev ntg " ++ show (ntg s H D))
+                                       putStrLn ("rev ttc " ++ show (ttc s H D))
+                                       putStrLn ("rev ntg after accel " ++ show (ntg (Do (Accel H posInf) s) D H))
+                                       putStrLn ("rev ttc after accel " ++ show (ttc (Do (Accel H posInf) s) D H))
+                                       putStrLn ("rev ntg after wait " ++ show (ntg (Do (Wait 0.5) (Do (Accel H posInf) s)) D H))
+                                       putStrLn ("rev ttc after wait " ++ show (ttc (Do (Wait 0.5) (Do (Accel H posInf) s)) D H))
                                        putStrLn "---"
                                        let f   = newquality s
                                        let cfl = canonicalize Linear f 0
@@ -385,14 +383,16 @@ main = do
                                        --putStrLn (show t)
                                        --putStrLn "---"
                                        --putStrLn (show (dropObs (sit2list (newsit s xInterpolateRecipLinAndLin))))
-                                       --putStrLn ("ntg0 = " ++ (show (maybe (-1000) (\sit -> ntg sit Car.H Car.D) (s0 (newsit s xInterpolateRecipLin)))))
-                                       --putStrLn ("ttc0 = " ++ (show (maybe (-1000) (\sit -> ttc sit Car.H Car.D) (s0 (newsit s xInterpolateRecipLin)))))
-                                       --putStrLn ("ntg1 = " ++ (show (maybe (-1000) (\sit -> ntg sit Car.H Car.D) (s1 (newsit s xInterpolateRecipLin)))))
-                                       --putStrLn ("ttc1 = " ++ (show (maybe (-1000) (\sit -> ttc sit Car.H Car.D) (s1 (newsit s xInterpolateRecipLin)))))
-                                       --putStrLn ("ntg2 = " ++ (show (maybe (-1000) (\sit -> ntg sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
-                                       --putStrLn ("ttc2 = " ++ (show (maybe (-1000) (\sit -> ttc sit Car.H Car.D) (s2 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ntg0 = " ++ (show (maybe (-1000) (\sit -> ntg sit H D) (s0 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ttc0 = " ++ (show (maybe (-1000) (\sit -> ttc sit H D) (s0 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ntg1 = " ++ (show (maybe (-1000) (\sit -> ntg sit H D) (s1 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ttc1 = " ++ (show (maybe (-1000) (\sit -> ttc sit H D) (s1 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ntg2 = " ++ (show (maybe (-1000) (\sit -> ntg sit H D) (s2 (newsit s xInterpolateRecipLin)))))
+                                       --putStrLn ("ttc2 = " ++ (show (maybe (-1000) (\sit -> ttc sit H D) (s2 (newsit s xInterpolateRecipLin)))))
                               else return ()
-                           if 19.5 < start s && start s < 19.7
+-}
+                           if 19.5 <= time s && time s < 19.7 ||
+                              29.0 <= time s && time s < 29.5
                               then do writeFile "trace.csv" (unlines (traceCsv s))
                                       writeFile "plot.sh" (unlines (gnuplot "trace.csv"))
                               else return ()
@@ -413,9 +413,9 @@ main = do
          mapM_ (putStrLn . show) (map (maybe Nothing $ (\x -> Just
                ( x
                , Obs.time x
-               , map (Obs.lane x) [Car.B,Car.D,Car.H]
-               , map (uncurry (Obs.ntg x)) [(x,y) | x <- [Car.B,Car.D,Car.H], y <- [Car.B,Car.D,Car.H]]
-               , map (uncurry (Obs.ttc x)) [(x,y) | x <- [Car.B,Car.D,Car.H], y <- [Car.B,Car.D,Car.H]]
+               , map (Obs.lane x) [B,D,H]
+               , map (uncurry (Obs.ntg x)) [(x,y) | x <- [B,D,H], y <- [B,D,H]]
+               , map (uncurry (Obs.ttc x)) [(x,y) | x <- [B,D,H], y <- [B,D,H]]
                ))) (take 30 observations))
 -}
 --         putStrLn "-------"
@@ -442,7 +442,7 @@ mydo4 l t | final t   = [(sit t, rew t, depth t)]
                              Nothing -> []
                              Just t'  -> (sit t', rew t', depth t') : mydo4 l t'
 {-
-   where bla x @ (Just t') | depth t' >= 35 = Just (Car.debug' ((show (value l t')) ++ " " ++ (show (depth t'))) t')
+   where bla x @ (Just t') | depth t' >= 35 = Just (debug' ((show (value l t')) ++ " " ++ (show (depth t'))) t')
                            | otherwise = x
          bla x @ Nothing = x
 -}

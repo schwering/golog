@@ -9,7 +9,8 @@ data Car = A | B | C | D | E | F | G | H deriving (Bounded, Enum, Eq, Ix, Ord, S
 
 cars :: [Car]
 --cars = [B .. H]
-cars = [D,H]
+--cars = [D,H]
+cars = [B,D,H]
 
 
 debug :: (Show a) => a -> a
