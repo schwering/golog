@@ -1,19 +1,53 @@
 prGolog
 =======
 
-This is a [situation calculus][SitCalc]- and [Golog][Golog]-based system
-written in [Haskell][Haskell].
-This [paper][CogRob-2012] and [these slides][CogRob-2012-slides]
-present the general approach.
-Our current application domain is automotive traffic.
-This [paper][Commonsense-2013] presents a theory for reasoning about
-traffic sitautions.
+This is a *plan recognition system* targeted at *automotive traffic*.
+It is generally capable of handling *continuous domains* where *multiple agents*
+interact with each other and where plan recognition needs to carried out
+*on-line*.
 
-We have [extended][TORCS-robots] a the racing game [TORCS][TORCS] (via
-a so-called robot) to function as driving simulator and observation
-source.
-The game sends all observations to the plan recognition system.
-These observations can also be played back using `src/replay.c`.
+Our approach to plan recognition is as follows.
+(See this [paper][CogRob-2012] and these [slides][CogRob-2012-slides] for
+details.)
+
+* First the domain is modeled in terms of a [situation calculus][SitCalc] basic
+  action theory which basically defines the available primitive actions and
+  fluents.
+  (This [paper][Commonsense-2013] presents our theory for reasoning about
+  traffic situations.)
+* Then one defines a plan library which consists of [Golog][Golog] programs.
+  Each of these programs represents a typical behavior pattern.
+* To perform a concrete plan recognition task, execution of these programs is
+  simulated.
+  The effects in this simulation are compared to the observations of the real
+  world.
+  If the observations and the simulation are consistent, the respective program
+  is considered a potential explanation of the agent's action, i.e., a
+  recognized plan.
+
+Our current application domain is automotive traffic.
+We use [TORCS][TORCS] as driving simulation.
+It transmits observations to the plan recognition twice a second.
+The modifications to TORCS can be found in [this repository][TORCS-robots].
+For testing purposes, observations can be recorded and replayed (using
+[src/replay.c](src/replay.c)).
+
+The prGolog interpreter may be useful beyond plan recognition tasks.
+Besides traditional constructs like sequence, if-then-else and loops, it
+features nondeterministic branch and iteration, concurrency by interleaving,
+and pick of an argument.
+The nondeterminism of the latter four constructs is resolved using decision
+theory, i.e., the interpreter opts for the "best" (wrt some reward function)
+alternative.
+The system is written in [Haskell][Haskell].
+The implementation is much more compact, powerful and efficient than previous
+implementations in [ECLiPSe-CLP][ECLiPSe] and [Mercury][Mercury], two logical
+languages.
+
+The central source files are [Golog.hs](src/Interpreter/Golog.hs) and
+[Tree.hs](src/Interpreter/Tree.hs) for the Golog interpreter, and
+[Theorems.hs](src/RSTC/Theorems.hs) and
+[Regression.hs](src/RSTC/BAT/Regression.hs) for the traffic BAT.
 
 Contact: [Christoph Schwering][Schwering] (schwering at kbsg.rwth-aachen.de).
 
@@ -26,6 +60,7 @@ Contact: [Christoph Schwering][Schwering] (schwering at kbsg.rwth-aachen.de).
 [Schwering]: http://www.kbsg.rwth-aachen.de/~schwering/
 [Haskell]: http://www.haskell.org/
 [ECLiPSe]: http://www.eclipseclp.org/
+[Mercury]: http://www.mercurylang.org/
 [TORCS]: http://torcs.sourceforge.net/
 [TORCS-robots]: https://github.com/schwering/torcs-drivers
 
