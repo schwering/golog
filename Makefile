@@ -1,8 +1,11 @@
+PROFILING = --enable-library-profiling --enable-executable-profiling
+PROFILING =
+
 all: dist replay
 	cabal build
 
 dist: prgolog.cabal
-	cabal configure --enable-library-profiling --enable-executable-profiling
+	cabal configure $(PROFILING)
 
 replay: src/replay.c
 	cc -Wall -o replay src/replay.c

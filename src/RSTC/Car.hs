@@ -3,7 +3,7 @@ module RSTC.Car where
 import Data.Ix
 import System.IO.Unsafe
 
-data Lane = LeftLane | RightLane deriving (Eq, Show)
+data Lane = LeftLane | RightLane deriving (Eq, Enum, Show)
 
 data Car = A | B | C | D | E | F | G | H deriving (Bounded, Enum, Eq, Ix, Ord, Show)
 

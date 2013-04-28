@@ -71,7 +71,7 @@ instance State Double where
    ttc  (State _ _ _ _     _    ttc') b c = ttc' ! (b, c)
 
 
-instance TransformableState Double where
+instance HistState Double where
    history (State _   as _ _ _ _) = as
    histlen (State len _  _ _ _ _) = len
 

@@ -4,7 +4,7 @@
 -- | Common base of BAT implementations using regression and progression.
 
 module RSTC.BAT.Base (Prim(..), NTGCat(..), TTCCat(..),
-                      State(..), TransformableState(..),
+                      State(..), HistState(..),
                       lookahead, ntgDiff, ttcDiff, quality, match,
                       bestAccel, ntgCats, ttcCats, nan,
                       defaultPoss, defaultReward,
@@ -62,8 +62,7 @@ class RealFloat a => State a where
    ttc  :: Sit (Prim a) -> Car -> Car -> TTC a
 
 
--- | Class 'TransformableState' defines some common operations of situation-like
--- types.
+-- | Class 'HistState' defines some common operations of situation-like types.
 --
 -- Minimal complete definition: history.
 --
@@ -73,7 +72,7 @@ class RealFloat a => State a where
 -- (2) 'history' may be incomplete, while 'sit2list' should be complete.
 -- (However, I don't know of a way to implement 'sit2list' without having a
 -- complete 'history' without additional cost.)
-class (State a, BAT (Prim a)) => TransformableState a where
+class (State a, BAT (Prim a)) => HistState a where
    history  :: Sit (Prim a) -> [Prim a]
    histlen  :: Sit (Prim a) -> Int
    sitlen   :: Sit (Prim a) -> Int
@@ -89,24 +88,24 @@ class (State a, BAT (Prim a)) => TransformableState a where
 
 
 -- | Appends list of actions in given order to situation term as new actions.
-append2sit :: TransformableState a => Sit (Prim a) -> [Prim a] -> Sit (Prim a)
+append2sit :: HistState a => Sit (Prim a) -> [Prim a] -> Sit (Prim a)
 append2sit s []     = s
 append2sit s (a:as) = append2sit (do_ a s) as
 
 
 -- | Injects a new action 'n' actions ago in the situation term.
-inject :: TransformableState a => Int -> (Prim a) -> Sit (Prim a) -> Sit (Prim a)
+inject :: HistState a => Int -> (Prim a) -> Sit (Prim a) -> Sit (Prim a)
 inject n a s = list2sit (reverse (take n l ++ [a] ++ drop n l))
    where l = reverse (sit2list s)
 
 
 -- | Removes the action 'n' actions ago in the situation term.
-remove :: TransformableState a => Int -> Sit (Prim a) -> Sit (Prim a)
+remove :: HistState a => Int -> Sit (Prim a) -> Sit (Prim a)
 remove n s = list2sit (reverse (take n l ++ drop (n+1) l))
    where l = reverse (sit2list s)
 
 
-bestAccel :: TransformableState a => Sit (Prim a) -> Car -> Car -> Accel a
+bestAccel :: HistState a => Sit (Prim a) -> Car -> Car -> Accel a
 bestAccel s b c = 0.5 * fx + 0.5 * gx
    where fx = let (f1, f2) = (f 2, f 3) in pick f1 f2 (nullAt id (canonicalize Recip  f1 0))
          gx = let (g1, g2) = (g 2, g 3) in pick g1 g2 (nullAt id (canonicalize Linear g1 0))
@@ -130,7 +129,7 @@ bestAccel s b c = 0.5 * fx + 0.5 * gx
                              Nothing -> []
 
 
-defaultPoss :: TransformableState a => Prim a -> Sit (Prim a) -> Bool
+defaultPoss :: HistState a => Prim a -> Sit (Prim a) -> Bool
 defaultPoss (Wait t)             _ = t >= 0 && not (isNaN t)
 defaultPoss a @ (Accel _ q)      s = noDupe a (history s) && not (isNaN q)
 defaultPoss a @ (LaneChange b l) s = noDupe a (history s) && l /= lane s b
@@ -144,7 +143,7 @@ defaultPoss (End _ _)            _ = True
 defaultPoss (Msg _)              _ = True
 
 
-defaultReward :: TransformableState a => Prim a -> Sit (Prim a) -> Reward
+defaultReward :: HistState a => Prim a -> Sit (Prim a) -> Reward
 defaultReward (Wait _)         _ = 0
 defaultReward (Accel _ _)      _ = -0.01
 defaultReward (LaneChange _ _) _ = -0.01
@@ -152,7 +151,7 @@ defaultReward (Init _)         _ = 0
 defaultReward (Prematch _)     _ = 0
 defaultReward (Match e)        s = 1 - sum ntgDiffs / genericLength ntgDiffs
    where ntgDiffs = map realToFrac [abs (ntgDiff s e b c) | b <- cars, c <- cars, b /= c]
-         ttcDiffs = map realToFrac [abs (signum (ttc s b c) - signum (O.ttc e b c)) | b <- cars, c <- cars, b < c]
+         --ttcDiffs = map realToFrac [abs (signum (ttc s b c) - signum (O.ttc e b c)) | b <- cars, c <- cars, b < c]
 defaultReward Abort            _ = 0
 defaultReward NoOp             _ = 0
 defaultReward (Start _ _)      s = max 0 (1000 - 2 * (fromIntegral (histlen s)))
@@ -186,10 +185,8 @@ match e s = let ntg_ttc = [(b, c, ntg s b c, O.ntg e b c,
             in all (\(l1, l2) -> l1 == l2) lanes &&
                all (\(ntg1, ntg2) -> haveCommon (ntgCats ntg1)
                                                 (ntgCats ntg2)) ntgs &&
-               --XXX
-               --all (\(ttc1, rv1, ttc2, rv2) -> haveCommon (ttcCats ttc1 rv1)
-               --                                           (ttcCats ttc2 rv2)) ttcs &&
-               True
+               all (\(ttc1, ttc2, rv1, rv2) -> haveCommon (ttcCats ttc1 rv1)
+                                                          (ttcCats ttc2 rv2)) ttcs
    where haveCommon (x:xs) (y:ys) | x < y     = haveCommon xs (y:ys)
                                   | y < x     = haveCommon (x:xs) ys
                                   | otherwise = True

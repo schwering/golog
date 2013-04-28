@@ -29,21 +29,21 @@ instance RealFloat a => BAT (Prim a) where
 
 
 instance RealFloat a => State a where
-   time = time'
+   time = memo1 1 time'
       where time' :: RealFloat a => Sit (Prim a) -> Time a
             time' (Do (Wait t) s) = t + (time s)
-            time' (Do (Init e) s) = O.time e
+            time' (Do (Init e) _) = O.time e
             time' (Do _ s)        = time s
             time' S0              = 0
 
-   lane = lane'
+   lane = memo2 1 lane'
       where lane' :: RealFloat a => Sit (Prim a) -> Car -> Lane
             lane' (Do (LaneChange c l) _) b | b == c = l
             lane' (Do (Init e) _)         b          = O.lane e b
             lane' (Do _ s)                b          = lane s b
             lane' S0                      _          = RightLane
 
-   ntg  = memo3 1 ntg'
+   ntg = memo3 1 ntg'
       where ntg' :: RealFloat a => Sit (Prim a) -> Car -> Car -> NTG a
             ntg' _                  b c | b == c = nan
             ntg' (Do (Wait t) s)    b c          = orTrans
@@ -57,7 +57,7 @@ instance RealFloat a => State a where
             ntg' (Do _        s)    b c          = ntg s b c
             ntg' S0                 _ _          = nan
 
-   ttc  = memo3 2 ttc'
+   ttc = memo3 2 ttc'
       where ttc' :: RealFloat a => Sit (Prim a) -> Car -> Car -> NTG a
             ttc' _                  b c | b == c = nan
             ttc' (Do (Wait t) s)    b c          = tttc (ntg s) (ttc s) t b c
@@ -76,7 +76,7 @@ instance RealFloat a => State a where
             ttc' S0                 _ _          = nan
 
 
-instance RealFloat a => TransformableState a where
+instance RealFloat a => HistState a where
    history S0       = []
    history (Do a s) = a : history s
 

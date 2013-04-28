@@ -112,7 +112,6 @@ relVeloc' :: RealFloat a => NTG a -> TTC a -> a
 relVeloc' ntg ttc = 1 / ((1 - ntg) / ttc)
 
 
-
 data NTGRelation = IsFollowing
                  | IsFollowed
                  | IsApproaching
