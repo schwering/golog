@@ -2,6 +2,7 @@
 
 module Util.MemoCache where
 
+import Prelude hiding (id)
 import Foreign.C
 import Foreign.C.Types
 import Foreign.Ptr
@@ -20,11 +21,11 @@ memo1 id f a = realToFrac r
          r  = unsafePerformIO (c_memo1 id (unsafePerformIO (wrap1 f')) a')
 
 
-memo2 :: (Enum b, Real c, Fractional d) => CacheId -> (a -> b -> c) -> a -> b -> d
-memo2 id f a b = realToFrac r
+memo2 :: (Enum b, Enum c) => CacheId -> (a -> b -> c) -> a -> b -> c
+memo2 id f a b = c2e r
    where f' x y = let x' = unsafePerformIO (deRefStablePtr x)
                       y' = c2e (y :: CInt)
-                  in (realToFrac (f x' y')) :: CDouble
+                  in (e2c (f x' y')) :: CInt
          a' = unsafePerformIO (newStablePtr a)
          b' = e2c b
          r  = unsafePerformIO (c_memo2 id (unsafePerformIO (wrap2 f')) a' b')
@@ -63,23 +64,23 @@ foreign import ccall "wrapper"
             IO (FunPtr (StablePtr a -> CDouble))
 
 foreign import ccall "wrapper"
-   wrap2 :: (StablePtr a -> CInt -> CDouble) ->
-            IO (FunPtr (StablePtr a -> CInt -> CDouble))
+   wrap2 :: (StablePtr a -> CInt -> CInt) ->
+            IO (FunPtr (StablePtr a -> CInt -> CInt))
 
 foreign import ccall "wrapper"
    wrap3 :: (StablePtr a -> CInt -> CInt -> CDouble) ->
             IO (FunPtr (StablePtr a -> CInt -> CInt -> CDouble))
 
 
-foreign import ccall "lru_cache1"
+foreign import ccall "PtrDbl_lru_cache"
    c_memo1 :: CacheId -> FunPtr (StablePtr a -> CDouble) ->
               StablePtr a -> IO CDouble
 
-foreign import ccall "lru_cache2"
-   c_memo2 :: CacheId -> FunPtr (StablePtr a -> CInt -> CDouble) ->
-              StablePtr a -> CInt -> IO CDouble
+foreign import ccall "PtrIntInt_lru_cache"
+   c_memo2 :: CacheId -> FunPtr (StablePtr a -> CInt -> CInt) ->
+              StablePtr a -> CInt -> IO CInt
 
-foreign import ccall "lru_cache3"
+foreign import ccall "PtrIntIntDbl_lru_cache"
    c_memo3 :: CacheId -> FunPtr (StablePtr a -> CInt -> CInt -> CDouble) ->
               StablePtr a -> CInt -> CInt -> IO CDouble
 

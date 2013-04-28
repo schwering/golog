@@ -7,13 +7,10 @@
 #include <unistd.h>
 #include <sys/times.h>
 
-typedef double (*func1_t)(HsStablePtr);
-typedef double (*func2_t)(HsStablePtr, int);
-typedef double (*func3_t)(HsStablePtr, int, int);
+typedef unsigned long long date_t;
 
-#define SIZE1 64
-#define SIZE2 64
-#define SIZE3 256
+
+#ifdef PROFILE_CACHE
 
 static clock_t ticks = 0;
 
@@ -26,210 +23,174 @@ static clock_t ticks = 0;
 	const clock_t c_end = end.tms_stime + end.tms_cstime; \
 	ticks += c_end - c_start;
 
+#else
 
-double lru_cache1(int z, func1_t f, HsStablePtr a)
-{
-	typedef unsigned long long date_t;
-	struct entry {
-		int z;
-		HsStablePtr a;
-		double b;
-		date_t date;
-	};
+#define TIMER_START
+#define TIMER_END(x)
 
-	static struct entry buf[SIZE1];
-	static int size = 0;
-	static date_t now = 0;
+#endif
 
-	//TIMER_START;
 
-	++now;
+#define COMMA 		,
+#define SEMICOLON 	;
 
-	int oldest_i = 0;
-	date_t oldest_date = ULLONG_MAX;
-
-	int i;
-	for (i = 0; i < size; ++i) {
-		if (buf[i].z == z && buf[i].a == a) {
-			buf[i].date = now;
-			//TIMER_END(ticks);
-			return buf[i].b;
-		}
-		if (buf[i].date < oldest_date) {
-			oldest_date = buf[i].date;
-			oldest_i = i;
-		}
-	}
-
-	const double b = f(a); /* this leads to recursive cache lookups! */
-
-	const bool replace = size == SIZE1;
-
-	if (replace) {
-		if (oldest_date == buf[oldest_i].date) {
-			i = oldest_i;
-		} else {
-			//TIMER_END(ticks);
-			return b;
-		}
-		if (buf[i].a) {
-			hs_free_stable_ptr(buf[i].a);
-			buf[i].a = NULL;
-		}
-	} else {
-		i = size;
-		++size;
-	}
-
-	buf[i].z = z;
-	buf[i].a = a;
-	buf[i].b = b;
-	buf[i].date = now;
-	//TIMER_END(ticks);
-	return b;
+/* Defines a new LRU cache.
+ *
+ * Name: the resulting function is called <Name>_lru_cache(...)
+ * Size: number cache lines
+ * ArgTypeList: a macro which takes a delimiter argument and lists the types
+ *              of the arguments, e.g., int <delim> float <delim> double
+ * ArgNameList: as ArgTypeList, but with variable names instead of types
+ * ArgTypeNameList: combination of ArgTypeList and ArgNameList
+ * ReturnType: the result of the cache
+ * Assign: a macro which takes a cache entry and copies the variables
+ * Free: a macro which frees memory allocated by a cache entry (and since it
+ *       sets the respective pointer to 0 to remember the deallocation)
+ * Equal: a macro which takes a cache entry and returns true if its entries
+ *        are equal to the current arguments
+ */
+#define LRU_CACHE(Name, Size,\
+		  ArgTypeList, ArgNameList, ArgTypeNameList, ReturnType,\
+		  Assign, Free, Equal)\
+struct Name ## _entry {\
+	int z;\
+	ArgTypeNameList(SEMICOLON);\
+	ReturnType result;\
+	date_t date;\
+};\
+typedef ReturnType (*Name ## _func_t)(ArgTypeList(COMMA));\
+ReturnType Name ## _lru_cache(int z, Name ## _func_t f, ArgTypeNameList(COMMA))\
+{\
+	static struct Name ## _entry buf[Size];\
+	static int size = 0;\
+	static date_t now = 0;\
+\
+	TIMER_START;\
+\
+	++now;\
+\
+	int oldest_i = 0;\
+	date_t oldest_date = ULLONG_MAX;\
+\
+	int i;\
+	for (i = 0; i < size; ++i) {\
+		if (buf[i].z == z && Equal(&buf[i])) {\
+			buf[i].date = now;\
+			TIMER_END(ticks);\
+			return buf[i].result;\
+		}\
+		if (buf[i].date < oldest_date) {\
+			oldest_date = buf[i].date;\
+			oldest_i = i;\
+		}\
+	}\
+\
+	const ReturnType result = f(ArgNameList(COMMA));\
+\
+	const bool replace = size == Size;\
+\
+	if (replace) {\
+		if (oldest_date == buf[oldest_i].date) {\
+			i = oldest_i;\
+		} else {\
+			TIMER_END(ticks);\
+			return result;\
+		}\
+		Free(&buf[i]);\
+	} else {\
+		i = size;\
+		++size;\
+	}\
+\
+	buf[i].z = z;\
+	Assign(&buf[i]);\
+	buf[i].result = result;\
+	buf[i].date = now;\
+	TIMER_END(ticks);\
+	return result;\
 }
 
 
-double lru_cache2(int z, func2_t f, HsStablePtr a, int b)
-{
-	typedef unsigned long long date_t;
-	struct entry {
-		int z;
-		HsStablePtr a;
-		int b;
-		double c;
-		date_t date;
-	};
 
-	static struct entry buf[SIZE2];
-	static int size = 0;
-	static date_t now = 0;
+#define TYPE_LIST(delim)	HsStablePtr
+#define NAME_LIST(delim)	a
+#define TYPE_NAME_LIST(delim)	HsStablePtr a
+#define RETURN_TYPE		double
+#define ASSIGN(e)		(e)->a = a
+#define EQUAL(e)		(e)->a == a
+#define FREE(e)			if ((e)->a) { hs_free_stable_ptr((e)->a); (e)->a = NULL; }
 
-	//TIMER_START;
+LRU_CACHE(PtrDbl, 8,
+		TYPE_LIST, NAME_LIST, TYPE_NAME_LIST, RETURN_TYPE,
+		ASSIGN, FREE, EQUAL)
 
-	++now;
-
-	int oldest_i = 0;
-	date_t oldest_date = ULLONG_MAX;
-
-	int i;
-	for (i = 0; i < size; ++i) {
-		if (buf[i].z == z && buf[i].a == a && buf[i].b == b) {
-			buf[i].date = now;
-			//TIMER_END(ticks);
-			return buf[i].c;
-		}
-		if (buf[i].date < oldest_date) {
-			oldest_date = buf[i].date;
-			oldest_i = i;
-		}
-	}
-
-	const double c = f(a, b); /* this leads to recursive cache lookups! */
-
-	const bool replace = size == SIZE2;
-
-	if (replace) {
-		if (oldest_date == buf[oldest_i].date) {
-			i = oldest_i;
-		} else {
-			//TIMER_END(ticks);
-			return c;
-		}
-		if (buf[i].a) {
-			hs_free_stable_ptr(buf[i].a);
-			buf[i].a = NULL;
-		}
-	} else {
-		i = size;
-		++size;
-	}
-
-	buf[i].z = z;
-	buf[i].a = a;
-	buf[i].b = b;
-	buf[i].c = c;
-	buf[i].date = now;
-	//TIMER_END(ticks);
-	return c;
-}
+#undef TYPE_LIST
+#undef NAME_LIST
+#undef TYPE_NAME_LIST
+#undef RETURN_TYPE
+#undef ASSIGN
+#undef EQUAL
+#undef FREE
 
 
-double lru_cache3(int z, func3_t f, HsStablePtr a, int b, int c)
-{
-	typedef unsigned long long date_t;
-	struct entry {
-		int z;
-		HsStablePtr a;
-		int b;
-		int c;
-		double d;
-		date_t date;
-	};
+#define TYPE_LIST(delim)	HsStablePtr delim int
+#define NAME_LIST(delim)	a delim b
+#define TYPE_NAME_LIST(delim)	HsStablePtr a delim int b
+#define RETURN_TYPE		int
+#define ASSIGN(e)		(e)->a = a; (e)->b = b
+#define EQUAL(e)		(e)->a == a && (e)->b == b
+#define FREE(e)			if ((e)->a) { hs_free_stable_ptr((e)->a); (e)->a = NULL; }
 
-	static struct entry buf[SIZE3];
-	static int size = 0;
-	static date_t now = 0;
+LRU_CACHE(PtrIntInt, 8,
+		TYPE_LIST, NAME_LIST, TYPE_NAME_LIST, RETURN_TYPE,
+		ASSIGN, FREE, EQUAL)
 
-	//TIMER_START;
+#undef TYPE_LIST
+#undef NAME_LIST
+#undef TYPE_NAME_LIST
+#undef RETURN_TYPE
+#undef ASSIGN
+#undef EQUAL
+#undef FREE
 
-	++now;
 
-	int oldest_i = 0;
-	date_t oldest_date = ULLONG_MAX;
+#define TYPE_LIST(delim)	HsStablePtr delim int delim int
+#define NAME_LIST(delim)	a delim b delim c
+#define TYPE_NAME_LIST(delim)	HsStablePtr a delim int b delim int c
+#define RETURN_TYPE		double
+#define ASSIGN(e)		(e)->a = a; (e)->b = b; (e)->c = c
+#define EQUAL(e)		(e)->a == a && (e)->b == b && (e)->c == c
+#define FREE(e)			if ((e)->a) { hs_free_stable_ptr((e)->a); (e)->a = NULL; }
 
-	int i;
-	for (i = 0; i < size; ++i) {
-		if (buf[i].z == z && buf[i].a == a && buf[i].b == b && buf[i].c == c) {
-			buf[i].date = now;
-			//TIMER_END(ticks);
-			return buf[i].d;
-		}
-		if (buf[i].date < oldest_date) {
-			oldest_date = buf[i].date;
-			oldest_i = i;
-		}
-	}
+LRU_CACHE(PtrIntIntDbl, 256,
+		TYPE_LIST, NAME_LIST, TYPE_NAME_LIST, RETURN_TYPE,
+		ASSIGN, FREE, EQUAL)
 
-	const double d = f(a, b, c); /* this leads to recursive cache lookups! */
-
-	const bool replace = size == SIZE3;
-
-	if (replace) {
-		if (oldest_date == buf[oldest_i].date) {
-			i = oldest_i;
-		} else {
-			//TIMER_END(ticks);
-			return d;
-		}
-		if (buf[i].a) {
-			hs_free_stable_ptr(buf[i].a);
-			buf[i].a = NULL;
-		}
-	} else {
-		i = size;
-		++size;
-	}
-
-	buf[i].z = z;
-	buf[i].a = a;
-	buf[i].b = b;
-	buf[i].c = c;
-	buf[i].d = d;
-	buf[i].date = now;
-	//TIMER_END(ticks);
-	return d;
-}
+#undef TYPE_LIST
+#undef NAME_LIST
+#undef TYPE_NAME_LIST
+#undef RETURN_TYPE
+#undef ASSIGN
+#undef EQUAL
+#undef FREE
 
 
 double memo_cache_time_cost(void)
 {
+#ifdef PROFILE_CACHE
 	return (double) (ticks / sysconf(_SC_CLK_TCK));
+#else
+	return 0.0;
+#endif
 }
 
 
 uint64_t memo_cache_ticks_cost(void)
 {
+#ifdef PROFILE_CACHE
 	return ticks;
+#else
+	return 0.0;
+#endif
 }
 
