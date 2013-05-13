@@ -104,7 +104,7 @@ pass b c =
    ) `Seq` (
       Star (actf (\s -> Accel b (bestAccel s b c)))
    ) `Seq` atomic (
-      -- test (\s -> ntg s b c < 0) `Seq`
+      test (\s -> ntg s b c < 0) `Seq`
       act (End b "pass") 
    )
 

@@ -12,7 +12,7 @@ import RSTC.Theorems
 
 import Foreign.C
 
-class RealFloat a => Obs a b | b -> a where
+class (RealFloat a, Show b) => Obs a b | b -> a where
    next :: b -> Maybe b
    time :: b -> Time a
    ntg  :: b -> Car -> Car -> NTG a

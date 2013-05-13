@@ -105,27 +105,34 @@ remove n s = list2sit (reverse (take n l ++ drop (n+1) l))
    where l = reverse (sit2list s)
 
 
-bestAccel :: HistState a => Sit (Prim a) -> Car -> Car -> Accel a
-bestAccel s b c = 0.5 * fx + 0.5 * gx
+bestAccel :: (Show a, HistState a) => Sit (Prim a) -> Car -> Car -> Accel a
+bestAccel sit b c = if haveObs then 0.5 * fx + 0.5 * gx else nan
    where fx = let (f1, f2) = (f 2, f 3) in pick f1 f2 (nullAt id (canonicalize Recip  f1 0))
          gx = let (g1, g2) = (g 2, g 3) in pick g1 g2 (nullAt id (canonicalize Linear g1 0))
          pick f1 f2 xs = case sortBy (\x y -> compare (abs (f1 x + f2 x)) (abs (f1 y + f2 y))) xs of (x:_) -> x ; [] -> nan
-         f n q = let s' = ss n q
-                 in case history s' of (Match e : _) -> quality s e b c
-                                       _             -> nan
-         g n q = let s' = ss n q
-                 in case history s' of (Match e : _) -> quality s e b c
-                                       _             -> nan
-         ss n q = append2sit s (Accel b q : (obsActions (history s) !! n))
-         obsActions (Match e : _ )  = inits (obsActions' (O.wrap e))
-         obsActions (Init e  : _ )  = inits (obsActions' (O.wrap e))
-         obsActions (_       : as)  = obsActions as
-         obsActions []              = error "RSTC.BAT.Base.bestAccel: no obs"
-         obsActions' :: O.Wrapper a -> [Prim a]
-         obsActions' (O.Wrapper e) =
+         f n q = let s = (newSit n q)
+                 in case history s of (Match e : _) -> ntgDiff s e b c
+                                      _             -> nan
+         g n q = let s = (newSit n q)
+                 in case history s of (Match e : _) -> ntgDiff s e c b
+                                      _             -> nan
+         haveObs :: Bool
+         haveObs = any (\a -> case a of { Match _ -> True ; _ -> False }) (history sit)
+         newSit n q = append2sit sit (Accel b q : (obsActions n sit))
+         obsActions :: (Show a, HistState a) => Int -> Sit (Prim a) -> [Prim a]
+         obsActions n s'  = take (2*n) (nextObs (lastMatch s'))
+         lastMatch :: HistState a => Sit (Prim a) -> O.Wrapper a
+         lastMatch s' = lastMatch' (history s')
+         lastMatch' :: [Prim a] -> O.Wrapper a
+         lastMatch' (Match e : _ )  = O.wrap e
+         lastMatch' (Init e  : _ )  = O.wrap e
+         lastMatch' (_       : as)  = lastMatch' as
+         lastMatch' []              = error "RSTC.BAT.Base.bestAccel: no init or match action"
+         nextObs :: (Show a) => O.Wrapper a -> [Prim a]
+         nextObs (O.Wrapper e) =
             case O.next e of Just e' -> Wait (O.time e' - O.time e) :
                                         Match e' :
-                                        obsActions' (O.wrap e')
+                                        nextObs (O.wrap e')
                              Nothing -> []
 
 
@@ -149,14 +156,17 @@ defaultReward (Accel _ _)      _ = -0.01
 defaultReward (LaneChange _ _) _ = -0.01
 defaultReward (Init _)         _ = 0
 defaultReward (Prematch _)     _ = 0
-defaultReward (Match e)        s = 1 - sum ntgDiffs / genericLength ntgDiffs
+defaultReward (Match e)        s = 1 - sum ntgDiffs / genericLength ntgDiffs - sum ttcDiffs / genericLength ttcDiffs
    where ntgDiffs = map realToFrac [abs (ntgDiff s e b c) | b <- cars, c <- cars, b /= c]
-         --ttcDiffs = map realToFrac [abs (signum (ttc s b c) - signum (O.ttc e b c)) | b <- cars, c <- cars, b < c]
+         ttcDiffs = map realToFrac [abs (signum (ttc s b c) - signum (O.ttc e b c)) | b <- cars, c <- cars, b < c]
 defaultReward Abort            _ = 0
 defaultReward NoOp             _ = 0
 defaultReward (Start _ _)      s = max 0 (1000 - 2 * (fromIntegral (histlen s)))
-defaultReward (End _ _)        s = case history s of (Match _ : _) -> 2 * (fromIntegral (histlen s - 1))
-                                                     _             -> 0
+defaultReward (End _ _)        s = case dropWhile startOrEnd (history s) of (Match _ : _) -> 2 * (fromIntegral (histlen s - 1))
+                                                                            _             -> 0
+   where startOrEnd (Start _ _)  = True
+         startOrEnd (End _ _)    = True
+         startOrEnd _            = False
 defaultReward (Msg _)          _ = 0
 
 

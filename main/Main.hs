@@ -333,10 +333,12 @@ main = do
 -}
              isMatch s = case history s of Match _ : _ -> True
                                            _           -> False
+             isEnd s = case history s of End _ _ : _ -> True
+                                         _           -> False
 --         putStrLn (show (force (tree prog S0 0 0)))
          mapM_ (\(s,v,d,t) ->
             do --putStrLn (show (sit2list s))
-               if isMatch s
+               if isMatch s || isEnd s
                   then do  putStrLn (show (filter (not.partOfObs) (sit2list s)))
                            putStrLn (show (dropObs (sit2list s)))
                            putStrLn (show (sit2list s))
@@ -391,7 +393,8 @@ main = do
                               else return ()
 -}
                            if False && 19.5 <= time s && time s < 19.7 ||
-                              True && 29.0 <= time s && time s < 29.5
+                              False && 29.0 <= time s && time s < 29.5 ||
+                              True && 29.5 <= time s
                               then do writeFile "trace.csv" (unlines (traceCsv s))
                                       writeFile "plot.sh" (unlines (gnuplot "trace.csv"))
                               else return ()
