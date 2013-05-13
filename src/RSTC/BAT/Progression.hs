@@ -9,7 +9,8 @@ module RSTC.BAT.Progression (Prim(..), NTGCat(..), TTCCat(..), State(..),
                              Sit(..),
                              lookahead, ntgDiff, ttcDiff, quality, match,
                              bestAccel, ntgCats, ttcCats, nan,
-                             history, sit2list, list2sit, inject, remove) where
+                             history, sit2list, list2sit, predsit,
+                             inject, remove) where
 
 import RSTC.Car
 import RSTC.BAT.Base

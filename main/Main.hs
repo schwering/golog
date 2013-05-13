@@ -8,7 +8,7 @@ import RSTC.Car
 import Interpreter.Golog
 import Interpreter.Tree
 import Interpreter.TreeUtil
-import RSTC.BAT.Regression
+import RSTC.BAT.Progression
 import qualified RSTC.Obs as Obs
 import RSTC.Progs
 import RSTC.Theorems
@@ -158,11 +158,6 @@ traceCsv sit = header : (reverse (map (concat . interleave delim . map show . cs
    where subsits s = case history s of Match _ : _ -> s : subsits (predsit s)
                                        _ : _       -> subsits (predsit s)
                                        _           -> []
-         --list  = sit2list sit
-         --lists = filter (isMatchAction . last) (map (\n -> take n list) [1..length list])
-         --sits  = map list2sit lists
-         --isMatchAction (Match _)  = True
-         --isMatchAction _          = False
          header = "time" ++ delim ++
                   concat (interleave delim (
                      ["ntg_S("++show b++","++show c++")" | b <- cars, c <- cars, b /= c] ++
@@ -344,6 +339,7 @@ main = do
                if isMatch s
                   then do  putStrLn (show (filter (not.partOfObs) (sit2list s)))
                            putStrLn (show (dropObs (sit2list s)))
+                           putStrLn (show (sit2list s))
                            putStrLn (show (v, d))
                            printFluents s
 {-
