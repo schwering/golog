@@ -84,7 +84,7 @@ class (State a, BAT (Prim a)) => HistState a where
    sitlen   = length . sit2list
    sit2list = reverse . history
    list2sit = append2sit s0
-   predsit  = list2sit . tail . sit2list
+   predsit  = list2sit . init . sit2list
 
 
 -- | Appends list of actions in given order to situation term as new actions.
