@@ -102,6 +102,11 @@ attc2 ntg ttc q b c = 1 / ((1-q) * ttc b c / ntg b c + q) * ttc b c
 -- Some useful properties.
 
 
+-- The TTC computed using only NTG in both directions.
+ttcFromNtg :: RealFloat a => NTGF a -> Car -> Car -> TTC a
+ttcFromNtg ntg b c = 1 / (1 / ntg b c + 1 / ntg c b)
+
+
 -- | Ratio v(b) / v(c) where b is the first and c the second 'Car'.
 relVeloc :: RealFloat a => NTGF a -> TTCF a -> Car -> Car -> a
 relVeloc ntg ttc b c = 1 / (1 - ntg b c / ttc b c)

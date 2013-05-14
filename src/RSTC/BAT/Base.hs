@@ -156,9 +156,8 @@ defaultReward (Accel _ _)      _ = -0.01
 defaultReward (LaneChange _ _) _ = -0.01
 defaultReward (Init _)         _ = 0
 defaultReward (Prematch _)     _ = 0
-defaultReward (Match e)        s = 1 - sum ntgDiffs / genericLength ntgDiffs - sum ttcDiffs / genericLength ttcDiffs
+defaultReward (Match e)        s = 1 - sum ntgDiffs / genericLength ntgDiffs
    where ntgDiffs = map realToFrac [abs (ntgDiff s e b c) | b <- cars, c <- cars, b /= c]
-         ttcDiffs = map realToFrac [abs (signum (ttc s b c) - signum (O.ttc e b c)) | b <- cars, c <- cars, b < c]
 defaultReward Abort            _ = 0
 defaultReward NoOp             _ = 0
 defaultReward (Start _ _)      s = max 0 (1000 - 2 * (fromIntegral (histlen s)))
