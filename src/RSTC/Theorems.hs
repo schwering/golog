@@ -114,7 +114,7 @@ relVeloc ntg ttc b c = 1 / (1 - ntg b c / ttc b c)
 
 -- | Ratio v(b) / v(c) where b is the first and c the second 'Car'.
 relVeloc' :: RealFloat a => NTG a -> TTC a -> a
-relVeloc' ntg ttc = 1 / ((1 - ntg) / ttc)
+relVeloc' ntg ttc = 1 / (1 - ntg / ttc)
 
 
 data NTGRelation = IsFollowing
