@@ -1,26 +1,27 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Main (main) where
 
 import RSTC.Car
 import Interpreter.Golog
 import Interpreter.Tree
-import Interpreter.TreeUtil
+--import Interpreter.TreeUtil
 import RSTC.BAT.Progression
 import qualified RSTC.Obs as Obs
 import RSTC.Progs
-import RSTC.Theorems
-import Util.Interpolation
+--import RSTC.Theorems
+--import Util.Interpolation
 import qualified Util.MemoCache
 
-import Data.List (sortBy)
-import Data.Maybe
-import Control.Applicative
+--import Data.List (sortBy)
+--import Data.Maybe
+--import Control.Applicative
 import Text.Printf
 import GHC.Stats
-import Data.ByteString.Char8 (pack)
+--import Data.ByteString.Char8 (pack)
 -- import System.Remote.Monitoring
 
 class Show a => ShowPart a where
@@ -118,7 +119,7 @@ instance BAT Prim where
 printFluents :: Sit (Prim Double) -> IO ()
 printFluents s = case reverse (sit2list s)
    of Match e : _ ->
-         do printf "time = %.2f\n" (time s)
+         do _ <- printf "time = %.2f\n" (time s)
             mapM_ (\(b,c) -> do printf "ntg %s %s:   model: %8.2f   obs: %8.2f   \916: %8.2f\n"
                                     (show b) (show c)
                                     (ntg s b c)
@@ -138,7 +139,7 @@ printFluents s = case reverse (sit2list s)
                                     (if lane s b == Obs.lane e b then 0 :: Int else 1)
                   ) cars
       _ ->
-         do printf "time = %.2f\n" (time s)
+         do _ <- printf "time = %.2f\n" (time s)
             mapM_ (\(b,c) -> do printf "ntg %s %s:   model: %8.2f\n"
                                     (show b) (show c)
                                     (ntg s b c)
@@ -154,7 +155,7 @@ printFluents s = case reverse (sit2list s)
 
 
 traceCsv :: Sit (Prim Double) -> [String]
-traceCsv sit = header : (reverse (map (concat . interleave delim . map show . csv) (subsits sit)))
+traceCsv ss = header : (reverse (map (concat . interleave delim . map show . csv) (subsits ss)))
    where subsits s = case history s of Match _ : _ -> s : subsits (predsit s)
                                        _ : _       -> subsits (predsit s)
                                        _           -> []
@@ -177,23 +178,25 @@ traceCsv sit = header : (reverse (map (concat . interleave delim . map show . cs
                   [Obs.ttc e b c | b <- cars, c <- cars, b < c] ++
                   [ntgDiff s e b c | b <- cars, c <- cars, b /= c] ++
                   [ttcDiff s e b c | b <- cars, c <- cars, b < c]
+               _ -> error "Main.traceCsv: no Match action"
 
 
 gnuplot :: String -> [String]
 gnuplot csvFile =
       ["gnuplot --persist << EOF"
+      ,"set termoption dash"
       ,"set yrange [-2:2]"
       ,"set xtics 1"
       ,"set grid"
       ,"set datafile separator \""++delim++"\""
       ,"set key autotitle columnhead"
-      ,"set terminal png size 1280,1024"
-      ,"set output \"trace-$(date +%Y-%m-%d_%H-%M-%S).png\""
-      ,"set terminal png"
+      --,"set terminal png size 1280,1024"
+      ,"set output \"trace-$(date +%Y-%m-%d_%H-%M-%S).svg\""
+      ,"set terminal svg dashed"
       ,"plot " ++
          concat (interleave ", " (
-            map (\i -> plotCmd i (i-offset) 2) [offset+1..offset+sitData] ++
-            map (\i -> plotCmd i (i-sitData-offset) 4) [offset+sitData+1..offset+sitData+obsData] ++
+            map (\i -> plotCmd i 1 (i-offset) 4) [offset+1..offset+sitData] ++
+            map (\i -> plotCmd i 2 (i-sitData-offset) 8) [offset+sitData+1..offset+sitData+obsData] ++
             []-- map (\i -> plotCmd i (i-obsData-sitData-offset) 8) [offset+sitData+obsData+1..offset+sitData+obsData+diffData]
          ))
       --,"set terminal qt"
@@ -201,14 +204,16 @@ gnuplot csvFile =
       ,"replot"
       ,"EOF"
       ]
-   where plotCmd i lt lw = "\""++csvFile++"\" u 1:"++show i++ " w l lt "++show lt++" lw "++show lw
+   where plotCmd :: Int -> Int -> Int -> Int -> String
+         plotCmd i lt lc lw = "\""++csvFile++"\" u 1:"++show i++ " w l lt "++show lt++" lc "++show lc++" lw "++show lw
          offset   = 1
          sitData  = length ([(b,c) | b <- cars, c <- cars, b /= c] ++
                             [(b,c) | b <- cars, c <- cars, b < c])
          obsData  = sitData
-         diffData = obsData
+         --diffData = obsData
 
 
+delim :: String
 delim = "\t"
 
 
@@ -217,34 +222,48 @@ interleave _ []     = []
 interleave _ [x]    = [x]
 interleave y (x:xs) = x:y:interleave y xs
 
-
-{-
-
---lastObs :: Sit (Prim a) -> (forall b. Obs.Obs a b => Maybe b)
---lastObs (Do (Match e) s) = Just e
---lastObs S0                   = Nothing
-
-
---nextObs :: Obs.Obs a b => Sit (Prim a) -> Maybe b
---nextObs s = case lastObs s of Just e -> Obs.next e
---                              _      -> Nothing
---nextObs = fmap Obs.next . lastObs
-
---nextObsNtg :: Sit (Prim a) -> Car -> Car -> a
---nextObsNtg (Do (Match e) s) = Obs.ntg (fromJust (Obs.next e))
+obsToJs :: Obs.Wrapper Double -> String
+obsToJs ow' = "new Rstc(" ++ toJs ow' cars ++ ")"
+   where toJs ow @ (Obs.Wrapper e) (b:c:ds) = "addM(" ++ toJs ow (c:ds) ++ ", " ++
+                                                   show b ++ ", " ++ show c ++ ", " ++
+                                                   "{ntg: " ++ show (Obs.ntg e b c) ++ ", " ++
+                                                   " ttc: " ++ show (Obs.ttc e b c) ++ "})"
+         toJs _                     _        = "{}"
 
 
-nextObsNtg :: Sit (Prim a) -> Car -> Car -> Maybe (NTG a)
-nextObsNtg (Do (Match e) s) b c = case Obs.next e of Just e' -> Just (Obs.ntg e' b c)
-                                                     _       -> Nothing
-nextObsNtg S0                   _ _ = Nothing
+printObsJs :: Sit (Prim Double) -> [String]
+printObsJs s = "var obs = [];" : map (\(i,oa) -> "obs[" ++ show i ++ "] = {time: " ++ show (t (w oa)) ++ ", rstc: " ++ obsToJs (w oa) ++ "};") (zip ([0..] :: [Int]) (filter isObsOrInit (sit2list s)))
+   where isObsOrInit (Match _) = True
+         isObsOrInit (Init _)  = True
+         isObsOrInit _         = False
+         t (Obs.Wrapper e)     = Obs.time e - tOffset
+         tOffset               = tOffset' (sit2list s)
+         tOffset' (Init e : _) = Obs.time e
+         tOffset' (_ : as)     = tOffset' as
+         tOffset' []           = error "Main.printObsJs: empty situation?"
+         w (Match e)           = Obs.wrap e
+         w (Init e)            = Obs.wrap e
+         w _                   = error "Main.printObsJs: no observation action"
 
 
-nextObsTtc :: Sit (Prim a) -> Car -> Car -> Maybe (NTG a)
-nextObsTtc (Do (Match e) s) b c = case Obs.next e of Just e' -> Just (Obs.ttc e' b c)
-                                                     _       -> Nothing
-nextObsTtc S0                   _ _ = Nothing
--}
+printSitJs :: Sit (Prim Double) -> [String]
+printSitJs ss = initial (sit2list ss) ++ map toJs (filter hasEffect (sit2list ss))
+   where initial (Init e : _)       = ["var modRstc = new ChangingRstc(" ++ obsToJs (Obs.wrap e) ++ ").wait(0);"
+                                      ,"modRstc.forceReferenceCar(obsRstc.computeReferenceCar());"
+                                      ,"var modLane = {};"
+                                      ,concat (map (\b -> "modLane[" ++ show b ++ ".id] = " ++ (case Obs.lane e b of RightLane -> "0" ; LeftLane -> "1") ++ ";") cars)
+                                      ,"var tDone = -1;"
+                                      ,"var tWait = 0;"]
+         initial (_ : as)           = initial as
+         initial []                 = error "Main.printSitJs: empty situation?"
+         hasEffect (Accel _ _)      = True
+         hasEffect (LaneChange _ _) = True
+         hasEffect (Wait _)         = True
+         hasEffect _                = False
+         toJs (Accel b q)           = "if (t > tWait && tDone < tWait) { tOffset += modRstc.time(); modRstc.accel(" ++ show b ++ ".id, " ++ show q ++ ").progress().wait(0); tDone = tWait; }"
+         toJs (LaneChange b l)      = "if (t > tWait && tDone < tWait) { modLane[" ++ show b ++".id] = " ++ (case l of RightLane -> "0" ; LeftLane -> "1") ++ "; tDone = tWait; }"
+         toJs (Wait t)              = "tWait += " ++ show t ++ ";"
+         toJs _                     = error "Main.printSitJs: no effect action"
 
 
 main :: IO ()
@@ -311,7 +330,7 @@ main = do
              dropObs (Wait _ :              x @ (Match _) : xs) = x : dropObs xs
              dropObs (                      x             : xs) = x : dropObs xs
              dropObs []                                         = []
-             newsit s q = inject 2 (Accel H q) (remove 2 s)
+             --newsit s q = inject 2 (Accel H q) (remove 2 s)
 {-
              newquality s @ (Do (Prematch e) _) q    = quality (newsit s q) e H D
              newquality _                       _    = 100000
@@ -336,7 +355,7 @@ main = do
              isEnd s = case history s of End _ _ : _ -> True
                                          _           -> False
 --         putStrLn (show (force (tree prog S0 0 0)))
-         mapM_ (\(s,v,d,t) ->
+         mapM_ (\(s,v,d,_t) ->
             do --putStrLn (show (sit2list s))
                if isMatch s || isEnd s
                   then do  putStrLn (show (filter (not.partOfObs) (sit2list s)))
@@ -394,9 +413,12 @@ main = do
 -}
                            if False && 19.5 <= time s && time s < 19.7 ||
                               False && 29.0 <= time s && time s < 29.5 ||
-                              True && 29.5 <= time s
+                              False && 29.5 <= time s ||
+                              True && (case history s of End _ _ : _ -> True ; _ -> False)
                               then do writeFile "trace.csv" (unlines (traceCsv s))
                                       writeFile "plot.sh" (unlines (gnuplot "trace.csv"))
+                                      mapM_ putStrLn (printObsJs s)
+                                      mapM_ putStrLn (printSitJs s)
                               else return ()
                            putStrLn ""
                   else return ()

@@ -2,7 +2,8 @@
 {-# LANGUAGE TypeFamilies #-} 
 {-# LANGUAGE Rank2Types #-}
 
--- | Golog interpreter with decision theory and concurrency.
+-- | Golog interpreter with transition semantics, decision theory and
+-- concurrency.
 -- Nondeterministic construct like branch, iteration, pick, and concurrency by
 -- interleaving are resolved by opting for the choice that leads to the highest
 -- rewarded situation.
@@ -18,7 +19,7 @@
 --   decomposing the program, executing the next atomic action, and continuing
 --   this recursively for the remaining program in 'tree'.
 --
--- \[1\] http:\/\/www.aaai.org\/ocs\/index.php\/WS\/AAAIW12\/paper\/view\/5281
+-- \[1\] http:\/\/kbsg.rwth-aachen.de\/~schwering\/CogRob-2012\/paper.pdf
 
 module Interpreter.Golog (BAT(..),
                           Reward, Depth, OptiF, Finality(..),
@@ -33,6 +34,21 @@ import Prelude hiding (max)
 
 type Reward = Double
 
+-- | Basic action theory for an action type 'a'.
+--
+-- The situation type 'Sit' is part of the BAT in order to allow the BAT use
+-- progression instead of regression.
+-- For /regression/, one usually defines @data Sit a = S0 | Do a (Sit a)@ in the
+-- instance @BAT a@.
+-- Then 's0' and 'do_' should be defined as 'S0' and 'Do', respectively.
+-- The fluents then need to be the successor state axioms.
+-- For /progression/, 'Sit' could be defined as a set map of values.
+-- In this case 's0' could return a map containing the initial values and 'do_'
+-- should compute the new map of values.
+--
+-- 'poss' corresponds to Reiter's /Poss/ predicate and should return 'True' iff
+-- the action is executable in the given situation.
+-- 'reward' indicates how good an action is in a situation.
 class BAT a where
    data Sit a :: *
    s0         :: Sit a

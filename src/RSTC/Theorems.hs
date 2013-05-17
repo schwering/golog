@@ -1,6 +1,7 @@
 -- | Spatio-Temporal Reasoning about Traffic Scenarios.
 -- Based on two temporal distance measures, net time gap (NTG) and time to
 -- collision (TTC).
+-- For details, see [1].
 --
 -- The following code implements the symmetry, transitivity, effect of by time,
 -- and effect of acceleration on NTG and TTC.
@@ -9,6 +10,8 @@
 -- infinity as representants for undefined values.
 -- When NaN or infinity occurs, the callee should try to compute a valid value
 -- via transitivity. The 'orTrans' function is helpful in this regard.
+--
+-- \[1\] http:\/\/kbsg.rwth-aachen.de\/~schwering\/Commonsense-2013\/paper.pdf
 
 module RSTC.Theorems where
 

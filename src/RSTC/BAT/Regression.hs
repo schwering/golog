@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies #-} 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Basic action theory based on relative temporal measures using regression.
 

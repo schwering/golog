@@ -39,10 +39,10 @@ Executable Main
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 
-Executable Test
-    Hs-Source-Dirs:  test
-    Main-Is:         Main.hs
-    -- Type:             detailed-1.0
-    --Test-Module:      Test
-    Build-Depends:    base, QuickCheck, random, prgolog
+--Executable Test
+--    Hs-Source-Dirs:  test
+--    Main-Is:         Main.hs
+--    -- Type:             detailed-1.0
+--    --Test-Module:      Test
+--    Build-Depends:    base, QuickCheck, random, prgolog
 

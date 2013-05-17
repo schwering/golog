@@ -1,5 +1,6 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Common base of BAT implementations using regression and progression.
 
@@ -106,7 +107,7 @@ remove n s = list2sit (reverse (take n l ++ drop (n+1) l))
 
 
 bestAccel :: (Show a, HistState a) => Sit (Prim a) -> Car -> Car -> Accel a
-bestAccel sit b c = if haveObs then 0.5 * fx + 0.5 * gx else nan
+bestAccel curSit b c = if haveObs then 0.5 * fx + 0.5 * gx else nan
    where fx = let (f1, f2) = (f 2, f 3) in pick f1 f2 (nullAt id (canonicalize Recip  f1 0))
          gx = let (g1, g2) = (g 2, g 3) in pick g1 g2 (nullAt id (canonicalize Linear g1 0))
          pick f1 f2 xs = case sortBy (\x y -> compare (abs (f1 x + f2 x)) (abs (f1 y + f2 y))) xs of (x:_) -> x ; [] -> nan
@@ -117,8 +118,8 @@ bestAccel sit b c = if haveObs then 0.5 * fx + 0.5 * gx else nan
                  in case history s of (Match e : _) -> ntgDiff s e c b
                                       _             -> nan
          haveObs :: Bool
-         haveObs = any (\a -> case a of { Match _ -> True ; _ -> False }) (history sit)
-         newSit n q = append2sit sit (Accel b q : (obsActions n sit))
+         haveObs = any (\a -> case a of { Match _ -> True ; _ -> False }) (history curSit)
+         newSit n q = append2sit curSit (Accel b q : (obsActions n curSit))
          obsActions :: (Show a, HistState a) => Int -> Sit (Prim a) -> [Prim a]
          obsActions n s'  = take (2*n) (nextObs (lastMatch s'))
          lastMatch :: HistState a => Sit (Prim a) -> O.Wrapper a
@@ -189,7 +190,7 @@ match :: (State a, O.Obs a b) => b -> Sit (Prim a) -> Bool
 match e s = let ntg_ttc = [(b, c, ntg s b c, O.ntg e b c,
                                   ttc s b c, O.ttc e b c) | b <- cars, c <- cars]
                 ntgs  = [(ntg1, ntg2) | (b, c, ntg1, ntg2, _, _) <- ntg_ttc, b /= c]
-                ttcs  = [(ttc1, ttc2, relVeloc' ntg1 ttc1, relVeloc' ntg2 ttc2) | (b, c, ntg1, ntg2, ttc1, ttc2) <- ntg_ttc, b < c]
+--                ttcs  = [(ttc1, ttc2, relVeloc' ntg1 ttc1, relVeloc' ntg2 ttc2) | (b, c, ntg1, ntg2, ttc1, ttc2) <- ntg_ttc, b < c]
                 lanes = [(lane s b, O.lane e b) | b <- cars]
             in all (\(l1, l2) -> l1 == l2) lanes &&
                all (\(ntg1, ntg2) -> haveCommon (ntgCats ntg1)

@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies #-} 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Basic action theory based on relative temporal measures using progression.
 
@@ -22,12 +22,12 @@ import Data.Array.IArray
 import Data.Array.Unboxed
 
 instance BAT (Prim Double) where
-   data Sit (Prim Double) = State Int -- ^ History length
-                                  [Prim Double] -- ^ History
-                                  (Time Double) -- ^ Current time
-                                  (Array Car Lane) -- ^ Lanes
-                                  (UArray (Car, Car) (NTG Double)) -- ^ NTGs
-                                  (UArray (Car, Car) (TTC Double)) -- ^ TTCs
+   data Sit (Prim Double) = State Int -- History length
+                                  [Prim Double] -- History
+                                  (Time Double) -- Current time
+                                  (Array Car Lane) -- Lanes
+                                  (UArray (Car, Car) (NTG Double)) -- NTGs
+                                  (UArray (Car, Car) (TTC Double)) -- TTCs
 
    s0  = State 0 [] 0
                (array (minBound, maxBound) [(b, RightLane) | b <- [minBound..maxBound]])

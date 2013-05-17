@@ -13,8 +13,8 @@ details.)
 * First the domain is modeled in terms of a [situation calculus][SitCalc] basic
   action theory which basically defines the available primitive actions and
   fluents.
-  (This [paper][Commonsense-2013] presents our theory for reasoning about
-  traffic situations.)
+  (This [paper][Commonsense-2013] and these [slides][Commonsense-2013-slides]
+  present our theory for reasoning about traffic situations.)
 * Then one defines a plan library which consists of [Golog][Golog] programs.
   Each of these programs represents a typical behavior pattern.
 * To perform a concrete plan recognition task, execution of these programs is
@@ -45,18 +45,26 @@ implementations in [ECLiPSe-CLP][ECLiPSe] and [Mercury][Mercury], two logical
 languages.
 
 The central source files are [Golog.hs](src/Interpreter/Golog.hs) and
-[Tree.hs](src/Interpreter/Tree.hs) for the Golog interpreter, and
-[Theorems.hs](src/RSTC/Theorems.hs) and
-[Regression.hs](src/RSTC/BAT/Regression.hs) for the traffic BAT.
+[Tree.hs](src/Interpreter/Tree.hs) for the Golog interpreter.
+The domain-specific code is
+[Theorems.hs](src/RSTC/Theorems.hs),
+[BAT.Base.hs](src/RSTC/BAT.Base.hs),
+[BAT.Regression.hs](src/RSTC/BAT/Regression.hs) and
+[BAT.Progression.hs](src/RSTC/BAT/Progression.hs) for the traffic BAT.
+Our Golog interpreter makes it easy to implement BATs using either regression
+or progression, hence the files BAT.Progression and BAT.Regression.
+In our experiments BAT.Progression has been significantly faster than
+BAT.Regression.
 
 Contact: [Christoph Schwering][Schwering] (schwering at kbsg.rwth-aachen.de).
 
 
 [SitCalc]: http://en.wikipedia.org/wiki/Situation_calculus
 [Golog]: http://www.cs.toronto.edu/cogrobo/main/
-[CogRob-2012]: http://www-kbsg.informatik.rwth-aachen.de/~schwering/CogRob-2012/PlaRaPeX.pdf
+[CogRob-2012]: http://www-kbsg.informatik.rwth-aachen.de/~schwering/CogRob-2012/paper.pdf
 [CogRob-2012-slides]: http://www-kbsg.informatik.rwth-aachen.de/~schwering/CogRob-2012/slides.html
-[Commonsense-2013]: http://www-kbsg.informatik.rwth-aachen.de/~schwering/Commonsense-2013/RSTC.pdf
+[Commonsense-2013]: http://www-kbsg.informatik.rwth-aachen.de/~schwering/Commonsense-2013/paper.pdf
+[Commonsense-2013-slides]: http://www-kbsg.informatik.rwth-aachen.de/~schwering/Commonsense-2013/slides.html
 [Schwering]: http://www.kbsg.rwth-aachen.de/~schwering/
 [Haskell]: http://www.haskell.org/
 [ECLiPSe]: http://www.eclipseclp.org/
