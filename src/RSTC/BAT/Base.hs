@@ -194,8 +194,9 @@ match e s = let ntg_ttc = [(b, c, ntg s b c, O.ntg e b c,
             in all (\(l1, l2) -> l1 == l2) lanes &&
                all (\(ntg1, ntg2) -> haveCommon (ntgCats ntg1)
                                                 (ntgCats ntg2)) ntgs &&
-               all (\(ttc1, ttc2, rv1, rv2) -> haveCommon (ttcCats ttc1 rv1)
-                                                          (ttcCats ttc2 rv2)) ttcs
+--               all (\(ttc1, ttc2, rv1, rv2) -> haveCommon (ttcCats ttc1 rv1)
+--                                                          (ttcCats ttc2 rv2)) ttcs &&
+               True
    where haveCommon (x:xs) (y:ys) | x < y     = haveCommon xs (y:ys)
                                   | y < x     = haveCommon (x:xs) ys
                                   | otherwise = True
