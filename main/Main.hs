@@ -185,7 +185,7 @@ gnuplot :: String -> [String]
 gnuplot csvFile =
       ["gnuplot --persist << EOF"
       ,"set termoption dash"
-      ,"set yrange [-2:2]"
+      ,"set yrange [-10:10]"
       ,"set xtics 1"
       ,"set grid"
       ,"set datafile separator \""++delim++"\""
