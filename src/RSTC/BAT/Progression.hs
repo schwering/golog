@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies #-} 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+--{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Basic action theory based on relative temporal measures using progression.
 
@@ -29,10 +29,10 @@ instance BAT (Prim Double) where
                                   (UArray (Car, Car) (NTG Double)) -- NTGs
                                   (UArray (Car, Car) (TTC Double)) -- TTCs
 
-   s0  = State 0 [] 0
+   s0 = State 0 [] 0
                (array (minBound, maxBound) [(b, RightLane) | b <- [minBound..maxBound]])
-               (array ((minBound, minBound), (maxBound,maxBound)) [((b,c), nan) | b <- [minBound..maxBound], c <- [minBound..maxBound]])
-               (array ((minBound, minBound), (maxBound,maxBound)) [((b,c), nan) | b <- [minBound..maxBound], c <- [minBound..maxBound]])
+               (array (minBound, maxBound) [((b,c), nan) | b <- [minBound..maxBound], c <- [minBound..maxBound]])
+               (array (minBound, maxBound) [((b,c), nan) | b <- [minBound..maxBound], c <- [minBound..maxBound]])
 
    do_ a @ (Wait t)         s @ (State len as time' lane' ntg' ttc') =
       State (len+1) (a:as) (time' + t)

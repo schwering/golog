@@ -39,6 +39,13 @@ Executable Main
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 
+Executable Web
+    Hs-Source-Dirs:  main
+    Main-Is:         Web.hs
+    Build-Depends:   base, prgolog, bytestring, wai, warp, enumerator, blaze-builder, http-types
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
+
 --Executable Test
 --    Hs-Source-Dirs:  test
 --    Main-Is:         Main.hs

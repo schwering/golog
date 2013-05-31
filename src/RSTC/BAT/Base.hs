@@ -171,7 +171,7 @@ defaultReward (Msg _)          _ = 0
 
 
 lookahead :: Depth
-lookahead = 5
+lookahead = 4
 
 
 ntgDiff :: (State a, O.Obs a b) => Sit (Prim a) -> b -> Car -> Car -> a

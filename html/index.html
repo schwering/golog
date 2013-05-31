@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html>
+  <head>
+    <link rel="stylesheet" href="street.css" type="text/css" />
+    <script type="text/javascript" src="planrecog.js"></script>
+    <script type="text/javascript" src="rstc.js"></script>
+    <script>
+      var time = null;
+      var action = null;
+      var ms = null;
+
+      function processNewSituation(json) {
+        if (!json.time) { return false; }
+        if (!time) { time = document.getElementById("time"); }
+        if (!action) { action = document.getElementById("action"); }
+        if (!ms) { ms = document.getElementById("measurements"); }
+        //console.log(json);
+        time.innerHTML = json.time;
+        action.innerHTML = JSON.stringify(json.action);
+        ms.innerHTML = JSON.stringify(toMeasurements(json, ["ntg", "ttc"]));
+
+        updateStreet(json);
+        return true;
+      }
+    </script>
+  </head>
+  <body>
+    <!-- <input type="submit" onclick="javascript:processNewSituation(request(index++));" /><br /> -->
+    <input type="submit" onclick="javascript:requestAll(processNewSituation);" /><br />
+    Time: <div id="time" style="display: inline;"></div><br />
+    Action: <div id="action" style="display: inline;"></div><br />
+    Measurements: <div id="measurements" style="display: inline;"></div><br />
+
+
+    <img style="display: none; visibility: hidden;" id="car-aqua" src="car-aqua.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="car-blue" src="car-blue.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="car-green" src="car-green.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="car-lightblue" src="car-lightblue.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="car-lime" src="car-lime.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="car-maroon" src="car-maroon.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="car-pink" src="car-pink.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="car-purple" src="car-purple.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="car-red" src="car-red.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="car-white" src="car-white.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="car-yellow" src="car-yellow.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="tree" src="tree.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="flame" src="flame.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="parachute" src="parachute.svg" alt="" />
+    <img style="display: none; visibility: hidden;" id="finch" src="finch.svg" alt="" />
+
+    <div id="street" class="street no-print"></div>
+    <script type="text/javascript">
+      "use strict";
+
+      var rstc = null;
+      var lanes = {};
+
+      var streetId = "street";
+      var timer = null;
+
+      function clear() {
+        if (timer != null)
+          timer.stop();
+        timer = null;
+        removeChildren(streetId);
+      }
+
+      function run() {
+        timer = new Timer();
+        var street = new Street(streetId, timer, 2, { offset: "25%", fps: 50, relWidth: 0.9 });
+
+        for (var name in rstc.cars) {
+          (function (name) {
+            var car = new Elem(name, "car-"+ carToColor(name), street,
+              function (t) { return pos(car.id); },
+              function (t) { return lanes[car.id]; }
+            );
+            console.log("Created new car "+ name +" with color "+ carToColor(name) +" at "+ pos(car.id));
+          })(name);
+        }
+
+        function pos(car) {
+          return SCALE * rstc.x(car) + 0.5;
+        }
+      }
+
+      function updateStreet(json) {
+        var ms = toMeasurements(json, ["ntg", "ttc"]);
+        for (var i = 0; i < json.lane.length; ++i) {
+          lanes[json.lane[i].b] = json.lane[i].l;
+        }
+        if (!rstc) {
+          rstc = new Rstc(ms);
+          rstc.forceReferenceCar("B");
+          run();
+        } else {
+          var ref = rstc.computeReferenceCar();
+          rstc = new Rstc(ms);
+          rstc.forceReferenceCar(ref);
+        }
+      }
+    </script>
+
+  </body>
+</html>
+
+<!-- vim:textwidth=80:shiftwidth=2:softtabstop=2:expandtab
+-->
+

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1">
+<title>A finch</title>
+ <defs>
+  <radialGradient id="rGiris" gradientUnits="userSpaceOnUse" cy="170" cx="170" gradientTransform="matrix(1,0,0,1.111,0,-19.27)" r="11">
+   <stop style="stop-color:#ff1b1b;" offset="0"/>
+   <stop style="stop-color:#620000;" offset="1"/>
+  </radialGradient>
+  <radialGradient id="rGpupill">
+   <stop style="stop-color:#5f5f5f;" offset="0"/>
+   <stop style="stop-color:#000000;" offset="1"/>
+  </radialGradient>
+  <radialGradient id="rGeye">
+   <stop style="stop-color:#f5f5f5;" offset="0"/>
+   <stop style="stop-color:#666;" offset="1"/>
+  </radialGradient>
+  <linearGradient id="lGbeak" y2="230" gradientUnits="userSpaceOnUse" x2="130" y1="210" x1="120">
+   <stop style="stop-color:#b0b0b0;" offset="0"/>
+   <stop style="stop-color:#393939;" offset="0.58"/>
+   <stop style="stop-color:#626262;" offset="1"/>
+  </linearGradient>
+  <linearGradient id="linearGradient3799" y2="230" gradientUnits="userSpaceOnUse" x2="130" y1="210" x1="120">
+   <stop style="stop-color:#b0b0b0;" offset="0"/>
+   <stop style="stop-color:#626262;" offset="1"/>
+  </linearGradient>
+  <filter id="fblur1">
+   <feGaussianBlur stdDeviation="1"/>
+  </filter>
+  <filter id="fblur3" filterUnits="userSpaceOnUse">
+   <feGaussianBlur stdDeviation="3"/>
+  </filter>
+  <radialGradient id="rGhead" gradientUnits="userSpaceOnUse" cy="170" cx="220" gradientTransform="matrix(1.293,-0.6644,0.4982,0.517,-159.9,217.6)" r="69">
+   <stop style="stop-color:#777777;" offset="0"/>
+   <stop style="stop-color:#363636;" offset="1"/>
+  </radialGradient>
+  <radialGradient id="radialGradient3872" gradientUnits="userSpaceOnUse" cy="130" cx="170" gradientTransform="matrix(0.9752,-0.4582,0.2878,0.7234,-36.11,109.5)" r="89">
+   <stop style="stop-color:#680c00;" offset="0"/>
+   <stop style="stop-color:#fb3f00;" offset="0.5"/>
+   <stop style="stop-color:#f1ff00;" offset="1"/>
+  </radialGradient>
+  <radialGradient id="rGtop" gradientUnits="userSpaceOnUse" cy="130" cx="200" gradientTransform="matrix(1.06,0,0,0.6919,-14.22,24.16)" r="89">
+   <stop style="stop-color:#ff4300;" offset="0"/>
+   <stop style="stop-color:#ff4300;stop-opacity:0;" offset="1"/>
+  </radialGradient>
+  <radialGradient id="rGheal" gradientUnits="userSpaceOnUse" cy="230" cx="310" gradientTransform="matrix(1.493,-0.5678,0.478,0.9026,-351.7,169.3)" r="58">
+   <stop style="stop-color:#ffff00;" offset="0"/>
+   <stop style="stop-color:#78ec00;" offset="1"/>
+  </radialGradient>
+  <radialGradient id="rGpaunch" gradientUnits="userSpaceOnUse" cy="210" cx="340" gradientTransform="matrix(0.2616,0.5126,-0.7402,0.3777,409,-47.93)" r="140">
+   <stop style="stop-color:#006000;" offset="0"/>
+   <stop style="stop-color:#00dc00;" offset="1"/>
+  </radialGradient>
+  <radialGradient id="radialGradient3950" gradientUnits="userSpaceOnUse" cy="90" cx="420" gradientTransform="matrix(1,0,0,0.5862,0,37.36)" r="72">
+   <stop style="stop-color:#7b7b7b;" offset="0"/>
+   <stop style="stop-color:#464646;" offset="1"/>
+  </radialGradient>
+  <radialGradient id="rGsprings" gradientUnits="userSpaceOnUse" cy="140" cx="330" gradientTransform="matrix(1.017,0,0,1.061,-2.422,-7.278)" r="64">
+   <stop style="stop-color:#6a6a6a;" offset="0"/>
+   <stop style="stop-color:#474747;" offset="1"/>
+  </radialGradient>
+  <linearGradient id="lGclaw" y2="320" gradientUnits="userSpaceOnUse" x2="420" gradientTransform="matrix(0.8727,0.8594,-0.624,1.346,236.9,-490.9)" y1="320" x1="410">
+   <stop style="stop-color:#565656;" offset="0"/>
+   <stop style="stop-color:#131313;" offset="1"/>
+  </linearGradient>
+  <filter id="fsprings" height="1.5" width="1.5" color-interpolation-filters="sRGB" y="-0.25" x="-0.25">
+   <feGaussianBlur stdDeviation="2" result="result11"/>
+   <feGaussianBlur result="result8" stdDeviation="0.5" in="SourceGraphic"/>
+   <feTurbulence numOctaves="1" type="fractalNoise" baseFrequency="0.08" result="result9"/>
+   <feDisplacementMap scale="100" yChannelSelector="R" in2="result11" result="result10" xChannelSelector="G"/>
+   <feConvolveMatrix divisor="1" kernelMatrix="1 1 1 1 -8 1 1 1 1 " in="result10" order="3 3" bias="0" result="result0" targetX="1" targetY="1" preserveAlpha="true"/>
+   <feColorMatrix result="result3" values="0 -6 0 0 1 0 -6 0 0 1 0 -6 0 0 1 0 0 0 1 0 " in="result0"/>
+   <feComposite operator="in" result="fbSourceGraphic" in2="SourceGraphic" in="result3"/>
+   <feBlend result="result12" in2="result8" mode="multiply"/>
+   <feGaussianBlur result="result7" stdDeviation="0.01" in="result12"/>
+   <feBlend result="result13" in2="result12" mode="screen"/>
+   <feComposite operator="in" in2="SourceGraphic"/>
+<feGaussianBlur stdDeviation="2"/>
+  </filter>
+  <filter id="frainbow" height="1.5" width="1.5" color-interpolation-filters="sRGB" y="-0.25" x="-0.25">
+   <feGaussianBlur stdDeviation="5" result="result8"/>
+   <feTurbulence baseFrequency="0.015" seed="20" result="result7" numOctaves="2" type="fractalNoise"/>
+   <feComposite operator="in" result="result6" in2="result8" in="SourceGraphic"/>
+   <feComposite in2="result7" k3="1" result="result2" in="result6" operator="arithmetic"/>
+   <feComposite operator="in" result="fbSourceGraphic" in2="result6" in="result2"/>
+   <feComposite operator="arithmetic" k2="2.5" in2="fbSourceGraphic" in="fbSourceGraphic"/>
+  </filter>
+ </defs>
+ <path id="top" style="filter:url(#fblur1);stroke:url(#rGtop);stroke-linecap:butt;stroke-width:1px;fill:url(#radialGradient3872);" d="m160,61-1,28,14-25-2.2,15,16-14-7,16,21-13-8.1,13,14-8.2-3.6,12,14-12-5.6,7.4,13-8.2s-7.4,11-5.2,10c2.1-0.5,22-9.1,22-9.1l-6.3,12,18-9.2-2.3,5.6,21-3.2-3.5,7.4,20-6.8-6.2,7.3-1.1,1.7-38,2-49,21-50,30-33,42-12-58s9.3,37,8.9,35c-0.5-2.3-2.8-56-2.8-56l4.9,43,2.5-49,0.2,31,8.6-43,2.3,26,9.9-35s1.9,35,2.6,32c6-33,24-47,24-47" transform="matrix(1.093,0,0,1.141,-9.479,-12.46)"/>
+<use xlink:href="#top" style="opacity:0.5; filter:url(#frainbow)" />
+ <path id="claw" style="fill:url(#lGclaw);filter:url(#frainbow)" d="m410,260c-1.6-0.1-2.5,0.3-2.7,1.3-0.1,0.5,0,1,0.3,1.7h-0.1c-0.5,0.2-0.7,0.8-0.7,1.6-2.8,3.4-6.3,9.8-9.5,18-4.9,13-17,40-17,46v0.3c0.1,0.4,0.1,0.7,0.3,0.9,0.1,0.1,0.1,0.1,0.3,0.1,0.2,0.1,0.6,0,1-0.2,0.1-0.1,0.2-0.1,0.2-0.1s0.1-0.1,0.1-0.1c4.2-2.5,14-15,20-25-4.7,14-10,31-8.4,33,2.4,1.8,14-16,19-29-2,13-4.6,30-2.4,31,2.9,1.4,12-24,14-36,0.4-3,0.6-5.9,0.7-8.6,3.4,4.7,7.5,9.9,12,11,6.9,2.3,15-3.6,18-5.5-5.5,0.4-22-1.4-27-20-0.1-0.6-0.4-1.2-0.6-1.8,12,5.9,33,12,33,9.4,0.6-3.2-24-16-34-22-7.2-4.2-14-6.7-17-6.8zm0.9,17c0.4,0.6,0.7,1.2,1.1,1.9-0.6,1-1.3,2.2-2,3.6,0.2-1,0.2-1.9,0.2-2.7,0.3-1,0.5-1.9,0.7-2.8zm46,23c-0.3,0-0.8,0.2-1.4,0.6,1.3-0.1,2.1-0.4,1.6-0.6h-0.2z"/>
+<g  id="gmainbird" style="filter:url(#fblur1)">
+ <path id="paunch" style="fill:url(#rGpaunch);" d="m190,260c22,17,49,32,73,38,58,16,110-2.8,170-15,0,0,9-12,5.5-11-3.5,1.5-37,16-31,10,6.6-6,9.2-5.9,7.6-9.6-1.8-4.2-14-1-14-1l18-13s37-28,20-23c-17,5.4-11,5-11,5,16-20,43-45,42-64-0.3-5.3-14,8.5-14,8.5,4.9-25,5.2-45,9.1-71,0,0,14-18,9.6-23-3.9-4.3-9.6,3-9.6,3s1.9-7.4-1-8.1c-2.9-0.64-5.1,8.1-5.1,8.1s-1.1-7.9-4-8.1c-2.9-0.17-4.6,7.1-4.6,7.1s-0.8-11-4-11c-3.2-0.1-3,7.1-3,7.1s1.7-17-3.6-17c-5.3,0.56,0,15,0,15l-6-15s-6.1-2.5-6.1,0-0.5,18-0.5,18l-4.5-4.5c-4.8,2,3.1,11,0,16-26,36-50,71-73,92-16,11-24,22-42,12l-50,10-18,16-35,15-23,16z"/>
+ <path style="fill:url(#radialGradient3950);" d="m350,75c24-8.6,17-9.5,51-18,23-8.1,57-13,69-14,12-1.3-25,17-25,17s31-16,34-11c2.9,5.3-25,16-25,16,9.6-0.52,32-20,32-9.8,0.1,7-11,8.6-10,11,1.2,3.5,10-2.1,12,1.5,2.1,4.9-9.7,13-9.7,13s16-6.3,11-1.7c-5.2,4.7-15,15-17,18,0,0-32,33-35,33s-60,3-60,1c-24-73-35-52-28-56z"/>
+ <path id="springs" style="fill:url(#rGsprings);" d="m280,99,36-14,26-8.9s26-0.96,33,1.2c6.3,1.8,13,4.5,16,9.8,2.5,3.4,4.7,8.8,2.6,12-4.1,6.9-23,7.3-23,7.3s17,0.2,19,6.2c2,3.9-4.5,12-4.5,12s6.7-1.1,9.7,0c3,1.2,7.2,6.2,7.2,6.2-14,34-67,100-97,78,11-37-10-58-39-66,0,0,16-22,16-24,0-2.1-2.6-20-2.6-20z"/>
+
+ <path id="heal" style="fill:url(#rGheal)" d="m310,170c15,29-11,67-59,85s-99,9.6-110-19c-15-29,11-67,59-85s99-9.6,110,19z"/>
+ <path id="head" style="fill:url(#rGhead)" d="m290,100c12,12-24,48-42,71-11,15-3.2,17-18,27-21,16-42,10-61,11-19,0.4-38,2.9-47-6.4-18-19,0.9-55,44-77,36-19,96-45,120-38,3.6,1.1,1.7,9,4.4,12z"/>
+</g>
+<use xlink:href="#gmainbird" style="opacity:0.4; filter:url(#fsprings)" />
+ <path id="beak" style="stroke-linejoin:miter;filter:url(#fblur1);stroke:url(#linearGradient3799);stroke-linecap:butt;stroke-width:1px;fill:url(#lGbeak);" d="m94,230s23-1,33-4.5c9.5-5.1,22-8.5,29-18l-11-1.5-17,6-16,8.6,24-13,10-3.6,0.5-3.5h-26l1.5-12-3-2.5s-18,18-23,30c-1.7,4.2-2.8,13-2.8,13z"/>
+
+ <path style="filter:url(#fblur1);fill:url(#rGeye);" d="m180,180c0,7.7-6,14-13,14-7.3,0-15-8.6-15-16-0.5-8.9,12-16,21-14,6.9,2.3,8,8.5,8,16z" transform="translate(5.556,-0.8839)"/>
+ <path style="filter:url(#fblur1);fill:url(#rGiris);" d="m180,180c0,5.9-4.4,11-9.7,11s-11-6.5-11-12c-0.3-6.8,8.9-12,15-10,5,1.8,5.8,6.5,5.8,12z"/>
+ <path style="opacity:0.6;fill:url(#rGpupill);" d="m130,200a3.6,3.7,0,1,1,-7.2,0,3.6,3.7,0,1,1,7.2,0z" transform="matrix(1.754,0,0,1.729,-46.82,-167)"/>
+ <path style="filter:url(#fblur3);fill:#ffffff;" d="m180,170a6.9,3.4,0,1,1,-14,0,6.9,3.4,0,1,1,14,0z" transform="matrix(1,-0.2656,0,1,0.2526,42.08)"/>
+</svg>

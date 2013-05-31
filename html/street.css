@@ -1,0 +1,54 @@
+div.street {
+  /* This combination doesn't work, because the major browsers change
+   * overflow-y to auto (i.e., scollbars when needed) when overflow-x
+   * is hidden.
+   * That can be easily fixed by wrapping a div with class street-container
+   * around the street div (the two following style definitions care about
+   * that).
+  overflow-y: visible;
+  overflow-x: hidden;
+  */
+  overflow: hidden;
+  position: relative; 
+  margin: 2ex 1.5em 2ex 1.5em;
+  /* border: 1px black solid; */
+}
+
+div.street-container {
+  overflow: hidden;
+  margin: 2ex 1.5em 2ex 1.5em;
+}
+
+div.street-container div.street {
+  overflow: visible;
+  margin: 0;
+}
+
+div.car-label {
+  font-size: 80%;
+  text-shadow: -1px 1px black, 1px 1px black, 1px -1px black, -1px -1px black;
+  color: white;
+  position: absolute;
+  top: 50%;
+  height: 3ex;
+  margin-top: -1.5ex;
+  right: 1.0ex;
+}
+
+div.street-label {
+  overflow: visible;
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: transparent;
+  color: white;
+  -webkit-text-fill-color: white; /* Will override color (regardless of order) */
+  -webkit-text-stroke-width: 1px;
+  -webkit-text-stroke-color: black;
+  font-weight: 800;
+  width: 100%;
+  height: 100%;
+  padding: 0.5ex 0.5ex 0.5ex 0.5ex;
+}
+
+

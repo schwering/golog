@@ -280,13 +280,25 @@ do2 l t | final t   = Just (sit t, rew t, depth t)
         | otherwise = trans l t >>= do2 l
 
 
-do3 :: BAT a => Depth -> Prog a -> Sit a -> [(Sit a, Reward, Depth, SitTree Grown a)]
+-- | Executes a program in a situation and returns all situations on the way.
+-- If there is none, the list is infinite.
+-- Additionally the reward and depth are returned.
+--
+-- The lookahead argument specifies the search depth up to which value is
+-- computed.
+do3 :: BAT a => Depth -> Prog a -> Sit a -> [(Sit a, Reward, Depth)]
 do3 l p s = do4 l (force (tree p s 0 0))
 
 
-do4 :: BAT a => Depth -> SitTree Grown a -> [(Sit a, Reward, Depth, SitTree Grown a)]
-do4 l t | final t   = [(sit t, rew t, depth t, t)]
+-- | The list of situations encountered on the search for the best final one. 
+-- If there is none, the list is infinite.
+-- Additionally the reward and depth are returned.
+--
+-- The lookahead argument specifies the search depth up to which value is
+-- computed.
+do4 :: BAT a => Depth -> SitTree Grown a -> [(Sit a, Reward, Depth)]
+do4 l t | final t   = [(sit t, rew t, depth t)]
         | otherwise = case trans l t of
                            Nothing -> []
-                           Just t' -> (sit t', rew t', depth t', t') : do4 l t'
+                           Just t' -> (sit t', rew t', depth t') : do4 l t'
 

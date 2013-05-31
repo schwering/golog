@@ -355,7 +355,7 @@ main = do
              isEnd s = case history s of End _ _ : _ -> True
                                          _           -> False
 --         putStrLn (show (force (tree prog S0 0 0)))
-         mapM_ (\(s,v,d,_t) ->
+         mapM_ (\(s,v,d) ->
             do --putStrLn (show (sit2list s))
                if isMatch s || isEnd s
                   then do  putStrLn (show (filter (not.partOfObs) (sit2list s)))

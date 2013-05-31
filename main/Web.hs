@@ -1,74 +1,116 @@
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 
-module Gui (main) where
+module Main (main) where
+
+import Blaze.ByteString.Builder (copyByteString)
+import Data.ByteString.Char8 (pack)
+import Data.List (isSuffixOf)
+import Data.Monoid
+import Network.HTTP.Types (status200, status404)
+import Network.Wai
+import Network.Wai.Handler.Warp
+import Text.Read (readMaybe)
 
 import RSTC.Car
 import Interpreter.Golog
-import RSTC.BAT.Regression
+import RSTC.BAT.Progression
+import qualified RSTC.Obs as Obs
 import RSTC.Progs
-import RSTC.Theorems
 
-import Control.Monad (msum)
-import Data.Text (Text)
-import Data.Text.Lazy (unpack)
-import Happstack.Server
-import Text.Blaze.Html5 (Html, (!), toHtml)
-import qualified Text.Blaze.Html5 as H
-import qualified Text.Blaze.Html5.Attributes as A
+
+type MyConf = (Sit (Prim Double), Reward, Depth)
+
+pr :: [MyConf]
+pr = let obs  = obsprog $ take 100 Obs.observations
+         cand = pass D B `Conc` overtake H B
+         prog = obs `Conc` cand
+     in do3 lookahead prog s0
 
 
 main :: IO ()
-main = simpleHTTP nullConf myApp
+main = do
+    let port = 8080
+    putStrLn $ "Listening on port " ++ show port
+    run port (app pr)
 
 
-myPolicy :: BodyPolicy
-myPolicy = (defaultBodyPolicy "/tmp/" 0 1000 1000)
+app :: Monad m => [MyConf] -> Request -> m Response
+app confs req = do
+    let paths = pathInfo req
+    let path = case paths of p:_ -> (read $ show $ p) :: String ; _ -> "index.html"
+    return $ case (readMaybe path) :: Maybe Int of
+                  Just i  -> index confs i
+                  Nothing -> indexFile path
 
 
-myApp :: ServerPart Response
-myApp =
-   do decodeBody myPolicy
-      msum handlers
-
-handlers :: [ServerPartT IO Response]
-handlers = [ dir "signIn"  $ signIn
-           , homePage
-           ]
+indexFile :: String -> Response
+indexFile fileName = ResponseFile status200 [("Content-Type", pack $ mimeType fileName)] ("html/" ++ fileName) Nothing
 
 
-homePage :: ServerPart Response
-homePage = msum [ signedIn, notSignedIn ]
-   where signedIn =
-            do ok $ template "Home page" $ do
-               return () -- H.h1 $ toHtml $ "Hello!"
-         notSignedIn =
-            do seeOther ("/signIn" :: String) (toResponse ())
+index :: [MyConf] -> Int -> Response
+index confs i = ResponseBuilder status [("Content-Type", "text/plain")] response
+   where restConfs = drop i confs
+         (s,r,d)   = case restConfs of x:_ -> x ; _ -> undefined
+         ntgs      = [(b, c, ntg s b c) | b <- cars, c <- cars, b /= c]
+         ttcs      = [(b, c, ttc s b c) | b <- cars, c <- cars, b < c]
+         lanes     = [(b, lane s b) | b <- cars]
+         ontgs     = case history s of (Match e):_ -> [(b, c, Obs.ntg e b c) | b <- cars, c <- cars, b /= c] ; _ -> []
+         ottcs     = case history s of (Match e):_ -> [(b, c, Obs.ttc e b c) | b <- cars, c <- cars, b /= c] ; _ -> []
+         olanes    = case history s of (Match e):_ -> [(b, Obs.lane e b) | b <- cars] ; _ -> []
+         isMatch   = case history s of (Match _):_ -> True ; _ -> False
+         status    = case restConfs of _:_ -> status200
+                                       _   -> status404
+         response  = case restConfs of _:_ -> mconcat $ map copyByteString $ json
+                                       _   -> copyByteString "{}"
+         tToStr    = \(b,c,t) -> ("{\"b\":\"" ++ show b ++ "\", \"c\":\"" ++ show c ++"\", \"t\":" ++ show t ++ "} ")
+         lToStr    = \(b,l) -> ("{\"b\":\"" ++ show b ++ "\", \"l\":" ++ show (laneToNumber l) ++ "} ")
+         json      =
+            [ "{ \"isMatch\": ", if isMatch then "true" else "false", "\n" ] ++
+            [ ", \"action\": ", (case history s of a:_ -> pack (toJson a) ; _ -> "null"), "\n" ] ++
+            [ ", \"time\": ", pack $ show (time s), "\n" ] ++
+            [ ", \"reward\": ", pack $ show r, "\n" ] ++
+            [ ", \"depth\": ", pack $ show d, "\n" ] ++
+            [ ", \"ntg\": [", pack (concat $ interleave ", " $ map tToStr ntgs), "]\n"] ++
+            [ ", \"ttc\": [", pack (concat $ interleave ", " $ map tToStr ttcs), "]\n"] ++
+            [ ", \"lane\": [", pack (concat $ interleave ", " $ map lToStr lanes), "]\n"] ++
+            [ ", \"ontg\": [", pack (concat $ interleave ", " $ map tToStr ontgs), "]\n"] ++
+            [ ", \"ottc\": [", pack (concat $ interleave ", " $ map tToStr ottcs), "]\n"] ++
+            [ ", \"olane\": [", pack (concat $ interleave ", " $ map lToStr olanes), "]\n"] ++
+            [ "}" ]
 
 
-signIn :: ServerPart Response
-signIn = msum [ alreadySignedIn, signInForm ]
-    where
-      alreadySignedIn :: ServerPart Response
-      alreadySignedIn =
-          do method GET
-             ok $ template "Signed in" $ do
-                    H.p $ "You are already signed in."
-
-      signInForm :: ServerPart Response
-      signInForm =
-          do method GET
-             ok $ template "Sign in" $ do
-                    H.form ! A.action "/signIn" ! A.enctype "multipart/form-data" ! A.method "POST" $ do
-                    H.label ! A.for "MatriculationNumber" $ "Put your matriculation number: "
-                    H.input ! A.type_ "text" ! A.id "MatriculationNumber" ! A.name "MatriculationNumberInput"
-                    H.input ! A.type_ "submit" ! A.value "Sign in"
+mimeType :: String -> String
+mimeType f = helper m
+   where m = [ ("svg", "image/svg+xml")
+             , ("html", "text/html")
+             , ("js", "application/javascript")
+             , ("css", "text/css")
+             ]
+         helper ((ending,mime):xs) | isSuffixOf ending f = mime
+                                   | otherwise           = helper xs
+         helper [] = "text/plain"
 
 
-template :: Text -> Html -> Response
-template title body = toResponse $
-   H.html $ do
-      H.head $ do
-         H.title (toHtml title)
-      H.body $ do
-         body
+toJson :: Show a => Prim a -> String
+toJson (Wait t) = "{ \"wait\": { \"time\": " ++ (show t) ++ "} }"
+toJson (Accel b q) = "{ \"accel\": { \"b\": \"" ++ (show b) ++ "\", \"factor\": " ++ (show q) ++ "} }"
+toJson (LaneChange b l) = "{ \"lc\": { \"b\": \"" ++ (show b) ++ "\", \"lane\": " ++ (show $ laneToNumber l) ++ "} }"
+toJson (Init e) = "{ \"init\": { \"time\": " ++ (show (Obs.time e)) ++ " } }"
+toJson (Prematch e) = "{ \"prematch\": { \"time\": " ++ (show (Obs.time e)) ++ " } }"
+toJson (Match e) = "{ \"match\": { \"time\": " ++ (show (Obs.time e)) ++ " } }"
+toJson Abort = "{ \"abort\": {} }"
+toJson NoOp = "{ \"noop\": {} }"
+toJson (Start b s) = "{ \"start\": { \"b\": \"" ++ (show b) ++ "\", \"prog\": \"" ++ s  ++ "\" } }"
+toJson (End b s) = "{ \"end\": { \"b\": \"" ++ (show b) ++ "\", \"prog\": \"" ++ s ++ "\" } }"
+toJson (Msg s) = "{ \"msg\": { \"msg\": \"" ++ s ++ "\" } }"
+
+
+laneToNumber :: Lane -> Double
+laneToNumber RightLane = 0
+laneToNumber LeftLane  = 1
+
+
+interleave :: a -> [a] -> [a]
+interleave _ []     = []
+interleave y (x:xs) = x : concat (map (\z -> [y,z]) xs)
 
