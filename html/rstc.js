@@ -62,7 +62,7 @@ function Timer() {
 
 var SCALE = 0.065;
 
-function Rstc(measurements) {
+function Rstc(measurements, start) {
   var cars = {};
   var ntg = {};
   var ttc = {};
@@ -133,8 +133,9 @@ function Rstc(measurements) {
   } while (change);
 
   this.cars = cars;
-  this.ntg = function (b, c) { return ntg[b][c]; }
-  this.ttc = function (b, c) { /*alert("t = 0 ==> "+ (ttc[b][c]));*/ return ttc[b][c]; }
+  this.start = function () { return (start) ? start : 0; };
+  this.ntg = function (b, c) { return ntg[b][c]; };
+  this.ttc = function (b, c) { /*alert("t = 0 ==> "+ (ttc[b][c]));*/ return ttc[b][c]; };
 };
 
 // The x position of b if c is the reference car.
@@ -194,6 +195,7 @@ Rstc.prototype.progress = function () {
   function EmptyRstc() {};
   EmptyRstc.prototype = Rstc.prototype;
   var rstc = new EmptyRstc();
+  var start = this.start();
   var ntg = {};
   var ttc = {};
   for (var b in this.cars) {
@@ -205,34 +207,40 @@ Rstc.prototype.progress = function () {
     }
   }
   rstc.cars = this.cars;
-  rstc.ntg = function (b, c) { return ntg[b][c]; }
-  rstc.ttc = function (b, c) { return ttc[b][c]; }
+  rstc.start = function () { return start; };
+  rstc.ntg = function (b, c) { return ntg[b][c]; };
+  rstc.ttc = function (b, c) { return ttc[b][c]; };
   rstc.referenceCar = this.computeReferenceCar();
   return rstc;
 }
 
 Rstc.prototype.wait = function (t) {
+  var start = this.start;
   var ntg = this.ntg;
   var ttc = this.ttc;
   function WaitRstc() {};
   WaitRstc.prototype = Rstc.prototype;
   var rstc = new WaitRstc();
   rstc.t = t;
-  rstc.time = function (t) { if (t != undefined) { this.t = t; } return this.t; };
+  rstc.time = function () { return this.t; };
+  rstc.start = function () { return start() + rstc.time(); };
   rstc.cars = this.cars;
-  rstc.ntg = function (b, c) { return ntg(b,c) - rstc.time() * ntg(b,c) / ttc(b,c); }
-  rstc.ttc = function (b, c) { return ttc(b,c) - rstc.time(); }
+  rstc.ntg = function (b, c) { return ntg(b,c) - rstc.time() * ntg(b,c) / ttc(b,c); };
+  rstc.ttc = function (b, c) { return ttc(b,c) - rstc.time(); };
+  rstc.wait = function (t) { this.t += t; return rstc; };
   rstc.referenceCar = this.computeReferenceCar();
   return rstc;
 }
 
 Rstc.prototype.accel = function (bb, q) {
+  var start = this.start;
   var ntg = this.ntg;
   var ttc = this.ttc;
   function AccelRstc() {};
   AccelRstc.prototype = Rstc.prototype;
   var rstc = new AccelRstc();
   rstc.cars = this.cars;
+  rstc.start = function () { return start(); };
   rstc.ntg = function (b, c) {
     if (b == bb) {
       return 1/q * ntg(b,c);
@@ -265,7 +273,8 @@ function ChangingRstc(rstc) {
   this.ttc = function (b, c) { return this.rstc.ttc(b, c); };
   this.x = function (b, c) { return this.rstc.x(b, c); };
   this.v = function (b) { return this.rstc.v(b); };
-  this.time = function (t) { return this.rstc.time(t); };
+  this.start = function () { return this.rstc.start(); };
+  this.time = function () { return this.rstc.time(); };
 }
 
 function InterpolatingRstc(obs) {
@@ -317,7 +326,7 @@ function InterpolatingRstc(obs) {
   };
   this.v = Rstc.prototype.v;
   this.x = Rstc.prototype.x;
-  this.time = function (t) { if (t != undefined) now = t; return now; };
+  this.time = function () { return now; };
 }
 
 var DEFAULT_FPS = 50;
@@ -787,27 +796,20 @@ function Animation(streetId, timer, props, jsonCallback) {
   this.street = function () { return street; }
   this.rstc = function () { return rstc; };
 
-  var t0 = undefined;
   var jsons = [];
   this.push = function (json) {
-    if (t0 === undefined) {
-      t0 = json.time;
-    }
     jsons.push(json);
   };
 
-  var tStartOffset = 0;
-  var tSitOffset = undefined;
+  var tLast = 0;
   street.addRedrawHook(function (t) {
-    if (jsons.length > 0 && t - tStartOffset >= jsons[0].time - t0) {
+    if (jsons.length > 0 && (rstc == null || rstc.start() >= jsons[0].time)) {
       var json = jsons.shift();
       jsonCallback(json);
       if (json.action.init) {
         lanes = jsonToLanes(json);
-        rstc = new ChangingRstc(new Rstc(jsonToMeasurements(json, props))).wait(0);
+        rstc = new ChangingRstc(new Rstc(jsonToMeasurements(json, props), json.time)).wait(0);
         rstc.forceReferenceCar("B");
-        tStartOffset = t;
-        tSitOffset = 0;
         for (var id in cars) {
           cars[id].kill();
         }
@@ -820,17 +822,20 @@ function Animation(streetId, timer, props, jsonCallback) {
           })(id);
         }
       } else if (json.action.accel) {
-        rstc.time(json.time - t0 - tSitOffset);
-        tSitOffset += rstc.time();
-        rstc.accel(json.action.accel.b, json.action.accel.q).progress().wait(0);
+        rstc
+          .wait(json.time - rstc.start()) // synchronize time of model with observation
+          .accel(json.action.accel.b, json.action.accel.q) // perform acceleration
+          .progress() // for performance
+          .wait(0); // to allow for efficient time counting
       } else if (json.action.lc) {
         lanes[json.action.lc.b] = json.action.lc.l;
       }
     }
     if (rstc) {
-      rstc.time(t - tSitOffset - tStartOffset);
+      rstc.wait(t - tLast);
       street.scroll(-1 /* * rstc.v(rstc.computeReferenceCar()) */ * t * SCALE);
     }
+    tLast = t;
   });
 
   this.clear = function () {

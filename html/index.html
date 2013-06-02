@@ -78,8 +78,10 @@
       }
 
       function updateTime(t) {
-        document.getElementById("time").innerHTML = t.toFixed(2);
-        document.getElementById("container-time").style.visibility = "visible";
+        if (animation && animation.rstc()) {
+          document.getElementById("time").innerHTML = animation.rstc().start().toFixed(2);
+          document.getElementById("container-time").style.visibility = "visible";
+        }
       }
 
       function processNewSituation(json) {

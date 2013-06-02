@@ -43,7 +43,7 @@ function createTable(json, contId, prop) {
 
   var table = addTable();
   var tr = addTr(table);
-  addTd(tr).style.backgroundColor = "lightgrey";
+  addTd(tr, prop +"-time");
   for (var i = 0; i < cars.length; ++i) {
     addTh(tr, cars[i]);
   }
@@ -69,6 +69,10 @@ function populateTableFromJson(json, prop) {
   }
 
   var xs = json[prop];
+  var time = document.getElementById(prop +"-time");
+  if (time) {
+    time.innerHTML = "T = "+ json.time.toFixed(1);
+  }
   for (var i = 0; i < xs.length; ++i) {
     var b = json[prop][i].b;
     var c = json[prop][i].c;
@@ -91,6 +95,10 @@ function populateTableFromRstc(rstc, prop) {
     return;
   }
 
+  var time = document.getElementById(prop +"-time");
+  if (time) {
+    time.innerHTML = "T = "+ rstc.start().toFixed(1);
+  }
   for (var b in rstc.cars) {
     for (var c in rstc.cars) {
       if (b == c) continue;
