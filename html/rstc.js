@@ -60,7 +60,7 @@ function Timer() {
   }
 }
 
-var SCALE = 0.1;
+var SCALE = 0.065;
 
 function Rstc(measurements) {
   var cars = {};
@@ -378,7 +378,7 @@ function Street(streetId, timer, lanes, extra) {
   ctx.canvas.height = streetHeight + pavementTopHeight + pavementBottomHeight;
 
   var markHeight = streetHeight / (10 * lanes);
-  var markWidth = streetWidth / 20;
+  var markWidth = streetHeight / lanes / 1.5;
 
   this.timer = function () { return timer; };
   this.streetWidth = function () { return streetWidth; };
@@ -444,9 +444,12 @@ function Street(streetId, timer, lanes, extra) {
 
 /* A image moving along the street. 
  * For cars, the height and width params can be left undefined. */
-function Elem(id, img, street, xf, yf, extra) {
+function Elem(id, street, xf, yf, extra) {
   if (extra == undefined) {
     extra = {};
+  }
+  if (extra.img == undefined) {
+    extra.img = "car-"+ carToColor(id);
   }
   if (extra.radf == undefined) {
     extra.radf = function () { return 0; };
@@ -458,7 +461,7 @@ function Elem(id, img, street, xf, yf, extra) {
     extra.width = extra.height * 2;
   }
 
-  var elem = document.getElementById(img);
+  var elem = document.getElementById(extra.img);
   this.id = id;
   this.xf = xf;
   this.yf = yf;
@@ -474,6 +477,8 @@ function Elem(id, img, street, xf, yf, extra) {
     street.ctx.drawImage(elem, -self.width/2, -self.height/2, self.width, self.height);
     street.ctx.restore();
   });
+
+  this.kill = function () { street.removeRedrawHook(i); };
 
   if (extra.timeout != undefined) {
     street.timer().addEvent(function () { street.removeRedrawHook(i); }, extra.timeout);
@@ -771,6 +776,70 @@ function carToColor(car) {
   return color;
 }
 
+
+function Animation(streetId, timer, props, jsonCallback) {
+  var street = new Street(streetId, timer, 2, { offset: "25%", fps: 50, relHeight: 0.5 });
+  var cars = {};
+
+  var lanes = null;
+  var rstc = null;
+
+  this.street = function () { return street; }
+  this.rstc = function () { return rstc; };
+
+  var t0 = undefined;
+  var jsons = [];
+  this.push = function (json) {
+    if (t0 === undefined) {
+      t0 = json.time;
+    }
+    jsons.push(json);
+  };
+
+  var tStartOffset = 0;
+  var tSitOffset = undefined;
+  street.addRedrawHook(function (t) {
+    if (jsons.length > 0 && t - tStartOffset >= jsons[0].time - t0) {
+      var json = jsons.shift();
+      jsonCallback(json);
+      if (json.action.init) {
+        lanes = jsonToLanes(json);
+        rstc = new ChangingRstc(new Rstc(jsonToMeasurements(json, props))).wait(0);
+        rstc.forceReferenceCar("B");
+        tStartOffset = t;
+        tSitOffset = 0;
+        for (var id in cars) {
+          cars[id].kill();
+        }
+        for (var id in rstc.cars) {
+          (function (id) {
+            cars[id] = new Elem(id, street,
+              function (t) { return SCALE * rstc.x(id) + 0.5; },
+              function (t) { return lanes[id]; }
+            );
+          })(id);
+        }
+      } else if (json.action.accel) {
+        rstc.time(json.time - t0 - tSitOffset);
+        tSitOffset += rstc.time();
+        rstc.accel(json.action.accel.b, json.action.accel.q).progress().wait(0);
+      } else if (json.action.lc) {
+        lanes[json.action.lc.b] = json.action.lc.l;
+      }
+    }
+    if (rstc) {
+      rstc.time(t - tSitOffset - tStartOffset);
+      street.scroll(-1 /* * rstc.v(rstc.computeReferenceCar()) */ * t * SCALE);
+    }
+  });
+
+  this.clear = function () {
+    if (timer != null)
+      timer.stop();
+    timer = null;
+    removeChildren(streetId);
+  }
+}
 
 // vim:textwidth=80:shiftwidth=2:softtabstop=2:expandtab
 

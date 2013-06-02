@@ -1,0 +1,22 @@
+div.table {
+  display: table;
+  border-collapse: collapse;
+}
+
+div.tr {
+  display: table-row;
+  border-collapse: collapse;
+}
+
+div.td {
+  display: table-cell; /* inline-block for overflow */
+  width: 4.5em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  padding: 2pt;
+  border: 1px solid black;
+  border-collapse: collapse;
+}
+

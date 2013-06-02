@@ -4,35 +4,134 @@
 
 <html>
   <head>
+    <link rel="stylesheet" href="main.css" type="text/css" />
+    <link rel="stylesheet" href="fonts.css" type="text/css" />
     <link rel="stylesheet" href="street.css" type="text/css" />
+    <link rel="stylesheet" href="table.css" type="text/css" />
     <script type="text/javascript" src="planrecog.js"></script>
     <script type="text/javascript" src="rstc.js"></script>
+    <script type="text/javascript" src="table.js"></script>
     <script>
       var time = null;
       var action = null;
       var ms = null;
 
+      var timer = new Timer();
+      var animation = null;
+
+      // Just copy the observed NTG/TTC as deltas.
+      // The dummy values are needed for table construction.
+      // The real values are computed in the jsonCallback
+      // because there we can access the RSTC.
+      function initDeltaInJson(json) {
+        if (json.ntg && json.ontg) {
+          json.dntg = [];
+          for (var i = 0; i < json.ontg.length; ++i) {
+            json.dntg[i] = {};
+            for (var key in json.ontg[i]) {
+              json.dntg[i][key] = json.ontg[i][key];
+            }
+          }
+        }
+        if (json.ttc && json.ottc) {
+          json.dttc = [];
+          for (var i = 0; i < json.ottc.length; ++i) {
+            json.dttc[i] = {};
+            for (var key in json.ottc[i]) {
+              json.dttc[i][key] = json.ottc[i][key];
+            }
+          }
+        }
+        return json;
+      }
+
+      // Replaces the dummy values for delta NTG/TTC with real ones.
+      function computeDeltaInJson(rstc, json) {
+        for (var i = 0; i < json.dntg.length; ++i) {
+          var b = json.dntg[i].b;
+          var c = json.dntg[i].c;
+          json.dntg[i].t -= rstc.ntg(b, c);
+        }
+        for (var i = 0; i < json.dttc.length; ++i) {
+          var b = json.dttc[i].b;
+          var c = json.dttc[i].c;
+          json.dttc[i].t -= rstc.ttc(b, c);
+        }
+        return json;
+      }
+
+      function populateObservationTables(json) {
+        populateTableFromJson(json, "ontg");
+        populateTableFromJson(json, "ottc");
+        if (animation && animation.rstc()) {
+          json = computeDeltaInJson(animation.rstc(), json);
+          populateTableFromJson(json, "dntg");
+          populateTableFromJson(json, "dttc");
+        }
+      }
+
+      function populateModelTables() {
+        if (animation.rstc()) {
+          populateTableFromRstc(animation.rstc(), "ntg");
+          populateTableFromRstc(animation.rstc(), "ttc");
+        }
+      }
+
+      function updateTime(t) {
+        document.getElementById("time").innerHTML = t.toFixed(2);
+        document.getElementById("container-time").style.visibility = "visible";
+      }
+
       function processNewSituation(json) {
         if (!json.time) { return false; }
-        if (!time) { time = document.getElementById("time"); }
-        if (!action) { action = document.getElementById("action"); }
-        if (!ms) { ms = document.getElementById("measurements"); }
-        //console.log(json);
-        time.innerHTML = json.time;
-        action.innerHTML = JSON.stringify(json.action);
-        ms.innerHTML = JSON.stringify(toMeasurements(json, ["ntg", "ttc"]));
 
-        updateStreet(json);
+        if (animation === null) {
+          animation = new Animation("street", timer, ["ntg", "ttc"], populateObservationTables);
+          animation.street().addRedrawHook(populateModelTables);
+          animation.street().addRedrawHook(updateTime);
+        }
+
+        json = initDeltaInJson(json);
+
+        var tables = ["ntg", "ttc", "ontg", "ottc", "dntg", "dttc"];
+        for (var i = 0; i < tables.length; ++i) {
+          if (!document.getElementById("table-"+ tables[i])) {
+            createTable(json, "container-"+ tables[i], tables[i]);
+            var heading = document.getElementById("heading-"+ tables[i]);
+            if (heading) {
+              heading.style.display = "block";
+            }
+            var container = document.getElementById("container-"+ tables[i]);
+            container.style.display = "inline-block";
+          }
+        }
+        animation.push(json);
         return true;
       }
     </script>
   </head>
   <body>
-    <!-- <input type="submit" onclick="javascript:processNewSituation(request(index++));" /><br /> -->
+    <h1>Plan Recognition</h1>
+
     <input type="submit" onclick="javascript:requestAll(processNewSituation);" /><br />
-    Time: <div id="time" style="display: inline;"></div><br />
-    Action: <div id="action" style="display: inline;"></div><br />
-    Measurements: <div id="measurements" style="display: inline;"></div><br />
+
+    <div id="street" class="street no-print"></div>
+
+    <div id="container-time" style="visibility: hidden;">Time: <div id="time" style="display: inline;"></div> s</div>
+
+    <h2 id="heading-ntg" style="display: none; margin-top: 2ex;">Net Time Gap (NTG)</h2>
+    <div>
+      <div id="container-ntg" style="display: none;"><p style="text-align: center;">Model</p></div>
+      <div id="container-ontg" style="display: none;"><p style="text-align: center;">Observation</p></div>
+      <div id="container-dntg" style="display: none;"><p style="text-align: center;">Delta</p></div>
+    </div>
+
+    <h2 id="heading-ttc" style="display: none; margin-top: 2ex;">Time To Collision (TTC)</h2>
+    <div>
+      <div id="container-ttc" style="display: none;"><p style="text-align: center;">Model</p></div>
+      <div id="container-ottc" style="display: none;"><p style="text-align: center;">Observation</p></div>
+      <div id="container-dttc" style="display: none;"><p style="text-align: center;">Delta</p></div>
+    </div>
 
 
     <img style="display: none; visibility: hidden;" id="car-aqua" src="car-aqua.svg" alt="" />
@@ -50,59 +149,6 @@
     <img style="display: none; visibility: hidden;" id="flame" src="flame.svg" alt="" />
     <img style="display: none; visibility: hidden;" id="parachute" src="parachute.svg" alt="" />
     <img style="display: none; visibility: hidden;" id="finch" src="finch.svg" alt="" />
-
-    <div id="street" class="street no-print"></div>
-    <script type="text/javascript">
-      "use strict";
-
-      var rstc = null;
-      var lanes = {};
-
-      var streetId = "street";
-      var timer = null;
-
-      function clear() {
-        if (timer != null)
-          timer.stop();
-        timer = null;
-        removeChildren(streetId);
-      }
-
-      function run() {
-        timer = new Timer();
-        var street = new Street(streetId, timer, 2, { offset: "25%", fps: 50, relWidth: 0.9 });
-
-        for (var name in rstc.cars) {
-          (function (name) {
-            var car = new Elem(name, "car-"+ carToColor(name), street,
-              function (t) { return pos(car.id); },
-              function (t) { return lanes[car.id]; }
-            );
-            console.log("Created new car "+ name +" with color "+ carToColor(name) +" at "+ pos(car.id));
-          })(name);
-        }
-
-        function pos(car) {
-          return SCALE * rstc.x(car) + 0.5;
-        }
-      }
-
-      function updateStreet(json) {
-        var ms = toMeasurements(json, ["ntg", "ttc"]);
-        for (var i = 0; i < json.lane.length; ++i) {
-          lanes[json.lane[i].b] = json.lane[i].l;
-        }
-        if (!rstc) {
-          rstc = new Rstc(ms);
-          rstc.forceReferenceCar("B");
-          run();
-        } else {
-          var ref = rstc.computeReferenceCar();
-          rstc = new Rstc(ms);
-          rstc.forceReferenceCar(ref);
-        }
-      }
-    </script>
 
   </body>
 </html>

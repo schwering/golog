@@ -9,7 +9,6 @@ import Data.Monoid
 import Network.HTTP.Types (status200, status404)
 import Network.Wai
 import Network.Wai.Handler.Warp
-import Text.Read (readMaybe)
 
 import RSTC.Car
 import Interpreter.Golog
@@ -38,9 +37,9 @@ app :: Monad m => [MyConf] -> Request -> m Response
 app confs req = do
     let paths = pathInfo req
     let path = case paths of p:_ -> (read $ show $ p) :: String ; _ -> "index.html"
-    return $ case (readMaybe path) :: Maybe Int of
-                  Just i  -> index confs i
-                  Nothing -> indexFile path
+    return $ if all (`elem` ['0'..'9']) path
+             then index confs (read path :: Int)
+             else indexFile path
 
 
 indexFile :: String -> Response
@@ -85,6 +84,7 @@ mimeType f = helper m
              , ("html", "text/html")
              , ("js", "application/javascript")
              , ("css", "text/css")
+             , ("ttf", "application/x-font-ttf")
              ]
          helper ((ending,mime):xs) | isSuffixOf ending f = mime
                                    | otherwise           = helper xs
@@ -92,9 +92,9 @@ mimeType f = helper m
 
 
 toJson :: Show a => Prim a -> String
-toJson (Wait t) = "{ \"wait\": { \"time\": " ++ (show t) ++ "} }"
-toJson (Accel b q) = "{ \"accel\": { \"b\": \"" ++ (show b) ++ "\", \"factor\": " ++ (show q) ++ "} }"
-toJson (LaneChange b l) = "{ \"lc\": { \"b\": \"" ++ (show b) ++ "\", \"lane\": " ++ (show $ laneToNumber l) ++ "} }"
+toJson (Wait t) = "{ \"wait\": { \"t\": " ++ (show t) ++ "} }"
+toJson (Accel b q) = "{ \"accel\": { \"b\": \"" ++ (show b) ++ "\", \"q\": " ++ (show q) ++ "} }"
+toJson (LaneChange b l) = "{ \"lc\": { \"b\": \"" ++ (show b) ++ "\", \"l\": " ++ (show $ laneToNumber l) ++ "} }"
 toJson (Init e) = "{ \"init\": { \"time\": " ++ (show (Obs.time e)) ++ " } }"
 toJson (Prematch e) = "{ \"prematch\": { \"time\": " ++ (show (Obs.time e)) ++ " } }"
 toJson (Match e) = "{ \"match\": { \"time\": " ++ (show (Obs.time e)) ++ " } }"
