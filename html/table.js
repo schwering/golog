@@ -22,9 +22,9 @@ function createTable(json, contId, prop) {
   function addTh(tr, car) {
     var th = document.createElement("div");
     th.className = "td";
-    th.style.color = carToColor(car);
     th.style.textAlign = "center";
     if (car) {
+      th.style.color = carToColor(car);
       th.innerHTML = car;
     }
     tr.appendChild(th);
@@ -43,7 +43,7 @@ function createTable(json, contId, prop) {
 
   var table = addTable();
   var tr = addTr(table);
-  addTd(tr, prop +"-time");
+  addTh(tr).id = prop +"-time";
   for (var i = 0; i < cars.length; ++i) {
     addTh(tr, cars[i]);
   }

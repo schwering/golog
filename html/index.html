@@ -88,7 +88,7 @@
         if (!json.time) { return false; }
 
         if (animation === null) {
-          animation = new Animation("street", timer, ["ntg", "ttc"], populateObservationTables);
+          animation = new Animation("street-model", timer, ["ntg", "ttc"], populateObservationTables);
           animation.street().addRedrawHook(populateModelTables);
           animation.street().addRedrawHook(updateTime);
         }
@@ -112,26 +112,26 @@
       }
     </script>
   </head>
-  <body>
+  <body onload="javascript:requestAll(processNewSituation);">
     <h1>Plan Recognition</h1>
 
-    <input type="submit" onclick="javascript:requestAll(processNewSituation);" /><br />
+    <!-- <input type="submit" onclick="javascript:requestAll(processNewSituation);" value="Restart" /><br /> -->
 
-    <div id="street" class="street no-print"></div>
+    <div id="street-model" class="street no-print"></div>
 
     <div id="container-time" style="visibility: hidden;">Time: <div id="time" style="display: inline;"></div> s</div>
 
     <h2 id="heading-ntg" style="display: none; margin-top: 2ex;">Net Time Gap (NTG)</h2>
     <div>
-      <div id="container-ntg" style="display: none;"><p style="text-align: center;">Model</p></div>
-      <div id="container-ontg" style="display: none;"><p style="text-align: center;">Observation</p></div>
+      <div id="container-ntg" style="display: none; margin-right: 2em;"><p style="text-align: center;">Model</p></div>
+      <div id="container-ontg" style="display: none; margin-right: 2em;"><p style="text-align: center;">Observation</p></div>
       <div id="container-dntg" style="display: none;"><p style="text-align: center;">Delta</p></div>
     </div>
 
     <h2 id="heading-ttc" style="display: none; margin-top: 2ex;">Time To Collision (TTC)</h2>
     <div>
-      <div id="container-ttc" style="display: none;"><p style="text-align: center;">Model</p></div>
-      <div id="container-ottc" style="display: none;"><p style="text-align: center;">Observation</p></div>
+      <div id="container-ttc" style="display: none; margin-right: 2em;"><p style="text-align: center;">Model</p></div>
+      <div id="container-ottc" style="display: none; margin-right: 2em;"><p style="text-align: center;">Observation</p></div>
       <div id="container-dttc" style="display: none;"><p style="text-align: center;">Delta</p></div>
     </div>
 
