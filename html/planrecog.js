@@ -65,7 +65,8 @@ function jsonCars(json, props) {
 
 // Given: { ... ntg : [ { b: "D", c: "E", t: 3.0 }, ... ], ... }
 // Want: { "D": { "E": 3.0, ... }, ... }
-function jsonToMeasurements(json, props) {
+function jsonToMeasurements(json, ntgProp, ttcProp) {
+  var props = [ntgProp, ttcProp];
   var ms = {};
   for (var j = 0; j < props.length; ++j) {
     var p = props[j];
@@ -80,17 +81,18 @@ function jsonToMeasurements(json, props) {
         if (!ms[b][c]) {
           ms[b][c] = {};
         }
-        ms[b][c][p] = t;
+        var q = (p == ntgProp) ? "ntg" : "ttc";
+        ms[b][c][q] = t;
       }
     }
   }
   return ms;
 }
 
-function jsonToLanes(json) {
+function jsonToLanes(json, laneProp) {
   var lanes = {};
   for (var i = 0; i < json.lane.length; ++i) {
-    lanes[json.lane[i].b] = json.lane[i].l;
+    lanes[json[laneProp][i].b] = json[laneProp][i].l;
   }
   return lanes;
 }
@@ -98,13 +100,35 @@ function jsonToLanes(json) {
 /* Animation object drawing in the street element with streetId.
  * The timer object is used to register events.
  * The JSON data needs to be added when it comes in using Animation.push().
- * The props parameter indicates which elements from the JSON data are used
+ * The props parameters indicates which elements from the JSON data are used
  * to construct the initial Rstc object.
  * For each processed JSON object, the jsonCallback is called. This is quite
  * bad architecture, but the animation object is the one who `defines time.'
  */
-function Animation(streetId, timer, props, jsonCallback) {
-  var street = new Street(streetId, timer, 2, { offset: "25%", fps: 50, relHeight: 0.5 });
+function Animation(args) {
+  if (args.streetId === undefined) {
+    args.streetId = "street";
+  }
+  if (args.timer === undefined) {
+    args.timer = new Timer();
+  }
+  if (args.isModel === undefined) {
+    args.isModel = true;
+  }
+  if (args.ntgProp === undefined) {
+    args.ntgProp = "ntg";
+  }
+  if (args.ttcProp === undefined) {
+    args.ttcProp = "ttc";
+  }
+  if (args.laneProp === undefined) {
+    args.laneProp = "lane";
+  }
+  if (args.jsonCallback === undefined) {
+    args.jsonCallback = function (json) { };
+  }
+
+  var street = new Street(args.streetId, args.timer, 2, { offset: "25%", fps: 50, relHeight: 0.5 });
   var cars = {};
 
   var lanes = null;
@@ -122,10 +146,28 @@ function Animation(streetId, timer, props, jsonCallback) {
   street.addRedrawHook(function (t) {
     if (jsons.length > 0 && (rstc == null || rstc.start() >= jsons[0].time)) {
       var json = jsons.shift();
-      jsonCallback(json);
-      if (json.action.init) {
-        lanes = jsonToLanes(json);
-        rstc = new ChangingRstc(new Rstc(jsonToMeasurements(json, props), json.time)).wait(0);
+      args.jsonCallback(json);
+      if (!args.isModel && json.isMatch) {
+        var firstCall = rstc == null;
+        lanes = jsonToLanes(json, args.laneProp);
+        rstc = new ChangingRstc(new Rstc(jsonToMeasurements(json, args.ntgProp, args.ttcProp), json.time)).wait(0);
+        rstc.forceReferenceCar("B");
+        if (firstCall) {
+          for (var id in cars) {
+            cars[id].kill();
+          }
+          for (var id in rstc.cars) {
+            (function (id) {
+              cars[id] = new Elem(id, street,
+                function (t) { return SCALE * rstc.x(id) + 0.5; },
+                function (t) { return lanes[id]; }
+              );
+            })(id);
+          }
+        }
+      } else if (args.isModel && json.action.init) {
+        lanes = jsonToLanes(json, args.laneProp);
+        rstc = new ChangingRstc(new Rstc(jsonToMeasurements(json, args.ntgProp, args.ttcProp), json.time)).wait(0);
         rstc.forceReferenceCar("B");
         for (var id in cars) {
           cars[id].kill();
@@ -138,13 +180,13 @@ function Animation(streetId, timer, props, jsonCallback) {
             );
           })(id);
         }
-      } else if (json.action.accel) {
+      } else if (args.isModel && json.action.accel) {
         rstc
           .wait(json.time - rstc.start()) // synchronize time of model with observation
           .accel(json.action.accel.b, json.action.accel.q) // perform acceleration
           .progress() // for performance
           .wait(0); // to allow for efficient time counting
-      } else if (json.action.lc) {
+      } else if (args.isModel && json.action.lc) {
         lanes[json.action.lc.b] = json.action.lc.l;
       }
     }
@@ -156,13 +198,12 @@ function Animation(streetId, timer, props, jsonCallback) {
   });
 
   this.clear = function () {
-    if (timer != null)
-      timer.stop();
-    timer = null;
-    removeChildren(streetId);
+    if (args.timer != null)
+      args.timer.stop();
+    args.timer = null;
+    removeChildren(args.streetId);
   }
 }
-
 
 // vim:textwidth=80:shiftwidth=2:softtabstop=2:expandtab
 

@@ -17,7 +17,8 @@
       var ms = null;
 
       var timer = new Timer();
-      var animation = null;
+      var animationModel = null;
+      var animationObservation = null;
 
       // Just copy the observed NTG/TTC as deltas.
       // The dummy values are needed for table construction.
@@ -63,23 +64,23 @@
       function populateObservationTables(json) {
         populateTableFromJson(json, "ontg");
         populateTableFromJson(json, "ottc");
-        if (animation && animation.rstc()) {
-          json = computeDeltaInJson(animation.rstc(), json);
+        if (animationModel && animationModel.rstc()) {
+          json = computeDeltaInJson(animationModel.rstc(), json);
           populateTableFromJson(json, "dntg");
           populateTableFromJson(json, "dttc");
         }
       }
 
       function populateModelTables() {
-        if (animation.rstc()) {
-          populateTableFromRstc(animation.rstc(), "ntg");
-          populateTableFromRstc(animation.rstc(), "ttc");
+        if (animationModel.rstc()) {
+          populateTableFromRstc(animationModel.rstc(), "ntg");
+          populateTableFromRstc(animationModel.rstc(), "ttc");
         }
       }
 
       function updateTime(t) {
-        if (animation && animation.rstc()) {
-          document.getElementById("time").innerHTML = animation.rstc().start().toFixed(2);
+        if (animationModel && animationModel.rstc()) {
+          document.getElementById("time").innerHTML = animationModel.rstc().start().toFixed(2);
           document.getElementById("container-time").style.visibility = "visible";
         }
       }
@@ -87,10 +88,14 @@
       function processNewSituation(json) {
         if (!json.time) { return false; }
 
-        if (animation === null) {
-          animation = new Animation("street-model", timer, ["ntg", "ttc"], populateObservationTables);
-          animation.street().addRedrawHook(populateModelTables);
-          animation.street().addRedrawHook(updateTime);
+        if (animationModel === null) {
+          animationModel = new Animation({ streetId: "street-model", timer: timer, isModel: true, ntgProp: "ntg", ttcProp: "ttc", laneProp: "lane" });
+          animationModel.street().addRedrawHook(populateModelTables);
+          animationModel.street().addRedrawHook(updateTime);
+        }
+
+        if (animationObservation === null) {
+          animationObservation = new Animation({ streetId: "street-real", timer: timer, isModel: false, ntgProp: "ontg", ttcProp: "ottc", laneProp: "olane", jsonCallback: populateObservationTables });
         }
 
         json = initDeltaInJson(json);
@@ -107,7 +112,8 @@
             container.style.display = "inline-block";
           }
         }
-        animation.push(json);
+        animationModel.push(json);
+        animationObservation.push(json);
         return true;
       }
     </script>
@@ -117,7 +123,8 @@
 
     <!-- <input type="submit" onclick="javascript:requestAll(processNewSituation);" value="Restart" /><br /> -->
 
-    <div id="street-model" class="street no-print"></div>
+    <div id="street-model" class="street no-print"><div class="unremovable street-label">Model:</div></div>
+    <div id="street-real" class="street no-print"><div class="unremovable street-label">Real:</div></div>
 
     <div id="container-time" style="visibility: hidden;">Time: <div id="time" style="display: inline;"></div> s</div>
 

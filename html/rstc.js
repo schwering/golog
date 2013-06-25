@@ -4,13 +4,29 @@ function rad2deg(rad) {
   return rad / Math.PI * 180;
 }
 
+function hasClass(element, name) {
+  if (element.nodeType != 1)
+    return false;
+
+  var regexp = new RegExp("(^| )" + name + "\W*");
+
+  if (typeof element.className != "undefined")
+    return regexp.test(element.className);
+
+  return regexp.test(element.getAttribute("class"));
+}
+
+function isArray(input) {
+  return typeof(input) == "object" && (input instanceof Array);
+}
+
 function removeChildren(ids) {
-  if (!is_array(ids))
+  if (!isArray(ids))
     ids = new Array(ids);
   for (var i = 0; i < ids.length; ++i) {
     var e = document.getElementById(ids[i]);
     for (var n = e.firstChild; n; ) {
-      if (!w3c_slidy.has_class(n, "unremovable")) {
+      if (!hasClass(n, "unremovable")) {
         e.removeChild(n);
         n = e.firstChild;
       } else {
@@ -18,10 +34,6 @@ function removeChildren(ids) {
       }
     }
   }
-}
-
-function is_array(input) {
-  return typeof(input) == "object" && (input instanceof Array);
 }
 
 /* A timer that synchronously executes a number of handlers.
