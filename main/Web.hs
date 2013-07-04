@@ -13,14 +13,15 @@ import Network.Wai.Handler.Warp
 import RSTC.Car
 import Interpreter.Golog
 import RSTC.BAT.Progression
-import qualified RSTC.Obs as Obs
+import qualified RSTC.Obs as O
 import RSTC.Progs
 
 
-type MyConf = (Sit (Prim Double), Reward, Depth)
+type MyConf a = (Sit (Prim a), Reward, Depth)
 
-pr :: [MyConf]
-pr = let obs  = obsprog $ take 100 Obs.observations
+--pr :: (HistState a, Show a) => [MyConf a]
+pr :: [MyConf (Qty Double)]
+pr = let obs  = obsprog $ take 100 O.observations
          cand = pass D B `Conc` overtake H B
          prog = obs `Conc` cand
      in do3 lookahead prog s0
@@ -33,7 +34,7 @@ main = do
     run port (app pr)
 
 
-app :: Monad m => [MyConf] -> Request -> m Response
+app :: (HistState a, Show a, Monad m) => [MyConf a] -> Request -> m Response
 app confs req = do
     let paths = pathInfo req
     let path = case paths of p:_ -> (read $ show $ p) :: String ; _ -> "index.html"
@@ -46,16 +47,16 @@ indexFile :: String -> Response
 indexFile fileName = ResponseFile status200 [("Content-Type", pack $ mimeType fileName)] ("html/" ++ fileName) Nothing
 
 
-index :: [MyConf] -> Int -> Response
+index :: (HistState a, Show a) => [MyConf a] -> Int -> Response
 index confs i = ResponseBuilder status [("Content-Type", "text/plain")] response
    where restConfs = drop i confs
          (s,r,d)   = case restConfs of x:_ -> x ; _ -> undefined
          ntgs      = [(b, c, ntg s b c) | b <- cars, c <- cars, b /= c]
          ttcs      = [(b, c, ttc s b c) | b <- cars, c <- cars, b < c]
          lanes     = [(b, lane s b) | b <- cars]
-         ontgs     = case history s of (Match e):_ -> [(b, c, Obs.ntg e b c) | b <- cars, c <- cars, b /= c] ; _ -> []
-         ottcs     = case history s of (Match e):_ -> [(b, c, Obs.ttc e b c) | b <- cars, c <- cars, b /= c] ; _ -> []
-         olanes    = case history s of (Match e):_ -> [(b, Obs.lane e b) | b <- cars] ; _ -> []
+         ontgs     = case history s of (Match e):_ -> [(b, c, O.ntg e b c) | b <- cars, c <- cars, b /= c] ; _ -> []
+         ottcs     = case history s of (Match e):_ -> [(b, c, O.ttc e b c) | b <- cars, c <- cars, b /= c] ; _ -> []
+         olanes    = case history s of (Match e):_ -> [(b, O.lane e b) | b <- cars] ; _ -> []
          isMatch   = case history s of (Match _):_ -> True ; _ -> False
          status    = case restConfs of _:_ -> status200
                                        _   -> status404
@@ -95,9 +96,9 @@ toJson :: Show a => Prim a -> String
 toJson (Wait t) = "{ \"wait\": { \"t\": " ++ (show t) ++ "} }"
 toJson (Accel b q) = "{ \"accel\": { \"b\": \"" ++ (show b) ++ "\", \"q\": " ++ (show q) ++ "} }"
 toJson (LaneChange b l) = "{ \"lc\": { \"b\": \"" ++ (show b) ++ "\", \"l\": " ++ (show $ laneToNumber l) ++ "} }"
-toJson (Init e) = "{ \"init\": { \"time\": " ++ (show (Obs.time e)) ++ " } }"
-toJson (Prematch e) = "{ \"prematch\": { \"time\": " ++ (show (Obs.time e)) ++ " } }"
-toJson (Match e) = "{ \"match\": { \"time\": " ++ (show (Obs.time e)) ++ " } }"
+toJson (Init e) = "{ \"init\": { \"time\": " ++ (show (O.time e :: Double)) ++ " } }"
+toJson (Prematch e) = "{ \"prematch\": { \"time\": " ++ (show (O.time e :: Double)) ++ " } }"
+toJson (Match e) = "{ \"match\": { \"time\": " ++ (show (O.time e :: Double)) ++ " } }"
 toJson Abort = "{ \"abort\": {} }"
 toJson NoOp = "{ \"noop\": {} }"
 toJson (Start b s) = "{ \"start\": { \"b\": \"" ++ (show b) ++ "\", \"prog\": \"" ++ s  ++ "\" } }"

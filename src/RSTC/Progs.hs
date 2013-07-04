@@ -7,7 +7,7 @@ module RSTC.Progs where
 import RSTC.Car
 import Interpreter.Golog
 import RSTC.BAT.Progression
-import qualified RSTC.Obs as Obs
+import qualified RSTC.Obs as O
 import RSTC.Theorems
 import Util.NativePSO
 
@@ -40,11 +40,11 @@ atomic :: Prog a -> Prog a
 atomic = PseudoAtom . Complex
 
 
-obsprog :: (Obs.Obs Double b) => [Maybe b] -> Prog (Prim Double)
+obsprog :: State a => [Maybe O.ObsId] -> Prog (Prim a)
 obsprog []     = Nil
 obsprog (e:es) = seq' (initAct:acts)
    where initAct = maybe Nil (act . Init) e
-         acts = map (\e' -> atomic ((actf (\s -> Wait (Obs.time e' - time s)))
+         acts = map (\e' -> atomic ((actf (\s -> Wait (O.time e' - time s)))
                               --`Seq` (act (Prematch e'))
                               `Seq` (act (Match e'))))
                     (catMaybes es)
@@ -52,7 +52,7 @@ obsprog (e:es) = seq' (initAct:acts)
          seq' (p:ps) = Seq p (seq' ps)
 
 
-follow :: Car -> Car -> Prog (Prim Double)
+follow :: State a => Car -> Car -> Prog (Prim a)
 follow b c =
    atomic (
       act (Start b "follow") `Seq`
@@ -65,7 +65,7 @@ follow b c =
    act (End b "follow")
 
 
-tailgate :: Car -> Car -> Prog (Prim Double)
+tailgate :: State a => Car -> Car -> Prog (Prim a)
 tailgate b c =
    atomic (
       act (Start b "tailgate") `Seq`
@@ -95,7 +95,7 @@ pass b c =
 -}
 
 
-pass :: Car -> Car -> Prog (Prim Double)
+pass :: HistState a => Car -> Car -> Prog (Prim a)
 pass b c =
    atomic (
       act (Start b "pass") `Seq`
@@ -109,7 +109,7 @@ pass b c =
    )
 
 
-overtake :: Car -> Car -> Prog (Prim Double)
+overtake :: HistState a => Car -> Car -> Prog (Prim a)
 overtake b c =
    atomic (
       act (Start b "overtake") `Seq`

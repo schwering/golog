@@ -9,8 +9,9 @@ import RSTC.Car
 import Interpreter.Golog
 import Interpreter.Tree
 --import Interpreter.TreeUtil
+import RSTC.BAT.Base
 import RSTC.BAT.Progression
-import qualified RSTC.Obs as Obs
+import qualified RSTC.Obs as O
 import RSTC.Progs
 --import RSTC.Theorems
 --import Util.Interpolation
@@ -31,17 +32,17 @@ class Show a => ShowPart a where
    showPart _ = show
    partSize _ = 0
 
-instance Show a => Show (Prim a) where
-   show (Wait t) = "Wait " ++ (show t)
-   show (Accel b q) = "Accel " ++ (show b) ++ " " ++ (show q)
+instance Show a => Show (Prim (Qty a)) where
+   show (Wait t) = "Wait " ++ show (unwrap t)
+   show (Accel b q) = "Accel " ++ show b ++ " " ++ show (unwrap q)
    show (LaneChange b l) = "LaneChange " ++ (show b) ++ " " ++ (show l)
-   show (Init e) = "Init " ++ (show (Obs.time e))
-   show (Prematch e) = "Prematch " ++ (show (Obs.time e))
-   show (Match e) = "Match " ++ (show (Obs.time e))
+   show (Init e) = "Init " ++ show (O.time e :: Double)
+   show (Prematch e) = "Prematch " ++ show (O.time e :: Double)
+   show (Match e) = "Match " ++ show (O.time e :: Double)
    show Abort = "Abort"
    show NoOp = "NoOp"
-   show (Start b s) = "Start " ++ (show b) ++ " " ++ s
-   show (End b s) = "End " ++ (show b) ++ " " ++ s
+   show (Start b s) = "Start " ++ show b ++ " " ++ s
+   show (End b s) = "End " ++ show b ++ " " ++ s
    show (Msg s) = "Msg " ++ s
 
 instance Show Finality where
@@ -66,7 +67,7 @@ instance Show a => Show (Prog a) where
    show (PseudoAtom p) = "PseudoAtom(" ++ (show p) ++ ")"
    show Nil = "nil"
 
-instance Show (Sit (Prim Double)) where
+instance Show (Sit (Prim (Qty Double))) where
    show = show . sit2list
 
 instance ShowPart c => Show (Tree a b c) where
@@ -74,16 +75,16 @@ instance ShowPart c => Show (Tree a b c) where
 
 instance ShowPart Double where
 --instance ShowPart Prim where
-instance ShowPart a => ShowPart (Prim a) where
+instance ShowPart a => ShowPart (Prim (Qty a)) where
 instance ShowPart Finality where
 instance ShowPart a => ShowPart (Atom a) where
 instance ShowPart a => ShowPart (PseudoAtom a) where
 instance ShowPart a => ShowPart (Prog a) where
 
-instance ShowPart (Sit (Prim Double)) where
+instance ShowPart (Sit (Prim (Qty Double))) where
    showPart n s = show (drop n (sit2list s))
 
-instance ShowPart (Conf (Prim Double)) where
+instance ShowPart (Conf (Prim (Qty Double))) where
    showPart n (s,r,d,f) = "("++ showPart n s ++", "++ show r ++", "++ show d ++", "++ show f ++")"
    partSize (s,_,_,_) = length (sit2list s)
 
@@ -116,37 +117,37 @@ instance BAT Prim where
 -}
 
 
-printFluents :: Sit (Prim Double) -> IO ()
+printFluents :: Sit (Prim (Qty Double)) -> IO ()
 printFluents s = case reverse (sit2list s)
    of Match e : _ ->
-         do _ <- printf "time = %.2f\n" (time s)
+         do _ <- printf "time = %.2f\n" (unwrap (time s))
             mapM_ (\(b,c) -> do printf "ntg %s %s:   model: %8.2f   obs: %8.2f   \916: %8.2f\n"
                                     (show b) (show c)
-                                    (ntg s b c)
-                                    (Obs.ntg e b c)
-                                    (ntgDiff s e b c)
+                                    (unwrap (ntg s b c))
+                                    (O.ntg e b c :: Double)
+                                    (unwrap (ntgDiff s e b c))
                   ) [(b,c) | b <- cars, c <- cars, b /= c]
             mapM_ (\(b,c) -> do printf "ttc %s %s:   model: %8.2f   obs: %8.2f   \916: %8.2f\n"
                                     (show b) (show c)
-                                    (ttc s b c)
-                                    (Obs.ttc e b c)
-                                    (ttcDiff s e b c)
+                                    (unwrap (ttc s b c))
+                                    (O.ttc e b c :: Double)
+                                    (unwrap (ttcDiff s e b c))
                   ) [(b,c) | b <- cars, c <- cars, b < c]
             mapM_ (\b -> do printf "lane %s:    model:    %.5s   obs:    %.5s   \916: %8d\n"
                                     (show b)
                                     (show (lane s b))
-                                    (show (Obs.lane e b))
-                                    (if lane s b == Obs.lane e b then 0 :: Int else 1)
+                                    (show (O.lane e b))
+                                    (if lane s b == O.lane e b then 0 :: Int else 1)
                   ) cars
       _ ->
-         do _ <- printf "time = %.2f\n" (time s)
+         do _ <- printf "time = %.2f\n" (unwrap (time s))
             mapM_ (\(b,c) -> do printf "ntg %s %s:   model: %8.2f\n"
                                     (show b) (show c)
-                                    (ntg s b c)
+                                    (unwrap (ntg s b c))
                   ) [(b,c) | b <- cars, c <- cars, b /= c]
             mapM_ (\(b,c) -> do printf "ttc %s %s:   model: %8.2f\n"
                                     (show b) (show c)
-                                    (ttc s b c)
+                                    (unwrap (ttc s b c))
                   ) [(b,c) | b <- cars, c <- cars, b < c]
             mapM_ (\b -> do printf "lane %s:    model:    %.5s\n"
                                     (show b)
@@ -154,8 +155,8 @@ printFluents s = case reverse (sit2list s)
                   ) cars
 
 
-traceCsv :: Sit (Prim Double) -> [String]
-traceCsv ss = header : (reverse (map (concat . interleave delim . map show . csv) (subsits ss)))
+traceCsv :: Sit (Prim (Qty Double)) -> [String]
+traceCsv ss = header : (reverse (map (concat . interleave delim . map (show.unwrap) . csv) (subsits ss)))
    where subsits s = case history s of Match _ : _ -> s : subsits (predsit s)
                                        _ : _       -> subsits (predsit s)
                                        _           -> []
@@ -174,8 +175,8 @@ traceCsv ss = header : (reverse (map (concat . interleave delim . map show . csv
                   [time s] ++
                   [ntg s b c | b <- cars, c <- cars, b /= c] ++
                   [ttc s b c | b <- cars, c <- cars, b < c] ++
-                  [Obs.ntg e b c | b <- cars, c <- cars, b /= c] ++
-                  [Obs.ttc e b c | b <- cars, c <- cars, b < c] ++
+                  [O.ntg e b c | b <- cars, c <- cars, b /= c] ++
+                  [O.ttc e b c | b <- cars, c <- cars, b < c] ++
                   [ntgDiff s e b c | b <- cars, c <- cars, b /= c] ++
                   [ttcDiff s e b c | b <- cars, c <- cars, b < c]
                _ -> error "Main.traceCsv: no Match action"
@@ -222,36 +223,38 @@ interleave _ []     = []
 interleave _ [x]    = [x]
 interleave y (x:xs) = x:y:interleave y xs
 
-obsToJs :: Obs.Wrapper Double -> String
+obsToJs :: O.Wrapper -> String
 obsToJs ow' = "new Rstc(" ++ toJs ow' cars ++ ")"
-   where toJs ow @ (Obs.Wrapper e) (b:c:ds) = "addM(" ++ toJs ow (c:ds) ++ ", " ++
-                                                   show b ++ ", " ++ show c ++ ", " ++
-                                                   "{ntg: " ++ show (Obs.ntg e b c) ++ ", " ++
-                                                   " ttc: " ++ show (Obs.ttc e b c) ++ "})"
+   where toJs ow @ (O.Wrapper e) (b:c:ds) = "addM(" ++ toJs ow (c:ds) ++ ", " ++
+                                                 show b ++ ", " ++ show c ++ ", " ++
+                                                 "{ntg: " ++ show (O.ntg e b c :: Double) ++ ", " ++
+                                                 " ttc: " ++ show (O.ttc e b c :: Double) ++ "})"
          toJs _                     _        = "{}"
 
 
-printObsJs :: Sit (Prim Double) -> [String]
+printObsJs :: Sit (Prim (Qty Double)) -> [String]
 printObsJs s = "var obs = [];" : map (\(i,oa) -> "obs[" ++ show i ++ "] = {time: " ++ show (t (w oa)) ++ ", rstc: " ++ obsToJs (w oa) ++ "};") (zip ([0..] :: [Int]) (filter isObsOrInit (sit2list s)))
    where isObsOrInit (Match _) = True
          isObsOrInit (Init _)  = True
          isObsOrInit _         = False
-         t (Obs.Wrapper e)     = Obs.time e - tOffset
+         t :: O.Wrapper -> Double
+         t (O.Wrapper e)       = (unwrap $ O.time e - tOffset)
+         tOffset :: Qty Double
          tOffset               = tOffset' (sit2list s)
-         tOffset' (Init e : _) = Obs.time e
+         tOffset' (Init e : _) = O.time e
          tOffset' (_ : as)     = tOffset' as
          tOffset' []           = error "Main.printObsJs: empty situation?"
-         w (Match e)           = Obs.wrap e
-         w (Init e)            = Obs.wrap e
+         w (Match e)           = O.wrap e
+         w (Init e)            = O.wrap e
          w _                   = error "Main.printObsJs: no observation action"
 
 
-printSitJs :: Sit (Prim Double) -> [String]
+printSitJs :: Sit (Prim (Qty Double)) -> [String]
 printSitJs ss = initial (sit2list ss) ++ map toJs (filter hasEffect (sit2list ss))
-   where initial (Init e : _)       = ["var modRstc = new ChangingRstc(" ++ obsToJs (Obs.wrap e) ++ ").wait(0);"
+   where initial (Init e : _)       = ["var modRstc = new ChangingRstc(" ++ obsToJs (O.wrap e) ++ ").wait(0);"
                                       ,"modRstc.forceReferenceCar(obsRstc.computeReferenceCar());"
                                       ,"var modLane = {};"
-                                      ,concat (map (\b -> "modLane[" ++ show b ++ ".id] = " ++ (case Obs.lane e b of RightLane -> "0" ; LeftLane -> "1") ++ ";") cars)
+                                      ,concat (map (\b -> "modLane[" ++ show b ++ ".id] = " ++ (case O.lane e b of RightLane -> "0" ; LeftLane -> "1") ++ ";") cars)
                                       ,"var tDone = -1;"
                                       ,"var tWait = 0;"]
          initial (_ : as)           = initial as
@@ -260,9 +263,9 @@ printSitJs ss = initial (sit2list ss) ++ map toJs (filter hasEffect (sit2list ss
          hasEffect (LaneChange _ _) = True
          hasEffect (Wait _)         = True
          hasEffect _                = False
-         toJs (Accel b q)           = "if (t > tWait && tDone < tWait) { tOffset += modRstc.time(); modRstc.accel(" ++ show b ++ ".id, " ++ show q ++ ").progress().wait(0); tDone = tWait; }"
+         toJs (Accel b q)           = "if (t > tWait && tDone < tWait) { tOffset += modRstc.time(); modRstc.accel(" ++ show b ++ ".id, " ++ show (unwrap q) ++ ").progress().wait(0); tDone = tWait; }"
          toJs (LaneChange b l)      = "if (t > tWait && tDone < tWait) { modLane[" ++ show b ++".id] = " ++ (case l of RightLane -> "0" ; LeftLane -> "1") ++ "; tDone = tWait; }"
-         toJs (Wait t)              = "tWait += " ++ show t ++ ";"
+         toJs (Wait t)              = "tWait += " ++ show (unwrap t) ++ ";"
          toJs _                     = error "Main.printSitJs: no effect action"
 
 
@@ -311,12 +314,12 @@ main = do
    mapM_ (\i -> putStrLn ("Pick nested 2: " ++ show i ++ ": " ++ show (do1 i (p6 i) S0))) [0..5]
    putStrLn "-------------------------------------------------------"
 -}
-         --mapM_ (putStrLn . show) (take 30 Obs.observations)
+         --mapM_ (putStrLn . show) (take 30 O.observations)
          --putStrLn "-------------------------------------------------------"
-         --mapM_ (\i -> putStrLn ((show . cutoff i) (tree (obsprog Obs.observations) S0 0.0 0))) [0..30]
+         --mapM_ (\i -> putStrLn ((show . cutoff i) (tree (obsprog O.observations) S0 0.0 0))) [0..30]
          --putStrLn "-------------------------------------------------------\n"
 -- {-
-         let obs      = take 100 Obs.observations
+         let obs      = take 100 O.observations
              obsProg  = obsprog obs
              --candProg = overtake H D
              candProg = pass D B `Conc` overtake H B
@@ -325,7 +328,7 @@ main = do
              partOfObs (Wait _)     = True
              partOfObs (Prematch _) = True
              partOfObs (Match _)    = True
-             partOfObs _                = False
+             partOfObs _            = False
              dropObs (Wait _ : Prematch _ : x @ (Match _) : xs) = x : dropObs xs
              dropObs (Wait _ :              x @ (Match _) : xs) = x : dropObs xs
              dropObs (                      x             : xs) = x : dropObs xs
@@ -436,10 +439,10 @@ main = do
 {-
          mapM_ (putStrLn . show) (map (maybe Nothing $ (\x -> Just
                ( x
-               , Obs.time x
-               , map (Obs.lane x) [B,D,H]
-               , map (uncurry (Obs.ntg x)) [(x,y) | x <- [B,D,H], y <- [B,D,H]]
-               , map (uncurry (Obs.ttc x)) [(x,y) | x <- [B,D,H], y <- [B,D,H]]
+               , O.time x
+               , map (O.lane x) [B,D,H]
+               , map (uncurry (O.ntg x)) [(x,y) | x <- [B,D,H], y <- [B,D,H]]
+               , map (uncurry (O.ttc x)) [(x,y) | x <- [B,D,H], y <- [B,D,H]]
                ))) (take 30 observations))
 -}
 --         putStrLn "-------"

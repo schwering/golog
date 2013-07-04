@@ -1,15 +1,18 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Common base of BAT implementations using regression and progression.
 
 module RSTC.BAT.Base (Prim(..), NTGCat(..), TTCCat(..),
-                      State(..), HistState(..),
+                      Wrapper(..), State(..), HistState(..),
                       lookahead, ntgDiff, ttcDiff, quality, match,
                       bestAccel, ntgCats, ttcCats, nan,
                       defaultPoss, defaultReward,
-                      remove, inject) where
+                      remove, inject,
+                      convert) where
 
 import RSTC.Car
 import Interpreter.Golog
@@ -22,9 +25,9 @@ import Data.List
 data Prim a = Wait (Time a)
             | Accel Car (Accel a)
             | LaneChange Car Lane
-            | forall b. O.Obs a b => Init b
-            | forall b. O.Obs a b => Prematch b
-            | forall b. O.Obs a b => Match b
+            | forall b. O.Obs b => Init b
+            | forall b. O.Obs b => Prematch b
+            | forall b. O.Obs b => Match b
             | Abort
             | NoOp
             | Start Car String
@@ -55,7 +58,12 @@ data TTCCat = ConvergingFast
             deriving (Bounded, Eq, Enum, Ord, Show)
 
 
--- | Class 'State' defines the RSTC fluents.
+class Wrapper w where
+   wrap   :: a -> w a
+   unwrap :: w a -> a
+
+
+-- | Defines the RSTC fluents.
 class RealFloat a => State a where
    time :: Sit (Prim a) -> Time a
    lane :: Sit (Prim a) -> Car -> Lane
@@ -63,7 +71,7 @@ class RealFloat a => State a where
    ttc  :: Sit (Prim a) -> Car -> Car -> TTC a
 
 
--- | Class 'HistState' defines some common operations of situation-like types.
+-- | Defines some common operations of situation-like types.
 --
 -- Minimal complete definition: history.
 --
@@ -106,7 +114,7 @@ remove n s = list2sit (reverse (take n l ++ drop (n+1) l))
    where l = reverse (sit2list s)
 
 
-bestAccel :: (Show a, HistState a) => Sit (Prim a) -> Car -> Car -> Accel a
+bestAccel :: HistState a => Sit (Prim a) -> Car -> Car -> Accel a
 bestAccel curSit b c = if haveObs then 0.5 * fx + 0.5 * gx else nan
    where fx = let (f1, f2) = (f 2, f 3) in pick f1 f2 (nullAt id (canonicalize Recip  f1 0))
          gx = let (g1, g2) = (g 2, g 3) in pick g1 g2 (nullAt id (canonicalize Linear g1 0))
@@ -120,16 +128,16 @@ bestAccel curSit b c = if haveObs then 0.5 * fx + 0.5 * gx else nan
          haveObs :: Bool
          haveObs = any (\a -> case a of { Match _ -> True ; _ -> False }) (history curSit)
          newSit n q = append2sit curSit (Accel b q : (obsActions n curSit))
-         obsActions :: (Show a, HistState a) => Int -> Sit (Prim a) -> [Prim a]
+         obsActions :: HistState a => Int -> Sit (Prim a) -> [Prim a]
          obsActions n s'  = take (2*n) (nextObs (lastMatch s'))
-         lastMatch :: HistState a => Sit (Prim a) -> O.Wrapper a
+         lastMatch :: HistState a => Sit (Prim a) -> O.Wrapper
          lastMatch s' = lastMatch' (history s')
-         lastMatch' :: [Prim a] -> O.Wrapper a
+         lastMatch' :: [Prim a] -> O.Wrapper
          lastMatch' (Match e : _ )  = O.wrap e
          lastMatch' (Init e  : _ )  = O.wrap e
          lastMatch' (_       : as)  = lastMatch' as
          lastMatch' []              = error "RSTC.BAT.Base.bestAccel: no init or match action"
-         nextObs :: (Show a) => O.Wrapper a -> [Prim a]
+         nextObs :: RealFloat a => O.Wrapper -> [Prim a]
          nextObs (O.Wrapper e) =
             case O.next e of Just e' -> Wait (O.time e' - O.time e) :
                                         Match e' :
@@ -174,22 +182,31 @@ lookahead :: Depth
 lookahead = 4
 
 
-ntgDiff :: (State a, O.Obs a b) => Sit (Prim a) -> b -> Car -> Car -> a
+ntgDiff :: (State a, O.Obs b) => Sit (Prim a) -> b -> Car -> Car -> NTG a
 ntgDiff s e b c = ntg s b c - O.ntg e b c
 
 
-ttcDiff :: (State a, O.Obs a b) => Sit (Prim a) -> b -> Car -> Car -> a
+ttcDiff :: (State a, O.Obs b) => Sit (Prim a) -> b -> Car -> Car -> TTC a
 ttcDiff s e b c = ttc s b c - O.ttc e b c
 
 
-quality :: (State a, O.Obs a b) => Sit (Prim a) -> b -> Car -> Car -> a
+quality :: (State a, O.Obs b) => Sit (Prim a) -> b -> Car -> Car -> a
 quality = ntgDiff
 
 
-match :: (State a, O.Obs a b) => b -> Sit (Prim a) -> Bool
-match e s = let ntg_ttc = [(b, c, ntg s b c, O.ntg e b c,
-                                  ttc s b c, O.ttc e b c) | b <- cars, c <- cars]
-                ntgs  = [(ntg1, ntg2) | (b, c, ntg1, ntg2, _, _) <- ntg_ttc, b /= c]
+match :: (State a, O.Obs b) => b -> Sit (Prim a) -> Bool
+match e s = let ntgs = [(ntg s b c, O.ntg e b c :: Double) | b <- cars, c <- cars, b /= c]
+--                Currently we don't consider TTCs in the matching quality
+--                (that's why we can use a simplified computation of the `ntgs'
+--                variable).
+--                I think this should be reasonable, because from the NTG
+--                measures between b and c in both directions we can compute
+--                their TTC (see RSTC.Theorems.ttcFromNtg for the formula):
+--                considering the TTCs in the matching quality, too, should be
+--                redundant, right?
+--                ntg_ttc = [(b, c, ntg s b c, O.ntg e b c,
+--                                  ttc s b c, O.ttc e b c) | b <- cars, c <- cars]
+--                ntgs  = [(ntg1, ntg2) | (b, c, ntg1, ntg2, _, _) <- ntg_ttc, b /= c]
 --                ttcs  = [(ttc1, ttc2, relVeloc' ntg1 ttc1, relVeloc' ntg2 ttc2) | (b, c, ntg1, ntg2, ttc1, ttc2) <- ntg_ttc, b < c]
                 lanes = [(lane s b, O.lane e b) | b <- cars]
             in all (\(l1, l2) -> l1 == l2) lanes &&
@@ -253,6 +270,32 @@ noDupe _ [] = True
 noDupe _ _  = error "RSTC.BAT.Base.noDupe: neither Accel nor LaneChange"
 
 
+-- | Switches between BAT implementations for the same primitive action type
+-- 'a'.
+--
+-- Our convention is that BATs implement the BAT typeclass for the type
+-- 'Prim (w n)' where 'n' is a number type and 'w n' wraps this number type so
+-- distinguish the typeclass instance from others.
+--
+-- This function relies on 'sit2list' and 'list2sit' of the 'HistState'
+-- implementations of the two BAT implementations.
+convert :: (Wrapper w1, Wrapper w2, HistState (w1 a), HistState (w2 a)) =>
+   Sit (Prim (w1 a)) -> Sit (Prim (w2 a))
+convert = list2sit . map (m (wrap . unwrap)) . sit2list
+   where m f (Wait t)         = Wait (f t)
+         m f (Accel b q)      = Accel b (f q)
+         m _ (LaneChange b l) = LaneChange b l
+         m _ (Init e)         = Init e
+         m _ (Prematch e)     = Prematch e
+         m _ (Match e)        = Match e
+         m _ Abort            = Abort
+         m _ NoOp             = NoOp
+         m _ (Start b msg)    = Start b msg
+         m _ (End b msg)      = End b msg
+         m _ (Msg msg)        = Msg msg
+
+
+-- | Returns '1/0' which should be a representation of 'NaN'.
 nan :: RealFloat a => a
 nan = (0 /) $! 0
 

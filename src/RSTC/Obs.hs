@@ -1,41 +1,42 @@
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 
 -- | Observation interface.
 
-module RSTC.Obs where
+module RSTC.Obs (Obs(..), Wrapper(..), wrap, ObsId, observations) where
 
 import RSTC.Car
 import RSTC.Theorems
 
 import Foreign.C
 
-class (RealFloat a, Show b) => Obs a b | b -> a where
-   next :: b -> Maybe b
-   time :: b -> Time a
-   ntg  :: b -> Car -> Car -> NTG a
-   ttc  :: b -> Car -> Car -> TTC a
-   lane :: b -> Car -> Lane
+class Obs a where
+   next :: a -> Maybe a
+   time :: RealFloat b => a -> Time b
+   ntg  :: RealFloat b => a -> Car -> Car -> NTG b
+   ttc  :: RealFloat b => a -> Car -> Car -> TTC b
+   lane :: a -> Car -> Lane
 
 
-data Wrapper a = forall b. Obs a b => Wrapper b
+data Wrapper = forall a. Obs a => Wrapper a
 
-wrap :: Obs a b => b -> Wrapper a
+wrap :: Obs a => a -> Wrapper
 wrap e = Wrapper e
 
 
-type ObsId = Int
+newtype ObsId = ObsId Int
 
-instance Obs Double ObsId where
-   next e     = getObs (succ e)
-   time e     = realToFrac (c_time (e2c e))
-   ntg  e b c = realToFrac (c_ntg (e2c e) (c2c b) (c2c c))
-   ttc  e b c = realToFrac (c_ttc (e2c e) (c2c b) (c2c c))
-   lane e b   = case c_lane (e2c e) (c2c b) of -1 -> LeftLane
-                                               1  -> RightLane
-                                               _  -> RightLane
+instance Show ObsId where
+   show (ObsId n) = show n
+
+instance Obs ObsId where
+   next (ObsId n)     = getObs (ObsId (succ n))
+   time (ObsId n)     = realToFrac (c_time (e2c n))
+   ntg  (ObsId n) b c = realToFrac (c_ntg (e2c n) (c2c b) (c2c c))
+   ttc  (ObsId n) b c = realToFrac (c_ttc (e2c n) (c2c b) (c2c c))
+   lane (ObsId n) b   = case c_lane (e2c n) (c2c b) of -1 -> LeftLane
+                                                       1  -> RightLane
+                                                       _  -> RightLane
 
 
 e2c :: Int -> CInt
@@ -46,12 +47,12 @@ c2c = fromIntegral . fromEnum
 
 
 observations :: [Maybe ObsId]
-observations = map getObs [0..]
+observations = map (getObs . ObsId) [0..]
 
 
 getObs :: ObsId -> Maybe ObsId
-getObs e = case c_next_obs (e2c e) of 1 -> Just e
-                                      _ -> Nothing
+getObs (ObsId n) = case c_next_obs (e2c n) of 1 -> Just (ObsId n)
+                                              _ -> Nothing
 
 foreign import ccall unsafe "obs_next"
    c_next_obs :: CInt -> CInt -- obs_id -> success
