@@ -12,6 +12,7 @@ Description:
 Library
     Hs-Source-Dirs:  src
     Exposed-Modules: Interpreter.Golog
+                     Interpreter.Golog2
                      Interpreter.Tree
                      Interpreter.TreeUtil
                      RSTC.BAT.Base
