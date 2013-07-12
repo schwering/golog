@@ -29,7 +29,7 @@ Library
     C-Sources:       src/RSTC/obs.c
                      src/Util/memo_cache.c
                      src/Util/native_pso.c
-    Build-Depends:   array, base, containers, random
+    Build-Depends:   array, base, containers, random, mtl
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 
