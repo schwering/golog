@@ -441,12 +441,12 @@ main = do
                               else return ()
                            putStrLn ""
                   else return ()
-            ) sits
+            ) (take 1 sits)
          putStrLn "-------------------------------------------------------"
          let showTreeDepth = 20
-         let treeDepth = 6
-         putStrLn $ showTree showTreeDepth $ let Conf t _ = treeT treeDepth prog s0 in t
-         putStrLn "-------------------------------------------------------"
+         let treeDepth = 4
+         --putStrLn $ showTree showTreeDepth $ let Conf t _ = treeT treeDepth prog s0 in t
+         --putStrLn "-------------------------------------------------------"
          putStrLn $ showTree showTreeDepth $ let Conf t _ = treeDT treeDepth prog s0 in t
          putStrLn "-------------------------------------------------------"
          stats <- getGCStats

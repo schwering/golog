@@ -14,7 +14,7 @@ instance BAT Int where
 instance DTBAT Int where
    reward _ s         | sitlen s > 5 = -1000
    reward a (Do a' _) | a == a'      = -1
-   reward a _                        = fromIntegral a
+   reward a _                        = fromIntegral (max 0 a)
 
 sitlen :: Sit Int -> Int
 sitlen S0       = 0
