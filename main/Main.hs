@@ -6,8 +6,9 @@
 module Main (main) where
 
 import RSTC.Car
-import Interpreter.Golog
-import Interpreter.Tree
+import Interpreter.Golog2
+import Interpreter.Golog2Util
+--import Interpreter.Tree
 --import Interpreter.TreeUtil
 import RSTC.BAT.Base
 import RSTC.BAT.Progression
@@ -45,14 +46,18 @@ instance Show a => Show (Prim (Qty a)) where
    show (End b s) = "End " ++ show b ++ " " ++ s
    show (Msg s) = "Msg " ++ s
 
+{-
 instance Show Finality where
    show Final = "Final"
    show Nonfinal = "Nonfinal"
+-}
 
+{-
 instance Show a => Show (Atom a) where
    show (Prim a)  = "Prim(" ++ (show a) ++ ")"
    show (PrimF _) = "PrimF(...)"
    show (Test _)  = "Test(...)"
+-}
 
 instance Show a => Show (PseudoAtom a) where
    show (Atom a) = "Atom(" ++ (show a) ++ ")"
@@ -60,23 +65,26 @@ instance Show a => Show (PseudoAtom a) where
 
 instance Show a => Show (Prog a) where
    show (Seq p1 p2) = "Seq(" ++ (show p1) ++ " " ++ (show p2) ++ ")"
-   show (Nondet p1 p2) = "Nondet(" ++ (show p1) ++ " " ++ (show p2) ++ ")"
+   --show (Nondet p1 p2) = "Nondet(" ++ (show p1) ++ " " ++ (show p2) ++ ")"
+   show (Nondet ps) = "Nondet[ " ++ concat (map (\p -> show p ++" ") ps) ++ "]"
    show (Conc p1 p2) = "Conc(" ++ (show p1) ++ " " ++ (show p2) ++ ")"
-   show (Star p) = "Star(" ++ (show p) ++ ")"
-   show (Pick _ _ _) = "Pick(...)"
+   --show (Star p) = "Star(" ++ (show p) ++ ")"
+   --show (Pick _ _ _) = "Pick(...)"
    show (PseudoAtom p) = "PseudoAtom(" ++ (show p) ++ ")"
    show Nil = "nil"
 
 instance Show (Sit (Prim (Qty Double))) where
-   show = show . sit2list
+   show = show . reverse . sit2list
 
+{-
 instance ShowPart c => Show (Tree a b c) where
    show = showTree 0 0
+-}
 
 instance ShowPart Double where
 --instance ShowPart Prim where
 instance ShowPart a => ShowPart (Prim (Qty a)) where
-instance ShowPart Finality where
+--instance ShowPart Finality where
 instance ShowPart a => ShowPart (Atom a) where
 instance ShowPart a => ShowPart (PseudoAtom a) where
 instance ShowPart a => ShowPart (Prog a) where
@@ -84,11 +92,13 @@ instance ShowPart a => ShowPart (Prog a) where
 instance ShowPart (Sit (Prim (Qty Double))) where
    showPart n s = show (drop n (sit2list s))
 
+{-
 instance ShowPart (Conf (Prim (Qty Double))) where
    showPart n (s,r,d,f) = "("++ showPart n s ++", "++ show r ++", "++ show d ++", "++ show f ++")"
    partSize (s,_,_,_) = length (sit2list s)
+-}
 
-
+{-
 showTree :: ShowPart c => Int -> Int -> Tree a b c -> String
 showTree n _ _ | n > 100 = (replicate (2*n) ' ') ++ "...\n"
 showTree n _ Empty = (replicate (2*n) ' ') ++ "Empty\n"
@@ -96,7 +106,7 @@ showTree n m (Leaf x) = (replicate (2*n) ' ') ++ "Leaf " ++ showPart m x ++ "\n"
 showTree n m (Parent x t) = (replicate (2*n) ' ') ++ "Parent " ++ showPart m x ++ "\n" ++ (showTree (n+1) (partSize x) t)
 showTree n m (Branch t1 t2) = (replicate (2*n) ' ') ++ "Branch\n" ++ (showTree (n+1) m t1) ++ (showTree (n+1) m t2)
 showTree n _ (Sprout _ _ _) = (replicate (2*n) ' ') ++ "Sprout g, <unknown tree>\n"
-
+-}
 
 {-
 data Prim = A | B | C | D | E Double deriving Show
@@ -324,7 +334,9 @@ main = do
              --candProg = overtake H D
              candProg = pass D B `Conc` overtake H B
              prog     = obsProg `Conc` candProg
-             confs    = do3 4 prog s0
+             --sits     = map (\(s,_,_) -> s) $ do3 4 prog s0
+             sits     = map sit $ do2 (treeDT 6 prog s0)
+             --confs    = do2 (treeDT 6 prog s0)
              partOfObs (Wait _)     = True
              partOfObs (Prematch _) = True
              partOfObs (Match _)    = True
@@ -358,14 +370,18 @@ main = do
              isEnd s = case history s of End _ _ : _ -> True
                                          _           -> False
 --         putStrLn (show (force (tree prog S0 0 0)))
-         mapM_ (\(s,v,d) ->
-            do --putStrLn (show (sit2list s))
+         --mapM_ (\(s,v,d) ->
+         mapM_ (\s ->
+            do
+               --let Conf t s = c
+               --putStrLn (show (sit2list s))
                if isMatch s || isEnd s
                   then do  putStrLn (show (filter (not.partOfObs) (sit2list s)))
                            putStrLn (show (dropObs (sit2list s)))
                            putStrLn (show (sit2list s))
-                           putStrLn (show (v, d))
+                           --putStrLn (show (v, d))
                            printFluents s
+                           --putStrLn (show t)
 {-
                            if False && 19.5 < time s && time s < 19.7
                               then do
@@ -425,7 +441,13 @@ main = do
                               else return ()
                            putStrLn ""
                   else return ()
-            ) confs
+            ) sits
+         putStrLn "-------------------------------------------------------"
+         let showTreeDepth = 20
+         let treeDepth = 6
+         putStrLn $ showTree showTreeDepth $ let Conf t _ = treeT treeDepth prog s0 in t
+         putStrLn "-------------------------------------------------------"
+         putStrLn $ showTree showTreeDepth $ let Conf t _ = treeDT treeDepth prog s0 in t
          putStrLn "-------------------------------------------------------"
          stats <- getGCStats
          putStrLn "GC Stats:"

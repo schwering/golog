@@ -5,7 +5,8 @@
 module RSTC.Progs where
 
 import RSTC.Car
-import Interpreter.Golog
+import Interpreter.Golog2
+import Interpreter.Golog2Util
 import RSTC.BAT.Progression
 import qualified RSTC.Obs as O
 import RSTC.Theorems
@@ -13,6 +14,9 @@ import Util.NativePSO
 
 import Data.Maybe
 import Debug.Trace
+
+--star = Star
+--atomic = PseudoAtom . Complex
 
 picknum :: (Double, Double) -> (Double -> Double) -> Double
 picknum bounds val = pso 10 m n defaultParams bounds (Max val)
@@ -34,10 +38,6 @@ test = PseudoAtom . Atom . Test
 
 ptest :: String -> Prog a
 ptest s = test (const (traceStack s True))
-
-
-atomic :: Prog a -> Prog a
-atomic = PseudoAtom . Complex
 
 
 obsprog :: State a => [Maybe O.ObsId] -> Prog (Prim a)
@@ -87,7 +87,7 @@ pass b c =
       test (\s -> isFollowing (ntg s) b c) `Seq`
       test (\s -> isConverging (ttc s) b c)
    ) `Seq` (
-      Star (Pick (fst . value lookahead) (picknum (0.95, 1.2)) (\q -> act (Accel b q)))
+      star (Pick (fst . value lookahead) (picknum (0.95, 1.2)) (\q -> act (Accel b q)))
    ) `Seq` atomic (
       test (\s -> ntg s b c <= 0) `Seq`
       act (End b "pass") 
@@ -102,7 +102,7 @@ pass b c =
       test (\s -> lane s b /= lane s c) `Seq`
       test (\s -> isFollowing (ntg s) b c)
    ) `Seq` (
-      Star (actf (\s -> Accel b (bestAccel s b c)))
+      star (actf (\s -> Accel b (bestAccel s b c)))
    ) `Seq` atomic (
       test (\s -> ntg s b c < 0) `Seq`
       act (End b "pass") 
@@ -122,9 +122,9 @@ overtake b c =
          test (\s -> ntg s b c < 0) `Seq`
          act (LaneChange b RightLane)
       ) `Conc` (
-         --Star (Pick (fst . value lookahead) (picknum (0.9, 1.5)) (\q -> act (Accel b q)))
+         --star (Pick (fst . value lookahead) (picknum (0.9, 1.5)) (\q -> act (Accel b q)))
          {-
-         Star (Pick (valueByQuality b c lookahead)
+         star (Pick (valueByQuality b c lookahead)
                     --(\val -> interpolateRecipLin id (0.7, 1.5) 0 (fromMaybe 100 . val))
                     --(\val -> interpolateRecipLinAndLinForZero id (0.7, 1.5) (fromMaybe (100, 100) . val))
                     (\val -> 0.5 * nullAt id (canonicalizeRecip (fst . fromMaybe (nan,nan) . val) 0) +
@@ -132,8 +132,8 @@ overtake b c =
                     (\q -> act (Accel b q)))
                     --(\q -> (act (Accel b (q)) `Seq` (actf (\s -> Msg (show (sitlen s)))))))
          -}
-         --Star (actf (\s -> Accel b (bestAccel s b c)))
-         Star (actf (\s -> Accel b (bestAccel s b c)))
+         --star (actf (\s -> Accel b (bestAccel s b c)))
+         star (actf (\s -> Accel b (bestAccel s b c)))
       )
    ) `Seq` atomic (
       test (\s -> ntg s b c < 0) `Seq`

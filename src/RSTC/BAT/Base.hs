@@ -15,7 +15,7 @@ module RSTC.BAT.Base (Prim(..), NTGCat(..), TTCCat(..),
                       convert) where
 
 import RSTC.Car
-import Interpreter.Golog
+import Interpreter.Golog2
 import qualified RSTC.Obs as O
 import RSTC.Theorems
 import Util.Interpolation
@@ -158,14 +158,13 @@ defaultPoss (Start _ _)          _ = True
 defaultPoss (End _ _)            _ = True
 defaultPoss (Msg _)              _ = True
 
-
 defaultReward :: HistState a => Prim a -> Sit (Prim a) -> Reward
 defaultReward (Wait _)         _ = 0
 defaultReward (Accel _ _)      _ = -0.01
 defaultReward (LaneChange _ _) _ = -0.01
 defaultReward (Init _)         _ = 0
 defaultReward (Prematch _)     _ = 0
-defaultReward (Match e)        s = 1 - sum ntgDiffs / genericLength ntgDiffs
+defaultReward (Match e)        s = 2 - sum ntgDiffs / genericLength ntgDiffs
    where ntgDiffs = map realToFrac [abs (ntgDiff s e b c) | b <- cars, c <- cars, b /= c]
 defaultReward Abort            _ = 0
 defaultReward NoOp             _ = 0

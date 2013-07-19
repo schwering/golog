@@ -2,8 +2,8 @@
 
 module Interpreter.Golog2
    (BAT(..), DTBAT(..), Reward, Depth,
-    Atom(..), PseudoAtom(..), Prog(..), Tree, Conf,
-    sit, tree, treeDT, trans, trans', final, final', do1, do2) where
+    Atom(..), PseudoAtom(..), Prog(..), Tree(..), Node(..), Conf(..),
+    value, sit, tree, treeT, treeDT, trans, trans', final, final', do1, do2) where
 
 import Data.List (maximumBy)
 import Data.Monoid
@@ -20,14 +20,10 @@ class BAT a where
 
 class BAT a => DTBAT a where
    reward     :: a -> Sit a -> Reward
-   lookahead  :: Sit a -> Depth
 
-data Atom a = Prim a
-            | PrimF (Sit a -> a)
-            | Test (Sit a -> Bool)
+data Atom a = Prim a | PrimF (Sit a -> a) | Test (Sit a -> Bool)
 
-data PseudoAtom a = Atom (Atom a)
-                  | Complex (Prog a)
+data PseudoAtom a = Atom (Atom a) | Complex (Prog a)
 
 data Prog a where
    Seq        :: Prog a -> Prog a -> Prog a
@@ -61,15 +57,15 @@ best :: a -> (a -> a -> Ordering) -> (Tree a -> Bool) -> Depth -> Tree a -> a
 best def _   _   _ Empty                 = def
 best def cmp cut l (Alt ts)              = maximumBy cmp (map (best def cmp cut l) ts)
 best def cmp cut l (Val x t) | l == 0    = x
-                             | cut t     = maximumBy cmp [x, best def cmp cut (l-1) t]
-                             | l > 0     = best def cmp cut (l-1) t
+                             | cut t     = maximumBy cmp [x, best x cmp cut (l-1) t]
+                             | l > 0     = best x cmp cut (l-1) t
                              | otherwise = error "best: l < 0"
 
 resolve :: ([Tree a] -> Tree a) -> Tree a -> Tree a
 resolve _ Empty     = Empty
-resolve f (Val x t) = Val x (resolve f t)
 resolve _ (Alt [])  = Empty
 resolve f (Alt ts)  = resolve f (f ts)
+resolve f (Val x t) = Val x (resolve f t)
 
 itl :: Tree a -> Tree a -> Tree a
 itl Empty          t2             = t2
@@ -98,6 +94,7 @@ data Node a b = Node (Sit a) b | Flop
 
 type NodeN a = Node a ()
 type NodeDT a = Node a (Reward, Depth)
+type NodeT a = Node a ((Reward, Depth), (Reward, Depth))
 
 sit :: Conf a b -> Sit a
 sit (Conf _ s) = s
@@ -110,21 +107,37 @@ tree p sz = Conf (scan exec (Node sz ()) (den p)) sz
          exec c@(Node s _) (Test f)  | f s      = c
          exec _            _                    = Flop
 
+treeT :: DTBAT a => Depth -> Prog a -> Sit a -> Conf a (NodeT a)
+treeT l p sz = Conf (augment (value l) (scan exec (Node sz (0,0)) (den p))) sz
+   where exec :: DTBAT a => NodeDT a -> Atom a -> NodeDT a
+         exec (Node s (r,d)) (Prim a)  | poss a s = Node (do_ a s)
+                                                         (r + reward a s, d+1)
+         exec c@(Node s _)   (PrimF a)            = exec c (Prim (a s))
+         exec (Node s (r,d)) (Test f)  | f s      = Node s (r,d+1)
+         exec _              _                    = Flop
+
+augment :: BAT a => (Tree (NodeDT a) -> (Reward, Depth)) -> Tree (NodeDT a) -> Tree (NodeT a)
+augment _ Empty                 = Empty
+augment f (Alt ts)              = Alt (map (augment f) ts)
+augment f t@(Val (Node x y) t') = Val (Node x (y, f t)) (augment f t')
+augment f t@(Val Flop       t') = Val Flop (augment f t')
+
 treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> Conf a (NodeDT a)
 treeDT l p sz = Conf (resolve choice (scan exec (Node sz (0,0)) (den p))) sz
    where exec :: DTBAT a => NodeDT a -> Atom a -> NodeDT a
          exec (Node s (r,d)) (Prim a)  | poss a s = Node (do_ a s)
-                                                         (r + reward a s, d + 1)
+                                                         (r + reward a s, d+1)
          exec c@(Node s _)   (PrimF a)            = exec c (Prim (a s))
          exec (Node s (r,d)) (Test f)  | f s      = Node s (r,d+1)
          exec _              _                    = Flop
-         choice = maximumBy (comparing value)
-         value :: DTBAT a => Tree (NodeDT a) -> (Reward, Depth)
-         value = val . best def cmp final' l
-            where def = Node s0 (0,0)
-                  val (Node _ rd) = rd
-                  val Flop        = (0,0)
-                  cmp x y = compare (val x) (val y)
+         choice = maximumBy (comparing (value l))
+
+value :: DTBAT a => Depth -> Tree (NodeDT a) -> (Reward, Depth)
+value l = val . best def cmp final' l
+   where def = Node s0 (0,0)
+         val (Node _ rd) = rd
+         val Flop        = (0,0)
+         cmp x y = compare (val x) (val y)
 
 trans :: Conf a (Node a b) -> [Conf a (Node a b)]
 trans (Conf Empty              _) = []

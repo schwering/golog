@@ -11,20 +11,18 @@ import Network.Wai
 import Network.Wai.Handler.Warp
 
 import RSTC.Car
-import Interpreter.Golog
+import Interpreter.Golog2
 import RSTC.BAT.Progression
 import qualified RSTC.Obs as O
 import RSTC.Progs
 
-
-type MyConf a = (Sit (Prim a), Reward, Depth)
-
---pr :: (HistState a, Show a) => [MyConf a]
-pr :: [MyConf (Qty Double)]
+--pr :: (HistState a, Show a) => [Sit a]
+pr :: [Sit (Prim (Qty Double))]
 pr = let obs  = obsprog $ take 100 O.observations
          cand = pass D B `Conc` overtake H B
          prog = obs `Conc` cand
-     in do3 lookahead prog s0
+     in map sit $ do2 (treeDT lookahead prog s0)
+     --in map (\(s,_,_) -> s) $ do3 lookahead prog s0
 
 
 main :: IO ()
@@ -34,12 +32,12 @@ main = do
     run port (app pr)
 
 
-app :: (HistState a, Show a, Monad m) => [MyConf a] -> Request -> m Response
-app confs req = do
+app :: (HistState a, Show a, Monad m) => [Sit (Prim a)] -> Request -> m Response
+app sits req = do
     let paths = pathInfo req
     let path = case paths of p:_ -> (read $ show $ p) :: String ; _ -> "index.html"
     return $ if all (`elem` ['0'..'9']) path
-             then index confs (read path :: Int)
+             then index sits (read path :: Int)
              else indexFile path
 
 
@@ -47,29 +45,29 @@ indexFile :: String -> Response
 indexFile fileName = ResponseFile status200 [("Content-Type", pack $ mimeType fileName)] ("html/" ++ fileName) Nothing
 
 
-index :: (HistState a, Show a) => [MyConf a] -> Int -> Response
-index confs i = ResponseBuilder status [("Content-Type", "text/plain")] response
-   where restConfs = drop i confs
-         (s,r,d)   = case restConfs of x:_ -> x ; _ -> undefined
-         ntgs      = [(b, c, ntg s b c) | b <- cars, c <- cars, b /= c]
-         ttcs      = [(b, c, ttc s b c) | b <- cars, c <- cars, b < c]
-         lanes     = [(b, lane s b) | b <- cars]
-         ontgs     = case history s of (Match e):_ -> [(b, c, O.ntg e b c) | b <- cars, c <- cars, b /= c] ; _ -> []
-         ottcs     = case history s of (Match e):_ -> [(b, c, O.ttc e b c) | b <- cars, c <- cars, b /= c] ; _ -> []
-         olanes    = case history s of (Match e):_ -> [(b, O.lane e b) | b <- cars] ; _ -> []
-         isMatch   = case history s of (Match _):_ -> True ; _ -> False
-         status    = case restConfs of _:_ -> status200
-                                       _   -> status404
-         response  = case restConfs of _:_ -> mconcat $ map copyByteString $ json
-                                       _   -> copyByteString "{}"
-         tToStr    = \(b,c,t) -> ("{\"b\":\"" ++ show b ++ "\", \"c\":\"" ++ show c ++"\", \"t\":" ++ show t ++ "} ")
-         lToStr    = \(b,l) -> ("{\"b\":\"" ++ show b ++ "\", \"l\":" ++ show (laneToNumber l) ++ "} ")
-         json      =
+index :: (HistState a, Show a) => [Sit (Prim a)] -> Int -> Response
+index sits i = ResponseBuilder status [("Content-Type", "text/plain")] response
+   where restSits = drop i sits
+         s        = case restSits of x:_ -> x ; _ -> undefined
+         ntgs     = [(b, c, ntg s b c) | b <- cars, c <- cars, b /= c]
+         ttcs     = [(b, c, ttc s b c) | b <- cars, c <- cars, b < c]
+         lanes    = [(b, lane s b) | b <- cars]
+         ontgs    = case history s of (Match e):_ -> [(b, c, O.ntg e b c) | b <- cars, c <- cars, b /= c] ; _ -> []
+         ottcs    = case history s of (Match e):_ -> [(b, c, O.ttc e b c) | b <- cars, c <- cars, b /= c] ; _ -> []
+         olanes   = case history s of (Match e):_ -> [(b, O.lane e b) | b <- cars] ; _ -> []
+         isMatch  = case history s of (Match _):_ -> True ; _ -> False
+         status   = case restSits of _:_ -> status200
+                                     _   -> status404
+         response = case restSits of _:_ -> mconcat $ map copyByteString $ json
+                                     _   -> copyByteString "{}"
+         tToStr   = \(b,c,t) -> ("{\"b\":\"" ++ show b ++ "\", \"c\":\"" ++ show c ++"\", \"t\":" ++ show t ++ "} ")
+         lToStr   = \(b,l) -> ("{\"b\":\"" ++ show b ++ "\", \"l\":" ++ show (laneToNumber l) ++ "} ")
+         json     =
             [ "{ \"isMatch\": ", if isMatch then "true" else "false", "\n" ] ++
             [ ", \"action\": ", (case history s of a:_ -> pack (toJson a) ; _ -> "null"), "\n" ] ++
             [ ", \"time\": ", pack $ show (time s), "\n" ] ++
-            [ ", \"reward\": ", pack $ show r, "\n" ] ++
-            [ ", \"depth\": ", pack $ show d, "\n" ] ++
+            --[ ", \"reward\": ", pack $ show r, "\n" ] ++
+            --[ ", \"depth\": ", pack $ show d, "\n" ] ++
             [ ", \"ntg\": [", pack (concat $ interleave ", " $ map tToStr ntgs), "]\n"] ++
             [ ", \"ttc\": [", pack (concat $ interleave ", " $ map tToStr ttcs), "]\n"] ++
             [ ", \"lane\": [", pack (concat $ interleave ", " $ map lToStr lanes), "]\n"] ++

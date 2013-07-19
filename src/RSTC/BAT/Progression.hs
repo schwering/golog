@@ -12,7 +12,7 @@ module RSTC.BAT.Progression (Qty, Wrapper(..),
 
 import RSTC.Car
 import RSTC.BAT.Base
-import Interpreter.Golog
+import Interpreter.Golog2
 import qualified RSTC.Obs as O
 import RSTC.Theorems
 
@@ -76,6 +76,8 @@ instance BAT (Prim (Qty Double)) where
       State (len+1) (a:as) time' lane' ntg' ttc'
 
    poss   = defaultPoss
+
+instance DTBAT (Prim (Qty Double)) where
    reward = defaultReward
 
 

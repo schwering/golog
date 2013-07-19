@@ -1,17 +1,14 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module Interpreter.Golog2Test where
+module Interpreter.GologTest where
 
-import Interpreter.Golog2
-import qualified Interpreter.Golog2Util as U
+import Interpreter.Golog
 
 instance BAT Int where
    data Sit Int = S0 | Do Int (Sit Int) deriving Show
    s0 = S0
    do_ = Do
    poss a _ = even a
-
-instance DTBAT Int where
    reward _ s         | sitlen s > 5 = -1000
    reward a (Do a' _) | a == a'      = -1
    reward a _                        = fromIntegral a
@@ -23,15 +20,13 @@ sitlen (Do _ s) = 1 + sitlen s
 p = PseudoAtom . Atom . Prim
 q = PseudoAtom . Complex
 
-star = U.star
-nondet = Nondet
+star p = Nil `Nondet` (p `Seq` star p)
+--star p = Nondet Nil (plus p)
+--star = Star
+plus p = Nondet p (p `Seq` plus p)
+nondet = foldl1 Nondet
 conc = foldl1 Conc
-atomic = U.atomic
 
-doDT :: DTBAT a => Depth -> Prog a -> Sit a -> [Sit a]
-doDT l p s = map sit $ do2 (treeDT l p s)
-
-allReward :: Sit Int -> Reward
-allReward S0       = 0
-allReward (Do a s) = allReward s + reward a s
+doDT :: BAT a => Depth -> Prog a -> Sit a -> [Sit a]
+doDT l p s = map (\(s,_,_) -> s) $ do3 l p s
 

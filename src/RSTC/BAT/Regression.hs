@@ -12,7 +12,7 @@ module RSTC.BAT.Regression (Qty, Wrapper(..),
 
 import RSTC.Car
 import RSTC.BAT.Base
-import Interpreter.Golog
+import Interpreter.Golog2
 import qualified RSTC.Obs as O
 import RSTC.Theorems
 import Util.MemoCache
@@ -37,6 +37,8 @@ instance RealFloat a => BAT (Prim (Qty a)) where
    s0  = S0
    do_ = Do
    poss = defaultPoss
+
+instance RealFloat a => DTBAT (Prim (Qty a)) where
    reward = defaultReward
 
 
