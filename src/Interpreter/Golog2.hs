@@ -1,9 +1,9 @@
-{-# LANGUAGE GADTs, Rank2Types, TypeFamilies #-}
+{-# LANGUAGE GADTs, TypeFamilies #-}
 
 module Interpreter.Golog2
-   (BAT(..), DTBAT(..), Reward, Depth,
-    Atom(..), PseudoAtom(..), Prog(..), Tree(..), Node(..), Conf(..),
-    sit, tree, treeDT, trans, trans', final, final', do1, do2) where
+  (BAT(..), DTBAT(..), Reward, Depth,
+   Atom(..), PseudoAtom(..), Prog(..), Tree(..), Node(..), Conf(..),
+   sit, treeND, treeDT, trans, trans', final, final', do1, do2) where
 
 import Data.List (maximumBy)
 import Data.Monoid
@@ -98,8 +98,8 @@ type NodeDT a = Node a (Reward, Depth)
 sit :: Conf a b -> Sit a
 sit (Conf _ s) = s
 
-tree :: BAT a => Prog a -> Sit a -> Conf a (NodeN a)
-tree p sz = Conf (scan exec (Node sz ()) (den p)) sz
+treeND :: BAT a => Prog a -> Sit a -> Conf a (NodeN a)
+treeND p sz = Conf (scan exec (Node sz ()) (den p)) sz
    where exec :: BAT a => NodeN a -> Atom a -> NodeN a
          exec (Node s _)   (Prim a)  | poss a s = Node (do_ a s) ()
          exec c@(Node s _) (PrimF a)            = exec c (Prim (a s))
@@ -116,7 +116,7 @@ treeDT l p sz = Conf (resolve choice (scan exec (Node sz (0,0)) (den p))) sz
          exec _              _                    = Flop
          choice = maximumBy (comparing (value l))
          value :: DTBAT a => Depth -> Tree (NodeDT a) -> (Reward, Depth)
-         value l = val . best def cmp final' l
+         value l' = val . best def cmp final' l'
             where def = Node s0 (0,0)
                   val (Node _ rd) = rd
                   val Flop        = (0,0)
@@ -126,7 +126,7 @@ trans :: Conf a (Node a b) -> [Conf a (Node a b)]
 trans (Conf Empty              _) = []
 trans (Conf (Val (Node s _) t) _) = [Conf t s]
 trans (Conf (Val Flop       _) _) = []
-trans (Conf (Alt ts)           s) = concat $ map (\t -> trans (Conf t s)) ts
+trans (Conf (Alt ts)           s) = concat (map (\t -> trans (Conf t s)) ts)
 
 trans' :: Conf a (Node a b) -> Maybe (Conf a (Node a b))
 trans' c = case trans c of []   -> Nothing

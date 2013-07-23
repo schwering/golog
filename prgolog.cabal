@@ -26,6 +26,7 @@ Library
                      Util.Interpolation
                      Util.MemoCache
                      Util.NativePSO
+                     Util.Random
     Other-Modules:
     C-Sources:       src/RSTC/obs.c
                      src/Util/memo_cache.c
@@ -41,12 +42,19 @@ Executable Main
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 
---Executable Web
---    Hs-Source-Dirs:  main
---    Main-Is:         Web.hs
---    Build-Depends:   base, prgolog, bytestring, wai, warp, enumerator, blaze-builder, http-types
---    GHC-Options:     -Wall -O -rtsopts
---    --GHC-Prof-Options:-prof -auto-all
+Executable Maze
+    Hs-Source-Dirs:  main
+    Main-Is:         Maze.hs
+    Build-Depends:   base, prgolog
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
+
+Executable Web
+    Hs-Source-Dirs:  main
+    Main-Is:         Web.hs
+    Build-Depends:   base, prgolog, bytestring, wai, warp, enumerator, blaze-builder, http-types
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
 
 --Executable Test
 --    Hs-Source-Dirs:  test
