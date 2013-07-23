@@ -335,7 +335,7 @@ main = do
              candProg = pass D B `Conc` overtake H B
              prog     = obsProg `Conc` candProg
              --sits     = map (\(s,_,_) -> s) $ do3 4 prog s0
-             sits     = map sit $ do2 (treeDT 6 prog s0)
+             sits     = map sit $ do2 (treeDT lookahead prog s0)
              --confs    = do2 (treeDT 6 prog s0)
              partOfObs (Wait _)     = True
              partOfObs (Prematch _) = True
@@ -441,14 +441,14 @@ main = do
                               else return ()
                            putStrLn ""
                   else return ()
-            ) (take 1 sits)
+            ) sits
          putStrLn "-------------------------------------------------------"
-         let showTreeDepth = 20
-         let treeDepth = 4
+         --let showTreeDepth = 20
+         --let treeDepth = 4
          --putStrLn $ showTree showTreeDepth $ let Conf t _ = treeT treeDepth prog s0 in t
          --putStrLn "-------------------------------------------------------"
-         putStrLn $ showTree showTreeDepth $ let Conf t _ = treeDT treeDepth prog s0 in t
-         putStrLn "-------------------------------------------------------"
+         --putStrLn $ showTree showTreeDepth $ let Conf t _ = treeDT treeDepth prog s0 in t
+         --putStrLn "-------------------------------------------------------"
          stats <- getGCStats
          putStrLn "GC Stats:"
          putStrLn (show stats)
