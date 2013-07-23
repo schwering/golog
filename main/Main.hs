@@ -313,15 +313,15 @@ main = do
    putStrLn "-------------------------------------------------------\n"
    putStrLn (maybe "nothing" (show . cutoff 10) (trans 100000 t1))
    putStrLn "-------------------------------------------------------\n"
-   mapM_ (\i -> putStrLn (show i ++ ": " ++ show (do1 i p2 S0))) [0..9]
+   mapM_ (\i -> putStrLn (show i ++ ": " ++ show (doo i p2 S0))) [0..9]
    putStrLn "-------------------------------------------------------"
-   mapM_ (\i -> putStrLn ("Pick one: " ++ show i ++ ": " ++ show (do1 i (p3 i) S0))) [0..5]
+   mapM_ (\i -> putStrLn ("Pick one: " ++ show i ++ ": " ++ show (doo i (p3 i) S0))) [0..5]
    putStrLn "-------------------------------------------------------"
-   mapM_ (\i -> putStrLn ("Pick seq: " ++ show i ++ ": " ++ show (do1 i (p4 i) S0))) [0..5]
+   mapM_ (\i -> putStrLn ("Pick seq: " ++ show i ++ ": " ++ show (doo i (p4 i) S0))) [0..5]
    putStrLn "-------------------------------------------------------"
-   mapM_ (\i -> putStrLn ("Pick nested: " ++ show i ++ ": " ++ show (do1 i (p5 i) S0))) [0..5]
+   mapM_ (\i -> putStrLn ("Pick nested: " ++ show i ++ ": " ++ show (doo i (p5 i) S0))) [0..5]
    putStrLn "-------------------------------------------------------"
-   mapM_ (\i -> putStrLn ("Pick nested 2: " ++ show i ++ ": " ++ show (do1 i (p6 i) S0))) [0..5]
+   mapM_ (\i -> putStrLn ("Pick nested 2: " ++ show i ++ ": " ++ show (doo i (p6 i) S0))) [0..5]
    putStrLn "-------------------------------------------------------"
 -}
          --mapM_ (putStrLn . show) (take 30 O.observations)
@@ -335,8 +335,8 @@ main = do
              candProg = pass D B `Conc` overtake H B
              prog     = obsProg `Conc` candProg
              --sits     = map (\(s,_,_) -> s) $ do3 4 prog s0
-             sits     = map sit $ do2 (treeDT lookahead prog s0)
-             --confs    = do2 (treeDT 6 prog s0)
+             sits     = map sit $ doo' (treeDT lookahead prog s0)
+             --confs    = doo' (treeDT 6 prog s0)
              partOfObs (Wait _)     = True
              partOfObs (Prematch _) = True
              partOfObs (Match _)    = True

@@ -2,8 +2,8 @@
 
 module Interpreter.Golog2
   (BAT(..), DTBAT(..), Reward, Depth,
-   Atom(..), PseudoAtom(..), Prog(..), Tree(..), Node(..), Conf(..),
-   sit, treeND, treeDT, trans, trans', final, final', do1, do2) where
+   Atom(..), PseudoAtom(..), Prog(..), Tree, Node, Conf,
+   sit, treeND, treeDT, final, trans, doo) where
 
 import Data.List (maximumBy)
 import Data.Monoid
@@ -79,8 +79,8 @@ den p' = rec (den' p')
    where rec :: Tree (PseudoAtom a) -> Tree (Atom a)
          rec Empty               = Empty
          rec (Alt ts)            = Alt (map rec ts)
-         rec (Val (Complex p) t) = mappend (den p) (rec t)
          rec (Val (Atom a)    t) = Val a (rec t)
+         rec (Val (Complex p) t) = mappend (den p) (rec t)
          den' :: Prog a -> Tree (PseudoAtom a)
          den' (Seq p1 p2)    = mappend (den' p1) (den' p2)
          den' (Nondet ps)    = Alt (map den' ps)
@@ -92,15 +92,15 @@ data Conf a b = Conf (Tree b) (Sit a)
 
 data Node a b = Node (Sit a) b | Flop
 
-type NodeN a = Node a ()
+type NodeND a = Node a ()
 type NodeDT a = Node a (Reward, Depth)
 
 sit :: Conf a b -> Sit a
 sit (Conf _ s) = s
 
-treeND :: BAT a => Prog a -> Sit a -> Conf a (NodeN a)
+treeND :: BAT a => Prog a -> Sit a -> Conf a (NodeND a)
 treeND p sz = Conf (scan exec (Node sz ()) (den p)) sz
-   where exec :: BAT a => NodeN a -> Atom a -> NodeN a
+   where exec :: BAT a => NodeND a -> Atom a -> NodeND a
          exec (Node s _)   (Prim a)  | poss a s = Node (do_ a s) ()
          exec c@(Node s _) (PrimF a)            = exec c (Prim (a s))
          exec c@(Node s _) (Test f)  | f s      = c
@@ -117,22 +117,13 @@ treeDT l p sz = Conf (resolve choice (scan exec (Node sz (0,0)) (den p))) sz
          choice = maximumBy (comparing (value l))
          value :: DTBAT a => Depth -> Tree (NodeDT a) -> (Reward, Depth)
          value l' = val . best def cmp final' l'
-            where def = Node s0 (0,0)
+            where def = Node s0 (-inf, minBound)
                   val (Node _ rd) = rd
-                  val Flop        = (0,0)
+                  val Flop        = (-inf, minBound)
                   cmp x y = compare (val x) (val y)
+                  inf = encodeFloat (floatRadix 0 - 1) (snd $ floatRange 0)
 
-trans :: Conf a (Node a b) -> [Conf a (Node a b)]
-trans (Conf Empty              _) = []
-trans (Conf (Val (Node s _) t) _) = [Conf t s]
-trans (Conf (Val Flop       _) _) = []
-trans (Conf (Alt ts)           s) = concat (map (\t -> trans (Conf t s)) ts)
-
-trans' :: Conf a (Node a b) -> Maybe (Conf a (Node a b))
-trans' c = case trans c of []   -> Nothing
-                           c':_ -> Just c'
-
-final  :: Conf a b -> Bool
+final :: Conf a b -> Bool
 final (Conf t _) = final' t
 
 final' :: Tree a -> Bool
@@ -141,10 +132,12 @@ final' (Alt [])  = True
 final' (Alt ts)  = any final' ts
 final' (Val _ _) = False
 
-do1 :: Conf a (Node a b) -> [[Conf a (Node a b)]]
-do1 c = let cs = trans c in cs : concat (map do1 cs)
+trans :: Conf a (Node a b) -> [Conf a (Node a b)]
+trans (Conf Empty              _) = []
+trans (Conf (Val (Node s _) t) _) = [Conf t s]
+trans (Conf (Val Flop       _) _) = []
+trans (Conf (Alt ts)           s) = concat (map (\t -> trans (Conf t s)) ts)
 
-do2 :: Conf a (Node a b) -> [Conf a (Node a b)]
-do2 c = case trans' c of Nothing -> []
-                         Just c' -> c' : do2 c'
+doo :: Conf a (Node a b) -> [[Conf a (Node a b)]]
+doo c = let cs = trans c in cs : concat (map doo cs)
 

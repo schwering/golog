@@ -1,10 +1,10 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts #-}
-{-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE EmptyDataDecls, UndecidableInstances #-}
 
 module Main (main) where
 
 import Prelude hiding (Left, Right)
-import Data.List (sortBy)
+import Data.List (elemIndices, sortBy)
 import Interpreter.Golog2
 import Interpreter.Golog2Util
 import qualified Util.Random as Random
@@ -54,7 +54,8 @@ isValidNeighborOf (P x' y') p@(P x y)
    | otherwise              = False
 
 dist :: Point -> Point -> Double
-dist = distEuclidean
+dist = --distManhattan
+       distEuclidean
 
 distEuclidean :: Point -> Point -> Double
 distEuclidean (P x1 y1) (P x2 y2) = sqrt (fromIntegral $ x*x + y*y)
@@ -64,6 +65,7 @@ distEuclidean (P x1 y1) (P x2 y2) = sqrt (fromIntegral $ x*x + y*y)
 distManhattan :: Point -> Point -> Double
 distManhattan (P x1 y1) (P x2 y2) = fromIntegral $ abs (x1 - x2) + abs (y1 - y2)
 
+
 data Prim a = Up | Down | Left | Right deriving (Show, Eq)
 
 
@@ -71,7 +73,7 @@ data Prim a = Up | Down | Left | Right deriving (Show, Eq)
 
 data Regr
 
-class DTBAT (Prim a) => MazeBAT a where
+class MazeBAT a where
    pos          :: Sit (Prim a) -> Point
    unvisited    :: Point -> Sit (Prim a) -> Bool
    visited      :: Sit (Prim a) -> [Point]
@@ -83,18 +85,9 @@ class DTBAT (Prim a) => MazeBAT a where
 
 instance BAT (Prim Regr) where
    data Sit (Prim Regr) = S0 | Do (Prim Regr) (Sit (Prim Regr)) deriving Show
-
    s0  = S0
-
    do_ = Do
-
-   poss a s = let p  = pos s
-                  p' = newPos a p
-              in p' `isValidNeighborOf` p && unvisited p' s
-
-instance DTBAT (Prim Regr) where
-   reward a s = (dist startPos goalPos - dist (newPos a (pos s)) goalPos)**2 -
-                (dist startPos goalPos - dist (pos s) goalPos)**2
+   poss = allowedAction
 
 instance MazeBAT Regr where
    pos = pos' . memory
@@ -118,41 +111,13 @@ data Progr
 
 instance BAT (Prim Progr) where
    data Sit (Prim Progr)       = Sit [Point] Reward [Prim Progr] Random.Supply
-
    s0                          = Sit [startPos] 0 [] startRandomSupply
-
    do_  a s@(Sit ps@(p:_) r m rs) = Sit (newPos a p : ps)
                                         (r + reward a s)
                                         (a : m)
                                         (newRandomSupply a rs)
-   do_  a s@(Sit []       _ _ _)  = error "do_: empty point history"
-
-   poss a s@(Sit (p:_) r m _)  = let p' = newPos a p
-                                 in p' `isValidNeighborOf` p && unvisited p' s
-   poss a s@(Sit []    _ _ _)  = error "poss: empty point history"
-
-instance DTBAT (Prim Progr) where
-   reward a s = (improv - penalty a (memory s) / 9) / normf
-      where oldRem = dist goalPos (pos s)
-            newRem = dist goalPos (newPos a (pos s)) 
-            improv = oldRem - newRem
-            normf  = fromIntegral $ sitlen s + 1
-            penalty a []     = 0
-            penalty a (a':_) = case (a,a') of (Up,Up)       -> 0
-                                              (Up,Down)     -> 2
-                                              (Up,_)        -> 1
-                                              (Down,Down)   -> 0
-                                              (Down,Up)     -> 2
-                                              (Down,_)      -> 1
-                                              (Left,Left)   -> 0
-                                              (Left,Right)  -> 2
-                                              (Left,_)      -> 1
-                                              (Right,Right) -> 0
-                                              (Right,Left)  -> 2
-                                              (Right,_)     -> 1
-   --dist (pos s) goalPos - dist (newPos a (pos s)) goalPos
-   --abs (dist startPos goalPos - dist (newPos a (pos s)) goalPos)**1 -
-   --abs (dist startPos goalPos - dist (pos s) goalPos)**1
+   do_  _ (Sit []         _ _ _)  = error "do_: empty point history"
+   poss = allowedAction
 
 instance MazeBAT Progr where
    pos (Sit (p:_) _ _ _) = p
@@ -168,6 +133,34 @@ instance MazeBAT Progr where
 
 
 {- Common BAT functions: -}
+
+allowedAction :: MazeBAT a => Prim a -> Sit (Prim a) -> Bool
+allowedAction a s = p' `isValidNeighborOf` p && unvisited p' s
+   where p' = newPos a p
+         p  = pos s
+
+instance (BAT (Prim a), MazeBAT a) => DTBAT (Prim a) where
+   reward a s = (improv - penalty a (memory s) / 9) / normf - 100
+      where oldRem = dist goalPos (pos s)
+            newRem = dist goalPos (newPos a (pos s)) 
+            improv = oldRem - newRem
+            normf  = fromIntegral $ sitlen s + 1
+            penalty Up    (Up:_)    = 0
+            penalty Up    (Down:_)  = 2
+            penalty Up    (_:_)     = 1
+            penalty Down  (Down:_)  = 0
+            penalty Down  (Up:_)    = 2
+            penalty Down  (_:_)     = 1
+            penalty Left  (Left:_)  = 0
+            penalty Left  (Right:_) = 2
+            penalty Left  (_:_)     = 1
+            penalty Right (Right:_) = 0
+            penalty Right (Left:_)  = 2
+            penalty Right (_:_)     = 1
+            penalty _     []        = 0
+   --dist (pos s) goalPos - dist (newPos a (pos s)) goalPos
+   --abs (dist startPos goalPos - dist (newPos a (pos s)) goalPos)**1 -
+   --abs (dist startPos goalPos - dist (pos s) goalPos)**1
 
 newPos :: (Prim a) -> Point -> Point
 newPos Up    p = up' p
@@ -187,22 +180,22 @@ newRandomSupply Down  rs = Random.shuffle 13 $ snd $ Random.random $ rs
 newRandomSupply Left  rs = Random.shuffle 19 $ snd $ Random.random $ rs
 newRandomSupply Right rs = Random.shuffle 31 $ snd $ Random.random $ rs
 
-random :: MazeBAT a => Sit (Prim a) -> Int
+random :: (BAT (Prim a), MazeBAT a) => Sit (Prim a) -> Int
 random s = fst $ Random.random (randomSupply s)
 
-up :: MazeBAT a => Sit (Prim a) -> Prim a
+up :: (BAT (Prim a), MazeBAT a) => Sit (Prim a) -> Prim a
 up s = opt (Down,Left,Right,Up) s
 
-down :: MazeBAT a => Sit (Prim a) -> Prim a
+down :: (BAT (Prim a), MazeBAT a) => Sit (Prim a) -> Prim a
 down s = opt (Up,Left,Right,Down) s
 
-left :: MazeBAT a => Sit (Prim a) -> Prim a
+left :: (BAT (Prim a), MazeBAT a) => Sit (Prim a) -> Prim a
 left s = opt (Up,Down,Right,Left) s
 
-right :: MazeBAT a => Sit (Prim a) -> Prim a
+right :: (BAT (Prim a), MazeBAT a) => Sit (Prim a) -> Prim a
 right s = opt (Up,Down,Left,Right) s
 
-opt :: MazeBAT a => (Prim a,Prim a,Prim a,Prim a) -> Sit (Prim a) -> (Prim a)
+opt :: (BAT (Prim a), MazeBAT a) => (Prim a,Prim a,Prim a,Prim a) -> Sit (Prim a) -> (Prim a)
 opt (a0,a1,a2,a3) s |  0 <= pct && pct < 10 && poss a0 s = a0
                     | 10 <= pct && pct < 30 && poss a1 s = a1
                     | 30 <= pct && pct < 50 && poss a2 s = a2
@@ -222,7 +215,7 @@ main = do
                             , primf right]) `Seq`
                test (\s -> pos s == goalPos)
        tree  = treeDT lookahead prog s0
-       confs = do2 tree
+       confs = doo' tree
    putStrLn $ show $ startPos
    putStrLn $ show $ goalPos
    mapM_ (\s -> putStrLn $ (if pos s == goalPos then " *** " else " ... ") ++

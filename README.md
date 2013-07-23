@@ -63,8 +63,7 @@ The prototype is much more compact, powerful, and efficient than previous
 prototypes in [ECLiPSe-CLP][ECLiPSe] and [Mercury][Mercury] (see
 [here][prGolog-old] for the code), two logical programming languages.
 
-The central source files are [Golog.hs](src/Interpreter/Golog.hs) and
-[Tree.hs](src/Interpreter/Tree.hs) for the interpreter.
+The interpreter is implemented in [Golog2.hs](src/Interpreter/Golog2.hs).
 
 The domain-specific code is
 [Theorems.hs](src/RSTC/Theorems.hs),
