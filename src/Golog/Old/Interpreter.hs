@@ -21,15 +21,15 @@
 --
 -- \[1\] http:\/\/kbsg.rwth-aachen.de\/~schwering\/CogRob-2012\/paper.pdf
 
-module Interpreter.Golog (BAT(..),
-                          Reward, Depth, OptiF, Finality(..),
-                          Atom(..), PseudoAtom(..), Prog(..),
-                          Conf, SitTree, Grown, Ungrown,
-                          force, best, isFinal, tree,
-                          trans, do1, do2, do3,
-                          sit, rew, depth, final, value) where
-
-import Interpreter.Tree
+module Golog.Old.Interpreter (BAT(..),
+                              Reward, Depth, OptiF, Finality(..),
+                              Atom(..), PseudoAtom(..), Prog(..),
+                              Conf, SitTree, Grown, Ungrown,
+                              force, best, isFinal, tree,
+                              trans, do1, do2, do3,
+                              sit, rew, depth, final, value) where
+    
+import Golog.Old.Tree
 import Prelude hiding (max)
 
 type Reward = Double

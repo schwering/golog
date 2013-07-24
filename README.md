@@ -54,7 +54,7 @@ It combines a number of features:
 * Progression and regression: the interpreter is indifferent to whether
   progression or regression is used as reasoning mechanism.
   This is an implementation detail of BAT.
-  This allows for lightning-fast progressive BATs :-).
+  This allows for usually much faster progressive BATs :-).
 
 The whole system is written in [Haskell][Haskell].
 The interpreter exploits Haskell's laziness to build up the (potentially)
@@ -63,13 +63,14 @@ The prototype is much more compact, powerful, and efficient than previous
 prototypes in [ECLiPSe-CLP][ECLiPSe] and [Mercury][Mercury] (see
 [here][prGolog-old] for the code), two logical programming languages.
 
-The interpreter is implemented in [Golog2.hs](src/Interpreter/Golog2.hs).
+The interpreter is implemented in
+[Golog.Interpreter](src/Golog/Interpreter.hs).
 
 The domain-specific code is
-[Theorems.hs](src/RSTC/Theorems.hs),
-[BAT.Base.hs](src/RSTC/BAT/Base.hs),
-[BAT.Regression.hs](src/RSTC/BAT/Regression.hs) and
-[BAT.Progression.hs](src/RSTC/BAT/Progression.hs) for the traffic BAT.
+[Theorems](src/RSTC/Theorems.hs),
+[BAT.Base](src/RSTC/BAT/Base.hs),
+[BAT.Regression](src/RSTC/BAT/Regression.hs) and
+[BAT.Progression](src/RSTC/BAT/Progression.hs) for the traffic BAT.
 Our Golog interpreter makes it easy to implement BATs using either regression
 or progression, hence the files BAT.Progression and BAT.Regression.
 In our experiments BAT.Progression has been significantly faster than

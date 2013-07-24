@@ -1,9 +1,12 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module Interpreter.Golog2Test where
+-- | A simple BAT for manual comparison between the old and new Golog
+-- interpreters.
+module GologTest where
 
-import Interpreter.Golog2
-import qualified Interpreter.Golog2Util as U
+import Golog.Interpreter
+import qualified Golog.Macro as M
+import Golog.Util
 
 instance BAT Int where
    data Sit Int = S0 | Do Int (Sit Int) deriving Show
@@ -23,15 +26,15 @@ sitlen (Do _ s) = 1 + sitlen s
 p = PseudoAtom . Atom . Prim
 q = PseudoAtom . Complex
 
-star = U.star
+star = M.star
 nondet = Nondet
 conc = foldl1 Conc
-atomic = U.atomic
+atomic = M.atomic
 
 doDT :: DTBAT a => Depth -> Prog a -> Sit a -> [Sit a]
-doDT l p s = map sit $ do2 (treeDT l p s)
+doDT l p s = map sit $ doo' (treeDT l p s)
 
-allReward :: Sit Int -> Reward
-allReward S0       = 0
-allReward (Do a s) = allReward s + reward a s
+rewardSum :: Sit Int -> Reward
+rewardSum S0       = 0
+rewardSum (Do a s) = rewardSum s + reward a s
 

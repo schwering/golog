@@ -7,9 +7,9 @@
 -- are represent tree functions of some element; this element is picked
 -- according to an optimization and evaluation function by 'force'.
 
-module Interpreter.Tree (Tree(..), Depth, ValF, OptiF, Grown, Ungrown,
-                         Functor(..), Foldable(..),
-                         branch, force, lmap, best) where
+module Golog.Old.Tree (Tree(..), Depth, ValF, OptiF, Grown, Ungrown,
+                       Functor(..), Foldable(..),
+                       branch, force, lmap, best) where
 
 import Prelude hiding (foldl, foldr, max)
 import Data.Foldable

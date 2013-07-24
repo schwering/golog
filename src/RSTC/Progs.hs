@@ -5,8 +5,8 @@
 module RSTC.Progs where
 
 import RSTC.Car
-import Interpreter.Golog2
-import Interpreter.Golog2Util
+import Golog.Interpreter
+import Golog.Macro
 import RSTC.BAT.Progression
 import qualified RSTC.Obs as O
 import RSTC.Theorems

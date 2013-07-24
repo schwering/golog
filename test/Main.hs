@@ -1,7 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Main (main) where
 
-import qualified Interpreter.GologTest
+import qualified Golog.InterpreterTest
+import qualified Golog.Old.InterpreterTest
 import qualified RSTC.TheoremsTest
 --import qualified Util.ExtFracTest
 import qualified Util.InterpolationTest
@@ -12,7 +13,8 @@ import Test.QuickCheck.All
 
 main :: IO ()
 main = do passed <- return True
-          passed <- liftM2 (&&) (return passed) Interpreter.GologTest.runTests
+          passed <- liftM2 (&&) (return passed) Golog.InterpreterTest.runTests
+          passed <- liftM2 (&&) (return passed) Golog.Old.InterpreterTest.runTests
           passed <- liftM2 (&&) (return passed) RSTC.TheoremsTest.runTests
           --passed <- liftM2 (&&) (return passed) Util.ExtFracTest.runTests
           passed <- liftM2 (&&) (return passed) Util.InterpolationTest.runTests

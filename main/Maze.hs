@@ -5,8 +5,9 @@ module Main (main) where
 
 import Prelude hiding (Left, Right)
 import Data.List (elemIndices, sortBy)
-import Interpreter.Golog2
-import Interpreter.Golog2Util
+import Golog.Interpreter
+import Golog.Macro
+import Golog.Util
 import qualified Util.Random as Random
 
 

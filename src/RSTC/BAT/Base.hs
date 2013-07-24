@@ -15,7 +15,7 @@ module RSTC.BAT.Base (Prim(..), NTGCat(..), TTCCat(..),
                       convert) where
 
 import RSTC.Car
-import Interpreter.Golog2
+import Golog.Interpreter
 import qualified RSTC.Obs as O
 import RSTC.Theorems
 import Util.Interpolation

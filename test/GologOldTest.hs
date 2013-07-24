@@ -1,8 +1,10 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module Interpreter.GologTest where
+-- | A simple BAT for manual comparison between the old and new Golog
+-- interpreters.
+module OldGologTest where
 
-import Interpreter.Golog
+import Golog.Old.Interpreter
 
 instance BAT Int where
    data Sit Int = S0 | Do Int (Sit Int) deriving Show

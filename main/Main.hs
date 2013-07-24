@@ -6,8 +6,8 @@
 module Main (main) where
 
 import RSTC.Car
-import Interpreter.Golog2
-import Interpreter.Golog2Util
+import Golog.Interpreter
+import Golog.Util
 --import Interpreter.Tree
 --import Interpreter.TreeUtil
 import RSTC.BAT.Base

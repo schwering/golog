@@ -1,10 +1,10 @@
 {-# LANGUAGE GADTs #-}
 
-module Interpreter.TreeUtil where
+module Golog.Old.TreeUtil where
 
 import Prelude hiding (foldr)
 import Data.Foldable
-import Interpreter.Tree
+import Golog.Old.Tree
 
 cutoff :: Int -> Tree a b c -> Tree a b c
 cutoff 0 _                   = Empty

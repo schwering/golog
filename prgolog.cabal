@@ -11,11 +11,12 @@ Description:
 
 Library
     Hs-Source-Dirs:  src
-    Exposed-Modules: Interpreter.Golog
-                     Interpreter.Golog2
-                     Interpreter.Golog2Util
-                     Interpreter.Tree
-                     Interpreter.TreeUtil
+    Exposed-Modules: Golog.Interpreter
+                     Golog.Macro
+                     Golog.Util
+                     Golog.Old.Interpreter
+                     Golog.Old.Tree
+                     Golog.Old.TreeUtil
                      RSTC.BAT.Base
                      RSTC.BAT.Regression
                      RSTC.BAT.Progression
@@ -56,10 +57,10 @@ Executable Web
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 
---Executable Test
---    Hs-Source-Dirs:  test
---    Main-Is:         Main.hs
---    -- Type:             detailed-1.0
---    --Test-Module:      Test
---    Build-Depends:    base, QuickCheck, random, prgolog
+Executable Test
+    Hs-Source-Dirs:  test
+    Main-Is:         Main.hs
+    -- Type:             detailed-1.0
+    --Test-Module:      Test
+    Build-Depends:    base, QuickCheck, random, prgolog
 

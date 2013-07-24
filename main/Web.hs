@@ -11,8 +11,8 @@ import Network.Wai
 import Network.Wai.Handler.Warp
 
 import RSTC.Car
-import Interpreter.Golog2
-import Interpreter.Golog2Util
+import Golog.Interpreter
+import Golog.Util
 import RSTC.BAT.Progression
 import qualified RSTC.Obs as O
 import RSTC.Progs

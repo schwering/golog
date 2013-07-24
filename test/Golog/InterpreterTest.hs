@@ -1,9 +1,9 @@
 {-# LANGUAGE TypeFamilies #-} 
 {-# LANGUAGE TemplateHaskell #-}
 
-module Interpreter.GologTest where
+module Golog.InterpreterTest where
 
-import Interpreter.Golog
+import Golog.Interpreter
 import Test.QuickCheck.All
 
 data Prim = A | B | C | D deriving (Eq, Show)
@@ -14,6 +14,7 @@ instance BAT Prim where
    poss D _ = False
    poss _ _ = True
 
+instance DTBAT Prim where
    reward A s = case s of Do A _ -> 0
                           _      -> 0
    reward B s = case s of Do B _ -> 0
@@ -36,12 +37,8 @@ instance (Eq a) => Eq (PseudoAtom a) where
 
 instance (Eq a) => Eq (Prog a) where
    Seq u v      == Seq x y      = u == x && v == y
-   Nondet u v   == Nondet x y   = u == x && v == y
+   Nondet u     == Nondet x     = u == x 
    Conc u v     == Conc x y     = u == x && v == y
-   Star x       == Star y       = x == y
-   Pick _ _ _   == Pick _ _ _   = error "GologTest.Eq.Prog.==: cannot compare picks"
-   Pick _ _ _   == _            = False
-   _            == Pick _ _ _   = False
    PseudoAtom x == PseudoAtom y = x == y
    Nil          == Nil          = True
    _            ==   _          = False
@@ -54,4 +51,5 @@ prop_three = const True
 
 runTests :: IO Bool
 runTests = $quickCheckAll
+
 

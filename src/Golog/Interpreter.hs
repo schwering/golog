@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, TypeFamilies #-}
 
-module Interpreter.Golog2
+module Golog.Interpreter
   (BAT(..), DTBAT(..), Reward, Depth,
    Atom(..), PseudoAtom(..), Prog(..), Tree, Node, Conf,
    sit, treeND, treeDT, final, trans, doo) where
@@ -121,7 +121,7 @@ treeDT l p sz = Conf (resolve choice (scan exec (Node sz (0,0)) (den p))) sz
                   val (Node _ rd) = rd
                   val Flop        = (-inf, minBound)
                   cmp x y = compare (val x) (val y)
-                  inf = encodeFloat (floatRadix 0 - 1) (snd $ floatRange 0)
+                  inf = 1/0
 
 final :: Conf a b -> Bool
 final (Conf t _) = final' t

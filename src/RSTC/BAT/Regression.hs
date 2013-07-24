@@ -12,7 +12,7 @@ module RSTC.BAT.Regression (Qty, Wrapper(..),
 
 import RSTC.Car
 import RSTC.BAT.Base
-import Interpreter.Golog2
+import Golog.Interpreter
 import qualified RSTC.Obs as O
 import RSTC.Theorems
 import Util.MemoCache
