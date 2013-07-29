@@ -1,6 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
 module Golog.Macro
   (prim, primf, test,
    atomic, star, plus, ifThenElse, while,
