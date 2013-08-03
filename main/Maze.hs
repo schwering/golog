@@ -4,7 +4,7 @@
 module Main (main) where
 
 import Prelude hiding (Left, Right)
-import Data.List (elemIndices, sortBy)
+import Data.List (sortBy)
 import Golog.Interpreter
 import Golog.Macro
 import Golog.Util

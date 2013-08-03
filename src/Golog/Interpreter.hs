@@ -2,8 +2,8 @@
 
 module Golog.Interpreter
   (BAT(..), DTBAT(..), Reward, Depth,
-   Atom(..), PseudoAtom(..), Prog(..), Tree, Node, Conf,
-   sit, treeND, treeDT, final, trans, doo) where
+   Atom(..), PseudoAtom(..), Prog(..), Conf,
+   treeND, treeDT, treeIO, treeDTIO, final, trans, sit, doo, sync) where
 
 import Data.List (maximumBy)
 import Data.Monoid
@@ -22,14 +22,12 @@ class BAT a => DTBAT a where
    reward     :: a -> Sit a -> Reward
 
 class BAT a => IOBAT a where
-   sync       :: a -> Sit a -> IO (Sit a)
+   syncA      :: a -> Sit a -> IO (Sit a)
 
-data Atom a = Prim a | PrimF (Sit a -> a) | Test (Sit a -> Bool)
-
+data Atom a       = Prim a | PrimF (Sit a -> a) | Test (Sit a -> Bool)
 data PseudoAtom a = Atom (Atom a) | Complex (Prog a)
-
-data Prog a = Seq (Prog a) (Prog a) | Nondet [Prog a] | Conc (Prog a) (Prog a)
-            | PseudoAtom (PseudoAtom a) | Nil
+data Prog a       = Seq (Prog a) (Prog a)  | Nondet [Prog a]
+                  | Conc (Prog a) (Prog a) | PseudoAtom (PseudoAtom a) | Nil
 
 data Tree a = Empty | Alt [Tree a] | Val a (Tree a)
 
@@ -88,22 +86,35 @@ den p' = rec (den' p')
 data Node a b = Node (Sit a) b | Flop
 type Conf a b = Tree (Node a b)
 type ConfND a = Conf a ()
-type ConfDT a = Conf a ((Reward, Depth))
---type ConfIO a b = Conf a (IO (
+type ConfDT a = Conf a (Reward, Depth)
+type ConfIO a = Conf a (SyncIO a (), ())
+type ConfDTIO a = Conf a (SyncIO a (Reward, Depth), (Reward, Depth))
+newtype SyncIO a b = SyncIO { runSync :: IO (Conf a (SyncIO a b, b)) }
 
 treeND :: BAT a => Prog a -> Sit a -> ConfND a
 treeND p sz = scan (exec (\_ _ _ _ -> ())) (Node sz ()) (den p)
 
 treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> ConfDT a
-treeDT l p sz = resolve (choiceDT l) (scan (exec f) (Node sz (0,0)) (den p))
+treeDT l p sz = resolve (choiceDT l id) (scan (exec f) (Node sz (0,0)) (den p))
    where f (r,d) a s _ = (r + reward a s, d + 1)
 
-{-
-treeIO :: IOBAT a => Prog a -> Sit a -> Conf a (NodeIO a)
+treeIO :: IOBAT a => Prog a -> Sit a -> ConfIO a
 treeIO p sz = cnf (den p) sz
-   where cnf t s = scan (exec f) (Node s (PayloadIO (return (cnf t s)))) t
-         f (PayloadIO s') a s t = PayloadIO (do s'' <- s'; s''' <- sync a s''; return (cnf t s'''))
--}
+   where cnf t s = scan (exec f) (root t s) t
+         root t s = Node s (SyncIO $ return (cnf t s), ())
+         f (pl,()) a _ t = (SyncIO $ do c <- runSync pl
+                                        s' <- syncA a (sit c)
+                                        return (cnf t s'), ())
+
+treeDTIO :: (DTBAT a, IOBAT a) => Depth -> Prog a -> Sit a -> ConfDTIO a
+treeDTIO l p sz = cnf (den p) sz
+   where cnf t s = resolve (choiceDT l snd) (scan (exec f) (root t s) t)
+         root t s = Node s (SyncIO $ return (cnf t s), (0,0))
+         f (pl,(r,d)) a s t = (SyncIO $ do c <- runSync pl
+                                           s' <- syncA a (sit c)
+                                           return (cnf t s'),
+                               (r + reward a s, d + 1))
+
 
 exec :: BAT a => (b -> a -> Sit a -> Tree (Atom a) -> b) ->
                  Node a b -> Atom a -> Tree (Atom a) -> Node a b
@@ -112,12 +123,11 @@ exec f c@(Node s _) (PrimF a) t            = exec f c (Prim (a s)) t
 exec _ c@(Node s _) (Test f)  _ | f s      = c
 exec _ _            _         _            = Flop
 
-choiceDT :: DTBAT a => Depth -> [ConfDT a] -> ConfDT a
-choiceDT l = maximumBy (comparing value)
-   where value :: DTBAT a => ConfDT a -> (Reward, Depth)
-         value = val . best def cmp final l
-            where def             = Node s0 (-1/0, minBound)
-                  val (Node _ rd) = rd
+choiceDT :: DTBAT a => Depth -> (b -> (Reward, Depth)) -> [Conf a b] -> Conf a b
+choiceDT l f = maximumBy (comparing value)
+   where value t = val (best def cmp final l t)
+            where def             = Flop
+                  val (Node _ pl) = f pl
                   val Flop        = (-1/0, minBound)
                   cmp x y         = compare (val x) (val y)
 
@@ -143,4 +153,8 @@ sit _                  = error "sit: invalid conf"
 
 doo :: Conf a b -> [[Conf a b]]
 doo c = let cs = trans c in cs : concat (map doo cs)
+
+sync :: Conf a (SyncIO a b, b) -> IO (Conf a (SyncIO a b, b))
+sync (Val (Node _ (pl,_)) _) = runSync pl
+sync _                       = error "sync: invalid conf"
 
