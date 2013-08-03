@@ -7,11 +7,11 @@ module Golog.Util
 import Golog.Interpreter
 import Control.Monad.State.Lazy
 
-trans' :: Conf a (Node a b) -> Maybe (Conf a (Node a b))
+trans' :: Conf a b -> Maybe (Conf a b)
 trans' c = case trans c of []   -> Nothing
                            c':_ -> Just c'
 
-doo' :: Conf a (Node a b) -> [Conf a (Node a b)]
+doo' :: Conf a b -> [Conf a b]
 doo' c = case trans' c of Nothing -> []
                           Just c' -> c' : doo' c'
 

@@ -1,4 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Golog.Macro

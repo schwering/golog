@@ -21,21 +21,17 @@ class BAT a where
 class BAT a => DTBAT a where
    reward     :: a -> Sit a -> Reward
 
+class BAT a => IOBAT a where
+   sync       :: a -> Sit a -> IO (Sit a)
+
 data Atom a = Prim a | PrimF (Sit a -> a) | Test (Sit a -> Bool)
 
 data PseudoAtom a = Atom (Atom a) | Complex (Prog a)
 
-data Prog a where
-   Seq        :: Prog a -> Prog a -> Prog a
-   Nondet     :: [Prog a] -> Prog a
-   Conc       :: Prog a -> Prog a -> Prog a
-   PseudoAtom :: PseudoAtom a -> Prog a
-   Nil        :: Prog a
+data Prog a = Seq (Prog a) (Prog a) | Nondet [Prog a] | Conc (Prog a) (Prog a)
+            | PseudoAtom (PseudoAtom a) | Nil
 
-data Tree a where
-   Empty :: Tree a
-   Alt   :: [Tree a] -> Tree a
-   Val   :: a -> Tree a -> Tree a
+data Tree a = Empty | Alt [Tree a] | Val a (Tree a)
 
 instance Monoid (Tree a) where
    mempty                = Empty
@@ -48,10 +44,11 @@ instance Functor Tree where
    fmap f (Alt ts)  = Alt (map (fmap f) ts)
    fmap f (Val x t) = Val (f x) (fmap f t)
 
-scan :: (b -> a -> b) -> b -> Tree a -> Tree b
-scan _ _ Empty     = Empty
-scan f x (Val y t) = let z = f x y in Val z (scan f z t)
-scan f x (Alt ts)  = Alt (map (scan f x) ts)
+scan :: (b -> a -> Tree a -> b) -> b -> Tree a -> Tree b
+scan f x0 t0 = Val x0 (scan' x0 t0)
+   where scan' _ Empty     = Empty
+         scan' x (Val y t) = let z = f x y t in Val z (scan' z t)
+         scan' x (Alt ts)  = Alt (map (scan' x) ts)
 
 best :: a -> (a -> a -> Ordering) -> (Tree a -> Bool) -> Depth -> Tree a -> a
 best def _   _   _ Empty                 = def
@@ -88,56 +85,62 @@ den p' = rec (den' p')
          den' (PseudoAtom a) = Val a Empty
          den' Nil            = Empty
 
-data Conf a b = Conf (Tree b) (Sit a)
-
 data Node a b = Node (Sit a) b | Flop
+type Conf a b = Tree (Node a b)
+type ConfND a = Conf a ()
+type ConfDT a = Conf a ((Reward, Depth))
+--type ConfIO a b = Conf a (IO (
 
-type NodeND a = Node a ()
-type NodeDT a = Node a (Reward, Depth)
+treeND :: BAT a => Prog a -> Sit a -> ConfND a
+treeND p sz = scan (exec (\_ _ _ _ -> ())) (Node sz ()) (den p)
 
-sit :: Conf a b -> Sit a
-sit (Conf _ s) = s
+treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> ConfDT a
+treeDT l p sz = resolve (choiceDT l) (scan (exec f) (Node sz (0,0)) (den p))
+   where f (r,d) a s _ = (r + reward a s, d + 1)
 
-treeND :: BAT a => Prog a -> Sit a -> Conf a (NodeND a)
-treeND p sz = Conf (scan exec (Node sz ()) (den p)) sz
-   where exec :: BAT a => NodeND a -> Atom a -> NodeND a
-         exec (Node s _)   (Prim a)  | poss a s = Node (do_ a s) ()
-         exec c@(Node s _) (PrimF a)            = exec c (Prim (a s))
-         exec c@(Node s _) (Test f)  | f s      = c
-         exec _            _                    = Flop
+{-
+treeIO :: IOBAT a => Prog a -> Sit a -> Conf a (NodeIO a)
+treeIO p sz = cnf (den p) sz
+   where cnf t s = scan (exec f) (Node s (PayloadIO (return (cnf t s)))) t
+         f (PayloadIO s') a s t = PayloadIO (do s'' <- s'; s''' <- sync a s''; return (cnf t s'''))
+-}
 
-treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> Conf a (NodeDT a)
-treeDT l p sz = Conf (resolve choice (scan exec (Node sz (0,0)) (den p))) sz
-   where exec :: DTBAT a => NodeDT a -> Atom a -> NodeDT a
-         exec (Node s (r,d)) (Prim a)  | poss a s = Node (do_ a s)
-                                                         (r + reward a s, d+1)
-         exec c@(Node s _)   (PrimF a)            = exec c (Prim (a s))
-         exec (Node s (r,d)) (Test f)  | f s      = Node s (r,d+1)
-         exec _              _                    = Flop
-         choice = maximumBy (comparing (value l))
-         value :: DTBAT a => Depth -> Tree (NodeDT a) -> (Reward, Depth)
-         value l' = val . best def cmp final' l'
-            where def = Node s0 (-inf, minBound)
+exec :: BAT a => (b -> a -> Sit a -> Tree (Atom a) -> b) ->
+                 Node a b -> Atom a -> Tree (Atom a) -> Node a b
+exec f (Node s pl)  (Prim a)  t | poss a s = Node (do_ a s) (f pl a s t)
+exec f c@(Node s _) (PrimF a) t            = exec f c (Prim (a s)) t
+exec _ c@(Node s _) (Test f)  _ | f s      = c
+exec _ _            _         _            = Flop
+
+choiceDT :: DTBAT a => Depth -> [ConfDT a] -> ConfDT a
+choiceDT l = maximumBy (comparing value)
+   where value :: DTBAT a => ConfDT a -> (Reward, Depth)
+         value = val . best def cmp final l
+            where def             = Node s0 (-1/0, minBound)
                   val (Node _ rd) = rd
-                  val Flop        = (-inf, minBound)
-                  cmp x y = compare (val x) (val y)
-                  inf = 1/0
+                  val Flop        = (-1/0, minBound)
+                  cmp x y         = compare (val x) (val y)
 
 final :: Conf a b -> Bool
-final (Conf t _) = final' t
+final Empty     = True
+final (Alt [])  = True
+final (Alt ts)  = any final ts
+final (Val _ _) = False
 
-final' :: Tree a -> Bool
-final' Empty     = True
-final' (Alt [])  = True
-final' (Alt ts)  = any final' ts
-final' (Val _ _) = False
+trans :: Conf a b -> [Conf a b]
+trans Empty              = error "trans: invalid conf"
+trans (Alt _)            = error "trans: invalid conf"
+trans (Val Flop       _) = []
+trans (Val (Node _ _) t) = trans' t
+   where trans' Empty                 = []
+         trans' (Val Flop       _)    = []
+         trans' t'@(Val (Node _ _) _) = [t']
+         trans' (Alt ts)              = concat (map trans ts)
 
-trans :: Conf a (Node a b) -> [Conf a (Node a b)]
-trans (Conf Empty              _) = []
-trans (Conf (Val (Node s _) t) _) = [Conf t s]
-trans (Conf (Val Flop       _) _) = []
-trans (Conf (Alt ts)           s) = concat (map (\t -> trans (Conf t s)) ts)
+sit :: Conf a b -> Sit a
+sit (Val (Node s _) _) = s
+sit _                  = error "sit: invalid conf"
 
-doo :: Conf a (Node a b) -> [[Conf a (Node a b)]]
+doo :: Conf a b -> [[Conf a b]]
 doo c = let cs = trans c in cs : concat (map doo cs)
 
