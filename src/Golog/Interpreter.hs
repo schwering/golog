@@ -50,6 +50,7 @@ scan f x0 t0 = Val x0 (scan' x0 t0)
 
 best :: a -> (a -> a -> Ordering) -> (Tree a -> Bool) -> Depth -> Tree a -> a
 best def _   _   _ Empty                 = def
+best def _   _   _ (Alt [])              = def
 best def cmp cut l (Alt ts)              = maximumBy cmp (map (best def cmp cut l) ts)
 best def cmp cut l (Val x t) | l == 0    = x
                              | cut t     = maximumBy cmp [x, best def cmp cut (l-1) t]
