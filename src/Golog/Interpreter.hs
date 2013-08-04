@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs, TypeFamilies #-}
 
 module Golog.Interpreter
-  (BAT(..), DTBAT(..), Reward, Depth,
+  (BAT(..), DTBAT(..), IOBAT(..), Reward, Depth,
    Atom(..), PseudoAtom(..), Prog(..), Conf,
    treeND, treeDT, treeIO, treeDTIO, final, trans, sit, doo, sync) where
 
@@ -99,22 +99,21 @@ treeDT l p sz = resolve (choiceDT l id) (scan (exec f) (Node sz (0,0)) (den p))
    where f (r,d) a s _ = (r + reward a s, d + 1)
 
 treeIO :: IOBAT a => Prog a -> Sit a -> ConfIO a
-treeIO p sz = cnf (den p) sz
-   where cnf t s = scan (exec f) (root t s) t
-         root t s = Node s (SyncIO $ return (cnf t s), ())
+treeIO p sz = cnf sz (den p)
+   where cnf s t = scan (exec f) (root s t) t
+         root s t = Node s (SyncIO $ return (cnf s t), ())
          f (pl,()) a _ t = (SyncIO $ do c <- runSync pl
                                         s' <- syncA a (sit c)
-                                        return (cnf t s'), ())
+                                        return (cnf s' t), ())
 
 treeDTIO :: (DTBAT a, IOBAT a) => Depth -> Prog a -> Sit a -> ConfDTIO a
-treeDTIO l p sz = cnf (den p) sz
-   where cnf t s = resolve (choiceDT l snd) (scan (exec f) (root t s) t)
-         root t s = Node s (SyncIO $ return (cnf t s), (0,0))
+treeDTIO l p sz = cnf sz (den p)
+   where cnf s t = resolve (choiceDT l snd) (scan (exec f) (root s t) t)
+         root s t = Node s (SyncIO $ return (cnf s t), (0,0))
          f (pl,(r,d)) a s t = (SyncIO $ do c <- runSync pl
                                            s' <- syncA a (sit c)
-                                           return (cnf t s'),
+                                           return (cnf s' t),
                                (r + reward a s, d + 1))
-
 
 exec :: BAT a => (b -> a -> Sit a -> Tree (Atom a) -> b) ->
                  Node a b -> Atom a -> Tree (Atom a) -> Node a b

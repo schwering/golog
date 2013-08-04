@@ -163,6 +163,12 @@ instance (BAT (Prim a), MazeBAT a) => DTBAT (Prim a) where
    --abs (dist startPos goalPos - dist (newPos a (pos s)) goalPos)**1 -
    --abs (dist startPos goalPos - dist (pos s) goalPos)**1
 
+instance (BAT (Prim a), MazeBAT a) => IOBAT (Prim a) where
+   syncA a s = do let s' = do_ a s
+                  putStrLn $ (if pos s' == goalPos then " *** " else " ... ") ++
+                             show (pos s', dist goalPos (pos s'), rewardSum s')
+                  return s'
+
 newPos :: (Prim a) -> Point -> Point
 newPos Up    p = up' p
 newPos Down  p = down' p
@@ -215,14 +221,18 @@ main = do
                             , primf left
                             , primf right]) `Seq`
                test (\s -> pos s == goalPos)
-       tree  = treeDT lookahead prog s0
+       tree  = treeDTIO lookahead prog s0
        confs = doo' tree
    putStrLn $ show $ startPos
    putStrLn $ show $ goalPos
+{-
    mapM_ (\s -> putStrLn $ (if pos s == goalPos then " *** " else " ... ") ++
             show (pos s, dist goalPos (pos s), rewardSum s
                   --,case s of Do a s' -> (pos s `elem` visited s', visited s')
                   )) $ map sit confs
+-}
+   s' <- sync (last confs)
+   putStrLn $ "Actions (sync'ed): " ++ show (sitlen $ sit s')
    let s = sit $ last $ confs
    putStrLn $ "Actions: " ++ show (sitlen s)
    draw s
