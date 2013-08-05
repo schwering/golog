@@ -6,7 +6,7 @@ module Golog.Interpreter
    treeND, treeDT, treeIO, treeDTIO, final, trans, sit, doo, sync) where
 
 import Data.List (maximumBy)
-import Data.Monoid
+import Data.Monoid (Monoid(..))
 import Data.Ord (comparing)
 
 type Reward = Double
@@ -143,9 +143,9 @@ trans (Alt _)            = error "trans: invalid conf"
 trans (Val Flop       _) = []
 trans (Val (Node _ _) t) = trans' t
    where trans' Empty                 = []
+         trans' (Alt ts)              = concat (map trans ts)
          trans' (Val Flop       _)    = []
          trans' t'@(Val (Node _ _) _) = [t']
-         trans' (Alt ts)              = concat (map trans ts)
 
 sit :: Conf a b -> Sit a
 sit (Val (Node s _) _) = s

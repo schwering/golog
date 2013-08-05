@@ -4,6 +4,7 @@
 module Main (main) where
 
 import Prelude hiding (Left, Right)
+import Control.Concurrent (threadDelay);
 import Data.List (sortBy)
 import Golog.Interpreter
 import Golog.Macro
@@ -165,7 +166,9 @@ instance (BAT (Prim a), MazeBAT a) => DTBAT (Prim a) where
 
 instance (BAT (Prim a), MazeBAT a) => IOBAT (Prim a) where
    syncA a s = do let s' = do_ a s
+                  --if a == Down then threadDelay (1*1000*1000) else return ()
                   putStrLn $ (if pos s' == goalPos then " *** " else " ... ") ++
+                             show a ++ ": " ++
                              show (pos s', dist goalPos (pos s'), rewardSum s')
                   return s'
 
