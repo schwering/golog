@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Golog.Interpreter
   (BAT(..), DTBAT(..), IOBAT(..), Reward, Depth,
@@ -96,7 +96,7 @@ treeND :: BAT a => Prog a -> Sit a -> ConfND a
 treeND p sz = scan (exec (\_ _ _ _ -> ())) (Node sz ()) (den p)
 
 treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> ConfDT a
-treeDT l p sz = resolve (choiceDT l id) (scan (exec f) (Node sz (0,0)) (den p))
+treeDT l p sz = resolve (chooseDT l id) (scan (exec f) (Node sz (0,0)) (den p))
    where f (r,d) a s _ = (r + reward a s, d + 1)
 
 treeIO :: IOBAT a => Prog a -> Sit a -> ConfIO a
@@ -109,7 +109,7 @@ treeIO p sz = cnf sz (den p)
 
 treeDTIO :: (DTBAT a, IOBAT a) => Depth -> Prog a -> Sit a -> ConfDTIO a
 treeDTIO l p sz = cnf sz (den p)
-   where cnf s t = resolve (choiceDT l snd) (scan (exec f) (root s t) t)
+   where cnf s t = resolve (chooseDT l snd) (scan (exec f) (root s t) t)
          root s t = Node s (SyncIO $ return (cnf s t), (0,0))
          f (pl,(r,d)) a s t = (SyncIO $ do c <- runSync pl
                                            s' <- syncA a (sit c)
@@ -123,8 +123,8 @@ exec f c@(Node s _) (PrimF a) t            = exec f c (Prim (a s)) t
 exec _ c@(Node s _) (Test f)  _ | f s      = c
 exec _ _            _         _            = Flop
 
-choiceDT :: DTBAT a => Depth -> (b -> (Reward, Depth)) -> [Conf a b] -> Conf a b
-choiceDT l f = maximumBy (comparing value)
+chooseDT :: DTBAT a => Depth -> (b -> (Reward, Depth)) -> [Conf a b] -> Conf a b
+chooseDT l f = maximumBy (comparing value)
    where value t = val (best def cmp final l t)
             where def             = Flop
                   val (Node _ pl) = f pl
