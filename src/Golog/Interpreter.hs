@@ -3,7 +3,7 @@
 module Golog.Interpreter
   (BAT(..), DTBAT(..), IOBAT(..), Reward, Depth,
    Atom(..), PseudoAtom(..), Prog(..), Conf,
-   treeND, treeDT, treeIO, treeDTIO, final, trans, sit, doo, sync) where
+   treeND, treeDT, treeIO, treeDTIO, final, trans, sit, sync) where
 
 import Data.List (maximumBy)
 import Data.Monoid (Monoid(..))
@@ -143,16 +143,13 @@ trans (Alt _)            = error "trans: invalid conf"
 trans (Val Flop       _) = []
 trans (Val (Node _ _) t) = trans' t
    where trans' Empty                 = []
-         trans' (Alt ts)              = concat (map trans ts)
+         trans' (Alt ts)              = concat (map trans' ts)
          trans' (Val Flop       _)    = []
          trans' t'@(Val (Node _ _) _) = [t']
 
 sit :: Conf a b -> Sit a
 sit (Val (Node s _) _) = s
 sit _                  = error "sit: invalid conf"
-
-doo :: Conf a b -> [[Conf a b]]
-doo c = let cs = trans c in cs : concat (map doo cs)
 
 sync :: Conf a (SyncIO a b, b) -> IO (Conf a (SyncIO a b, b))
 sync (Val (Node _ (pl,_)) _) = runSync pl
