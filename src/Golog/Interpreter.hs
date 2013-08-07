@@ -125,17 +125,20 @@ exec _ _            _         _            = Flop
 
 chooseDT :: DTBAT a => Depth -> (b -> (Reward, Depth)) -> [Conf a b] -> Conf a b
 chooseDT l f = maximumBy (comparing value)
-   where value t = val (best def cmp final l t)
+   where value t = val (best def cmp (final' False) l t)
             where def             = Flop
                   val (Node _ pl) = f pl
                   val Flop        = (-1/0, minBound)
                   cmp x y         = compare (val x) (val y)
 
+final' :: Bool -> Conf a b -> Bool
+final' _    Empty     = True
+final' _    (Alt [])  = True
+final' next (Alt ts)  = any (final' next) ts
+final' next (Val _ t) = next && final' False t
+
 final :: Conf a b -> Bool
-final Empty     = True
-final (Alt [])  = True
-final (Alt ts)  = any final ts
-final (Val _ _) = False
+final t = final' True t
 
 trans :: Conf a b -> [Conf a b]
 trans Empty              = error "trans: invalid conf"

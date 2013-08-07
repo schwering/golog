@@ -59,6 +59,7 @@ instance Show a => Show (Atom a) where
    show (Test _)  = "Test(...)"
 -}
 
+{-
 instance Show a => Show (PseudoAtom a) where
    show (Atom a) = "Atom(" ++ (show a) ++ ")"
    show (Complex p) = "Complex(" ++ (show p) ++ ")"
@@ -72,6 +73,7 @@ instance Show a => Show (Prog a) where
    --show (Pick _ _ _) = "Pick(...)"
    show (PseudoAtom p) = "PseudoAtom(" ++ (show p) ++ ")"
    show Nil = "nil"
+-}
 
 instance Show (Sit (Prim (Qty Double))) where
    show = show . reverse . sit2list
@@ -335,7 +337,7 @@ main = do
              candProg = pass D B `Conc` overtake H B
              prog     = obsProg `Conc` candProg
              --sits     = map (\(s,_,_) -> s) $ do3 4 prog s0
-             sits     = map sit $ doo' (treeDT lookahead prog s0)
+             sits     = map sit $ transTrace' (treeDT lookahead prog s0)
              --confs    = doo' (treeDT 6 prog s0)
              partOfObs (Wait _)     = True
              partOfObs (Prematch _) = True

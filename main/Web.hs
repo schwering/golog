@@ -22,7 +22,7 @@ pr :: [Sit (Prim (Qty Double))]
 pr = let obs  = obsprog $ take 100 O.observations
          cand = pass D B `Conc` overtake H B
          prog = obs `Conc` cand
-     in map sit $ doo' (treeDT lookahead prog s0)
+     in map sit $ transTrace' (treeDT lookahead prog s0)
      --in map (\(s,_,_) -> s) $ do3 lookahead prog s0
 
 
@@ -61,7 +61,7 @@ index sits i = ResponseBuilder status [("Content-Type", "text/plain")] response
                                      _   -> status404
          response = case restSits of _:_ -> mconcat $ map copyByteString $ json
                                      _   -> copyByteString "{}"
-         tToStr   = \(b,c,t) -> ("{\"b\":\"" ++ show b ++ "\", \"c\":\"" ++ show c ++"\", \"t\":" ++ show t ++ "} ")
+         tToStr   = \(b,c,t) -> ("{\"b\":\"" ++ show b ++ "\", \"c\":\"" ++ show c ++"\", \"t\":" ++ (if isNaN t then "0" else show t) ++ "} ")
          lToStr   = \(b,l) -> ("{\"b\":\"" ++ show b ++ "\", \"l\":" ++ show (laneToNumber l) ++ "} ")
          json     =
             [ "{ \"isMatch\": ", if isMatch then "true" else "false", "\n" ] ++

@@ -225,7 +225,7 @@ main = do
                             , primf right]) `Seq`
                test (\s -> pos s == goalPos)
        tree  = treeDTIO lookahead prog s0
-       confs = doo' tree
+       confs = transTrace' tree
    putStrLn $ show $ startPos
    putStrLn $ show $ goalPos
 {-
@@ -234,7 +234,8 @@ main = do
                   --,case s of Do a s' -> (pos s `elem` visited s', visited s')
                   )) $ map sit confs
 -}
-   s' <- sync (last confs)
+   let conf = last confs
+   s' <- sync conf
    putStrLn $ "Actions (sync'ed): " ++ show (sitlen $ sit s')
    let s = sit $ last $ confs
    putStrLn $ "Actions: " ++ show (sitlen s)

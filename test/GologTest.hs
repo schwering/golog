@@ -27,16 +27,15 @@ sitlen :: Sit Int -> Int
 sitlen S0       = 0
 sitlen (Do _ s) = 1 + sitlen s
 
-p = PseudoAtom . Atom . Prim
-q = PseudoAtom . Complex
-
+p = M.prim
+q = M.atomic
 star = M.star
 nondet = Nondet
 conc = foldl1 Conc
 atomic = M.atomic
 
 doDT :: DTBAT a => Depth -> Prog a -> Sit a -> [Sit a]
-doDT l p s = map sit $ doo' (treeDT l p s)
+doDT l p s = map sit $ doo (treeDT l p s)
 
 rewardSum :: Sit Int -> Reward
 rewardSum S0       = 0
