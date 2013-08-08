@@ -1,6 +1,9 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 -- | Control record for the SCR competition server.
 module TORCS.CarControl where
 
+import Data.Typeable
 import TORCS.MessageParser
 
 -- | The commands for to be send to the SCR server.
@@ -30,6 +33,7 @@ data CarControl = CarControl {
       -- Range @[0,1]@.
       meta     :: Int
    }
+   deriving (Typeable, Show)
 
 stringifyControl :: CarControl -> String
 stringifyControl ctrl = stringify1 "accel"    (accel ctrl) ++

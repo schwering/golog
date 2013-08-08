@@ -104,8 +104,7 @@ treeNDIO p sz = cnf sz (den p)
                                         s' <- syncA a (sit c)
                                         return (cnf s' t), ())
 
-treeDTIO :: (DTBAT a, IOBAT a) => Depth -> Prog a -> Sit a ->
-                                  ConfIO a (Reward, Depth)
+treeDTIO :: (DTBAT a, IOBAT a) => Depth -> Prog a -> Sit a -> ConfIO a (Reward, Depth)
 treeDTIO l p sz = cnf sz (den p)
    where cnf s t = resolve (chooseDT l snd) (scan (exec f) (root s t) t)
          root s t = Node s (SyncIO $ return (cnf s t), (0,0))

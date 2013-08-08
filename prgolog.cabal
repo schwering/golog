@@ -30,6 +30,7 @@ Library
                      TORCS.Client
                      TORCS.MessageParser
                      TORCS.NullDriver
+                     TORCS.SimpleDriver
                      Util.Interpolation
                      Util.MemoCache
                      Util.NativePSO
@@ -38,7 +39,7 @@ Library
     C-Sources:       src/RSTC/obs.c
                      src/Util/memo_cache.c
                      src/Util/native_pso.c
-    Build-Depends:   array, base, bytestring, containers, network, parsec, random, mtl
+    Build-Depends:   array, base, bytestring, containers, network, parsec, global-variables, random, mtl
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 
@@ -60,6 +61,13 @@ Executable Web
     Hs-Source-Dirs:  main
     Main-Is:         Web.hs
     Build-Depends:   base, prgolog, bytestring, wai, warp, enumerator, blaze-builder, http-types
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
+
+Executable Driver
+    Hs-Source-Dirs:  main
+    Main-Is:         Driver.hs
+    Build-Depends:   base, prgolog
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 

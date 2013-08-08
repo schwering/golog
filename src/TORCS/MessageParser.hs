@@ -3,8 +3,8 @@ module TORCS.MessageParser
 
 import Text.ParserCombinators.Parsec
 
-type ParseResult = Either ParseError [(Tag, [String])]
 type Tag = String
+type ParseResult = Either ParseError [(Tag, [String])]
 
 stringify1 :: Show a => Tag -> a -> String
 stringify1 tag value = stringify tag [value]

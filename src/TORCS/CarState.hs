@@ -1,6 +1,9 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 -- | State record for the SCR competition server.
 module TORCS.CarState where
 
+import Data.Typeable
 import TORCS.MessageParser
 
 -- | The current state of the car, as received from the SCR server.
@@ -98,6 +101,7 @@ data CarState = CarState {
       -- Range @(-inf,+inf)@, unit meters.
       z             :: Double
    }
+   deriving (Typeable, Show)
 
 parseState :: String -> CarState
 parseState str = CarState { angle          = parseMsg1 result "angle"

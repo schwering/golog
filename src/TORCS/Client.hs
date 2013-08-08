@@ -1,9 +1,12 @@
+{-# LANGUAGE TypeFamilies #-}
+
 -- | Client loop for SCR robots.
 -- An instance of the 'Driver' class should be handed to the 'run' function.
 module TORCS.Client (Driver(..), run) where
 
 import Data.ByteString.Char8 (pack, unpack)
-import Network.Socket (Socket, SockAddr, SocketType(Datagram), addrAddress, getAddrInfo, socket, addrFamily, sClose)
+import Network.Socket (Socket, SockAddr, SocketType(Datagram), addrAddress,
+                       getAddrInfo, socket, addrFamily, sClose)
 import Network.Socket.ByteString (sendAllTo, recvFrom)
 import Network.BSD (HostName, defaultProtocol)
 import TORCS.MessageParser
@@ -15,22 +18,30 @@ data Handle = Handle Socket SockAddr
 
 -- | Class for SCR driver robots.
 class Driver a where
+   data State a :: *
+
    -- | Name should be @\"SCR\"@ unless changed in the SCR TORCS robot.
-   name     :: a -> String
+   -- The first argument is dummy.
+   name         :: a -> String
 
    -- | Orientation of the 19 range finders in degrees.
+   -- The first argument is dummy.
    -- Default: @[-90,-75,-60,-45,-30,20,15,10,5,0,5,10,15,20,30,45,60,75,90]@.
-   angles   :: a -> [Double]
+   angles       :: a -> [Double]
+
+   -- | Returns the initial state.
+   -- The first argument is dummy.
+   initialState :: a -> IO (State a)
 
    -- | Handler for incoming sensor readings which returns a new action.
    -- The 
-   command  :: a -> String -> IO String
+   command      :: State a -> String -> IO (State a, String)
 
    -- | Handler for the shutdown event.
-   shutdown :: a -> IO ()
+   shutdown     :: State a -> IO ()
 
    -- | Handler for the restart event.
-   restart  :: a -> IO ()
+   restart      :: State a -> IO (State a)
 
    name _   = "SCR"
    angles _ = [-90,-75,-60,-45,-30,20,15,10,5,0,5,10,15,20,30,45,60,75,90]
@@ -43,15 +54,12 @@ createHandle hostname port =
        sock <- socket (addrFamily serveraddr) Datagram defaultProtocol
        return $ Handle sock (addrAddress serveraddr)
 
-
 closeHandle :: Handle -> IO ()
 closeHandle (Handle sock _) = sClose sock
-
 
 send :: Handle -> String -> IO ()
 send (Handle sock addr) str = do sendAllTo sock (pack str) addr
                                  putStrLn $ "SEND: " ++ str
-
 
 recv :: Handle -> IO String
 recv (Handle sock addr) = do  (bstr, addr') <- recvFrom sock 1000
@@ -69,17 +77,20 @@ recv (Handle sock addr) = do  (bstr, addr') <- recvFrom sock 1000
 -- should be @"3002"@ etc.
 run :: Driver a => a -> HostName -> Port -> IO ()
 run driver host port =
-      do h <- createHandle host port
-         send h $ name driver ++ stringify "init" (angles driver)
-         loop h
-   where loop h = do str <- recv h
-                     if str == "***shutdown***"
-                        then do  shutdown driver
-                        else
-                           if str == "***restart***"
-                              then do  restart driver
-                                       loop h
-                              else do  str' <- command driver str
-                                       send h str'
-                                       loop h
+      do handle <- createHandle host port
+         send handle $ name driver ++ stringify "init" (angles driver)
+         state <- initialState driver
+         loop handle state
+   where loop handle state =
+            do str <- recv handle
+               if str == "***shutdown***"
+                  then do  shutdown state
+                           closeHandle handle
+                  else
+                     if str == "***restart***"
+                        then do  state <- restart state
+                                 loop handle state
+                        else do  (state, str) <- command state str
+                                 send handle str
+                                 loop handle state
 
