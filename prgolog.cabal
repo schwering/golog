@@ -25,6 +25,11 @@ Library
                      RSTC.Obs
                      RSTC.Progs
                      RSTC.Theorems
+                     TORCS.CarControl
+                     TORCS.CarState
+                     TORCS.Client
+                     TORCS.MessageParser
+                     TORCS.NullDriver
                      Util.Interpolation
                      Util.MemoCache
                      Util.NativePSO
@@ -33,7 +38,7 @@ Library
     C-Sources:       src/RSTC/obs.c
                      src/Util/memo_cache.c
                      src/Util/native_pso.c
-    Build-Depends:   array, base, containers, random, mtl
+    Build-Depends:   array, base, bytestring, containers, network, parsec, random, mtl
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 
