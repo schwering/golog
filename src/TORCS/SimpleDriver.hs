@@ -2,16 +2,16 @@
 
 module TORCS.SimpleDriver where
 
-import Data.Global
 import Data.IORef
-import Data.Maybe (fromMaybe)
 import Golog.Interpreter
+import Text.Printf
 import TORCS.CarControl
 import TORCS.CarState
 import qualified TORCS.CarControl as Control
 import qualified TORCS.CarState as State
 import TORCS.Client
 import TORCS.MessageParser
+import TORCS.PhysicsUtil
 
 data Prim = Accel Double | Brake Double | Clutch Double | Gear Int |
             Steering Double | Focus Int | Meta Int | ReadSensors
@@ -20,73 +20,68 @@ data Prim = Accel Double | Brake Double | Clutch Double | Gear Int |
 data SimpleDriver = SimpleDriver
 
 instance BAT Prim where
-   data Sit Prim = Sit CarState CarControl
+   data Sit Prim = Sit {
+      currentControl :: CarControl,
+      currentState   :: CarState,
+      sensedState    :: IORef CarState
+   }
 
-   s0 = Sit state control
-      where state = CarState {
-               angle          = 0,
-               curLapTime     = 0,
-               damage         = 0,
-               distFromStart  = 0,
-               distRaced      = 0,
-               State.focus    = replicate 5 (-1),
-               fuel           = 0,
-               State.gear     = 1,
-               lastLapTime    = 0,
-               opponents      = replicate 36 200,
-               racePos        = 1,
-               rpm            = 0,
-               speedX         = 0,
-               speedY         = 0,
-               speedZ         = 0,
-               track          = replicate 19 200,
-               trackPos       = 0,
-               wheelSpinVel   = replicate 4 0,
-               z              = 0
-            }
-            control = CarControl {
-               accel         = 0,
-               brake         = 0,
-               clutch        = 0,
-               Control.gear  = 0,
-               steering      = 0,
-               Control.focus = 0,
-               meta          = 0
-            }
+   s0 = Sit defaultControl defaultState undefined
 
-   do_ (Accel x)    (Sit state control) = Sit state control{accel = x}
-   do_ (Brake x)    (Sit state control) = Sit state control{brake = x}
-   do_ (Clutch x)   (Sit state control) = Sit state control{clutch = x}
-   do_ (Gear x)     (Sit state control) = Sit state control{Control.gear = x}
-   do_ (Steering x) (Sit state control) = Sit state control{steering = x}
-   do_ (Focus x)    (Sit state control) = Sit state control{Control.focus = x}
-   do_ (Meta x)     (Sit state control) = Sit state control{meta = x}
-   do_ ReadSensors  s                   = s
+   do_ (Accel x)    s = updateControl (\c -> c{accel = x}) s
+   do_ (Brake x)    s = updateControl (\c -> c{brake = x}) s
+   do_ (Clutch x)   s = updateControl (\c -> c{clutch = x}) s
+   do_ (Gear x)     s = updateControl (\c -> c{Control.gear = x}) s
+   do_ (Steering x) s = updateControl (\c -> c{steering = x}) s
+   do_ (Focus x)    s = updateControl (\c -> c{Control.focus = x}) s
+   do_ (Meta x)     s = updateControl (\c -> c{meta = x}) s
+   do_ ReadSensors  s = s
 
-   poss a s = True
+   poss _ _ = True
 
--- | Global 'IORef' used to push the received 'CarState' into the situation.
--- That's really ugly because we cannot handle multiple drivers.
-ref :: IORef (Maybe (CarState))
-ref = declareIORef "some-cool-variable" Nothing
+updateControl :: (CarControl -> CarControl) -> Sit Prim -> Sit Prim
+updateControl f (Sit control state sensings) = Sit (f control) state sensings
+
+-- | Computes the time in seconds it takes for the car to reach the end of the
+-- track in the direction to with the @i@th laser beam points according to
+-- 'beamOris'.
+--
+-- Imagine the car's velocity in X and Y direction is a vector V and the
+-- vector's angle from the positive X axis is @beta@.
+-- Furthermore let there be a laser beam with angle @alpha@ indicate that the
+-- track ends in @d@
+trackTime :: CarState -> [Double]
+trackTime state = beamTimes
+   where msX          = kmh2ms (speedX state)
+         msY          = kmh2ms (speedY state)
+         track'       = map (\d -> if d >= 200 then 1/0 else d) (track state)
+         beta         = atan2 msY msX
+         v            = sqrt (msX^(2::Int) + msY^(2::Int))
+         beamOriDists = zip (beamOris SimpleDriver) track'
+         beamTimes    = map (\(alpha,d) -> d/v * cos (alpha - beta)) beamOriDists
 
 instance IOBAT Prim where
-   syncA ReadSensors (Sit state0 control) =
-      do state1 <- readIORef ref
-         return $ Sit (fromMaybe state0 state1) control
+   syncA ReadSensors s =
+      do sensed <- readIORef (sensedState s)
+         let s' = s{currentState = sensed}
+         return s'
    syncA a s =
       return $ do_ a s
 
 instance Driver SimpleDriver where
    data State SimpleDriver = State (Sit Prim)
-   initialState _    = do  writeIORef ref Nothing
-                           return $ State s0
-   command (State s) str = do putStrLn ("STATE: " ++ str)
+
+   initialState _    = do  ref <- newIORef defaultState
+                           return $ State s0{sensedState = ref}
+
+   command (State s) str = do --putStrLn ("STATE: " ++ str)
                               let state = parseState str
-                              writeIORef ref (Just state)
+                              writeIORef (sensedState s) state
                               let cmd = stringify1 "accel" (0.75 :: Double)
                               return (State s, cmd)
+
    shutdown _        = do  putStrLn "SHUTDOWN"
+
    restart state     = do  putStrLn "RESTART"
                            return state
 

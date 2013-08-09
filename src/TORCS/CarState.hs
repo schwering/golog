@@ -5,6 +5,7 @@ module TORCS.CarState where
 
 import Data.Typeable
 import TORCS.MessageParser
+import TORCS.PhysicsUtil
 
 -- | The current state of the car, as received from the SCR server.
 -- Each field's comment is copied from the SCR manual.
@@ -64,16 +65,16 @@ data CarState = CarState {
       racePos       :: Int,
       -- | Rumber of rotation per minute of the car engine.
       -- Range @[2000,7000]@, unit rpm.
-      rpm           :: Int,
+      rpm           :: Double,
       -- | Speed of the car along the longitudinal axis of the car.
       -- Range @(-inf,+inf)@, unit km\/h.
-      speedX        :: Double,
+      speedX        :: KmH,
       -- | Speed of the car along the transverse axis of the car.
       -- Range @(-inf,+inf)@, unit km\/h.
-      speedY        :: Double,
+      speedY        :: KmH,
       -- | Speed of the car along the Z axis of the car.
       -- Range @(-inf,+inf)@, unit km\/h.
-      speedZ        :: Double,
+      speedZ        :: KmH,
       -- | Vector of 19 range finder sensors: each sensors returns the distance
       -- between the track edge and the car within a range of 200 meters. When
       -- noisy option is enabled (see Section 7), sensors are affected by i.i.d.
@@ -113,16 +114,39 @@ parseState str = CarState { angle          = parseMsg1 result "angle"
                           , fuel           = parseMsg1 result "fuel"
                           , gear           = parseMsg1 result "gear"
                           , lastLapTime    = parseMsg1 result "lastLapTime"
-                          , opponents      = parseMsg1 result "opponents"
+                          , opponents      = parseMsg  result "opponents"
                           , racePos        = parseMsg1 result "racePos"
                           , rpm            = parseMsg1 result "rpm"
                           , speedX         = parseMsg1 result "speedX"
                           , speedY         = parseMsg1 result "speedY"
                           , speedZ         = parseMsg1 result "speedZ"
-                          , track          = parseMsg1 result "track"
+                          , track          = parseMsg  result "track"
                           , trackPos       = parseMsg1 result "trackPos"
-                          , wheelSpinVel   = parseMsg1 result "wheelSpinVel"
+                          , wheelSpinVel   = parseMsg  result "wheelSpinVel"
                           , z              = parseMsg1 result "z"
                           }
    where result = parseMsg' str
+
+defaultState :: CarState
+defaultState = CarState {
+                  angle          = 0,
+                  curLapTime     = 0,
+                  damage         = 0,
+                  distFromStart  = 0,
+                  distRaced      = 0,
+                  focus          = replicate 5 (-1),
+                  fuel           = 0,
+                  gear           = 1,
+                  lastLapTime    = 0,
+                  opponents      = replicate 36 200,
+                  racePos        = 1,
+                  rpm            = 0,
+                  speedX         = 0,
+                  speedY         = 0,
+                  speedZ         = 0,
+                  track          = replicate 19 200,
+                  trackPos       = 0,
+                  wheelSpinVel   = replicate 4 0,
+                  z              = 0
+               }
 

@@ -9,7 +9,9 @@ import Network.Socket (Socket, SockAddr, SocketType(Datagram), addrAddress,
                        getAddrInfo, socket, addrFamily, sClose)
 import Network.Socket.ByteString (sendAllTo, recvFrom)
 import Network.BSD (HostName, defaultProtocol)
+import System.Timeout
 import TORCS.MessageParser
+import TORCS.PhysicsUtil
 
 type Name = String
 type Port = String
@@ -22,12 +24,13 @@ class Driver a where
 
    -- | Name should be @\"SCR\"@ unless changed in the SCR TORCS robot.
    -- The first argument is dummy.
-   name         :: a -> String
+   name         :: a -> Name
 
    -- | Orientation of the 19 range finders in degrees.
    -- The first argument is dummy.
-   -- Default: @[-90,-75,-60,-45,-30,20,15,10,5,0,5,10,15,20,30,45,60,75,90]@.
-   angles       :: a -> [Double]
+   -- Default: the radians of the degrees in the range
+   -- @[-90,-75,-60,-45,-30,20,15,10,5,0,5,10,15,20,30,45,60,75,90]@.
+   beamOris     :: a -> [Double]
 
    -- | Returns the initial state.
    -- The first argument is dummy.
@@ -44,22 +47,25 @@ class Driver a where
    restart      :: State a -> IO (State a)
 
    name _   = "SCR"
-   angles _ = [-90,-75,-60,-45,-30,20,15,10,5,0,5,10,15,20,30,45,60,75,90]
+   beamOris _ = map (deg2rad.Deg)
+                    [-90,-75,-60,-45,-30,20,15,10,5,0,5,10,15,20,30,45,60,75,90]
 
+udpTimeout :: Int
+udpTimeout = 1000000
 
 createHandle :: HostName -> Port -> IO Handle
 createHandle hostname port =
-    do addrinfos <- getAddrInfo Nothing (Just hostname) (Just port)
-       let serveraddr = head addrinfos
-       sock <- socket (addrFamily serveraddr) Datagram defaultProtocol
-       return $ Handle sock (addrAddress serveraddr)
+    do   addrinfos <- getAddrInfo Nothing (Just hostname) (Just port)
+         let serveraddr = head addrinfos
+         sock <- socket (addrFamily serveraddr) Datagram defaultProtocol
+         return $ Handle sock (addrAddress serveraddr)
 
 closeHandle :: Handle -> IO ()
 closeHandle (Handle sock _) = sClose sock
 
 send :: Handle -> String -> IO ()
 send (Handle sock addr) str = do sendAllTo sock (pack str) addr
-                                 putStrLn $ "SEND: " ++ str
+                                 --putStrLn $ "SEND: " ++ str
 
 recv :: Handle -> IO String
 recv (Handle sock addr) = do  (bstr, addr') <- recvFrom sock 1000
@@ -67,7 +73,7 @@ recv (Handle sock addr) = do  (bstr, addr') <- recvFrom sock 1000
                                  then fail "Invalid sender address"
                                  else return ()
                               let str = unpack bstr
-                              putStrLn $ " RECV: " ++ str
+                              --putStrLn $ " RECV: " ++ str
                               return str
 
 -- | Client loop for a driver @a@.
@@ -78,19 +84,27 @@ recv (Handle sock addr) = do  (bstr, addr') <- recvFrom sock 1000
 run :: Driver a => a -> HostName -> Port -> IO ()
 run driver host port =
       do handle <- createHandle host port
-         send handle $ name driver ++ stringify "init" (angles driver)
          state <- initialState driver
+         greet handle
          loop handle state
-   where loop handle state =
+   where beamDegs = map rad2deg (beamOris driver)
+         greet handle =
+            do send handle $ name driver ++ stringify "init" beamDegs
+               maybeStr <- timeout udpTimeout $ recv handle
+               if maybe False ("***identified***\0" ==) maybeStr
+                  then do  putStrLn "Indentified!"
+                  else do  putStrLn "No response from SCR server yet"
+                           greet handle
+         loop handle state =
             do str <- recv handle
-               if str == "***shutdown***"
+               if "***shutdown***\0" == str
                   then do  shutdown state
                            closeHandle handle
                   else
-                     if str == "***restart***"
-                        then do  state <- restart state
-                                 loop handle state
-                        else do  (state, str) <- command state str
-                                 send handle str
-                                 loop handle state
+                     if "***restart***\0" == str
+                        then do  state' <- restart state
+                                 loop handle state'
+                        else do  (state', str') <- command state str
+                                 send handle str'
+                                 loop handle state'
 

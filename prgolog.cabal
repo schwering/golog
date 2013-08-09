@@ -30,6 +30,7 @@ Library
                      TORCS.Client
                      TORCS.MessageParser
                      TORCS.NullDriver
+                     TORCS.PhysicsUtil
                      TORCS.SimpleDriver
                      Util.Interpolation
                      Util.MemoCache
@@ -39,7 +40,7 @@ Library
     C-Sources:       src/RSTC/obs.c
                      src/Util/memo_cache.c
                      src/Util/native_pso.c
-    Build-Depends:   array, base, bytestring, containers, network, parsec, global-variables, random, mtl
+    Build-Depends:   array, base, bytestring, containers, network, parsec, random, mtl
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 

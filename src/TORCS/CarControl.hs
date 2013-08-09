@@ -44,3 +44,14 @@ stringifyControl ctrl = stringify1 "accel"    (accel ctrl) ++
                         stringify1 "focus"    (focus ctrl) ++
                         stringify1 "meta"     (meta ctrl)
 
+defaultControl :: CarControl
+defaultControl = CarControl {
+                    accel         = 0,
+                    brake         = 0,
+                    clutch        = 0,
+                    gear          = 0,
+                    steering      = 0,
+                    focus         = 0,
+                    meta          = 0
+                 }
+
