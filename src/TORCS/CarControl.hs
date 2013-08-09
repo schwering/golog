@@ -3,7 +3,6 @@
 -- | Control record for the SCR competition server.
 module TORCS.CarControl where
 
-import Data.Typeable
 import TORCS.MessageParser
 
 -- | The commands for to be send to the SCR server.
@@ -33,7 +32,7 @@ data CarControl = CarControl {
       -- Range @[0,1]@.
       meta     :: Int
    }
-   deriving (Typeable, Show)
+   deriving Show
 
 stringifyControl :: CarControl -> String
 stringifyControl ctrl = stringify1 "accel"    (accel ctrl) ++
@@ -46,12 +45,12 @@ stringifyControl ctrl = stringify1 "accel"    (accel ctrl) ++
 
 defaultControl :: CarControl
 defaultControl = CarControl {
-                    accel         = 0,
-                    brake         = 0,
-                    clutch        = 0,
-                    gear          = 0,
-                    steering      = 0,
-                    focus         = 0,
-                    meta          = 0
+                    accel    = 0,
+                    brake    = 0,
+                    clutch   = 0,
+                    gear     = 0,
+                    steering = 0,
+                    focus    = 0,
+                    meta     = 0
                  }
 

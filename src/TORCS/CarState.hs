@@ -3,7 +3,6 @@
 -- | State record for the SCR competition server.
 module TORCS.CarState where
 
-import Data.Typeable
 import TORCS.MessageParser
 import TORCS.PhysicsUtil
 
@@ -102,7 +101,7 @@ data CarState = CarState {
       -- Range @(-inf,+inf)@, unit meters.
       z             :: Double
    }
-   deriving (Typeable, Show)
+   deriving Show
 
 parseState :: String -> CarState
 parseState str = CarState { angle          = parseMsg1 result "angle"

@@ -49,7 +49,16 @@ updateControl f (Sit control state sensings) = Sit (f control) state sensings
 -- Imagine the car's velocity in X and Y direction is a vector V and the
 -- vector's angle from the positive X axis is @beta@.
 -- Furthermore let there be a laser beam with angle @alpha@ indicate that the
--- track ends in @d@
+-- track ends in @d@.
+--
+-- Since alpha is relative to the car's X axis, but the car's movement is
+-- rotated by beta from the X axis, the car's movement is rotated by
+-- @beta - alpha@ from the /beam/.
+--
+-- Therefore we project the car's velocity @v@ onto this beam by multiplying
+-- @v * cos (beta - alpha)@.
+-- Finally we divide the beam's length @d@ by this velocity to compute the time
+-- it takes the car to travel the beam's distance in the beam's direction.
 trackTime :: CarState -> [Double]
 trackTime state = beamTimes
    where msX          = kmh2ms (speedX state)
@@ -58,7 +67,7 @@ trackTime state = beamTimes
          beta         = atan2 msY msX
          v            = sqrt (msX^(2::Int) + msY^(2::Int))
          beamOriDists = zip (beamOris SimpleDriver) track'
-         beamTimes    = map (\(alpha,d) -> d/v * cos (alpha - beta)) beamOriDists
+         beamTimes    = map (\(alpha,d) -> d / (v * cos (beta - alpha))) beamOriDists
 
 instance IOBAT Prim where
    syncA ReadSensors s =
@@ -71,17 +80,21 @@ instance IOBAT Prim where
 instance Driver SimpleDriver where
    data State SimpleDriver = State (Sit Prim)
 
-   initialState _    = do  ref <- newIORef defaultState
-                           return $ State s0{sensedState = ref}
+   initialState _ = do  ref <- newIORef defaultState
+                        return $ State s0{sensedState = ref}
 
    command (State s) str = do --putStrLn ("STATE: " ++ str)
                               let state = parseState str
+                              _ <- printf "%.2f s  (%.2f m)    %.2f s  (%.2f m)    %.2f s  (%.2f m)\n"
+                                   (trackTime state !!  0) (track state !!  0)
+                                   (trackTime state !!  9) (track state !!  9)
+                                   (trackTime state !! 18) (track state !! 18)
                               writeIORef (sensedState s) state
                               let cmd = stringify1 "accel" (0.75 :: Double)
                               return (State s, cmd)
 
-   shutdown _        = do  putStrLn "SHUTDOWN"
+   shutdown _ = do  putStrLn "SHUTDOWN"
 
-   restart state     = do  putStrLn "RESTART"
-                           return state
+   restart state = do  putStrLn "RESTART"
+                       return state
 

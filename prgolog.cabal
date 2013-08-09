@@ -12,7 +12,6 @@ Description:
 Library
     Hs-Source-Dirs:  src
     Exposed-Modules: Golog.Interpreter
-                     Golog.Hierarchy
                      Golog.Macro
                      Golog.Util
                      Golog.Old.Interpreter
