@@ -32,7 +32,7 @@ instance BAT Prim where
    do_ (Brake x)    s = updateControl (\c -> c{brake = x}) s
    do_ (Clutch x)   s = updateControl (\c -> c{clutch = x}) s
    do_ (Gear x)     s = updateControl (\c -> c{Control.gear = x}) s
-   do_ (Steering x) s = updateControl (\c -> c{steering = x}) s
+   do_ (Steering x) s = updateControl (\c -> c{steer = x}) s
    do_ (Focus x)    s = updateControl (\c -> c{Control.focus = x}) s
    do_ (Meta x)     s = updateControl (\c -> c{meta = x}) s
    do_ ReadSensors  s = s
