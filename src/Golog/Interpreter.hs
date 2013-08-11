@@ -70,19 +70,19 @@ itl (Alt ts)       t2             = Alt (map (\t1 -> itl t1 t2) ts)
 itl t1             (Alt ts)       = Alt (map (\t2 -> itl t1 t2) ts)
 itl t1@(Val x1 r1) t2@(Val x2 r2) = Alt [Val x1 (itl t2 r1), Val x2 (itl t1 r2)]
 
-den :: Prog a -> Tree (Atom a)
-den p' = rec (den' p')
+ast :: Prog a -> Tree (Atom a)
+ast p' = rec (ast' p')
    where rec :: Tree (PseudoAtom a) -> Tree (Atom a)
          rec Empty               = Empty
          rec (Alt ts)            = Alt (map rec ts)
          rec (Val (Atom a)    t) = Val a (rec t)
-         rec (Val (Complex p) t) = mappend (den p) (rec t)
-         den' :: Prog a -> Tree (PseudoAtom a)
-         den' (Seq p1 p2)    = mappend (den' p1) (den' p2)
-         den' (Nondet ps)    = Alt (map den' ps)
-         den' (Conc p1 p2)   = itl (den' p1) (den' p2)
-         den' (PseudoAtom a) = Val a Empty
-         den' Nil            = Empty
+         rec (Val (Complex p) t) = mappend (ast p) (rec t)
+         ast' :: Prog a -> Tree (PseudoAtom a)
+         ast' (Seq p1 p2)    = mappend (ast' p1) (ast' p2)
+         ast' (Nondet ps)    = Alt (map ast' ps)
+         ast' (Conc p1 p2)   = itl (ast' p1) (ast' p2)
+         ast' (PseudoAtom a) = Val a Empty
+         ast' Nil            = Empty
 
 data Node a b = Node (Sit a) b | Flop
 type Conf a b = Tree (Node a b)
@@ -90,14 +90,14 @@ type ConfIO a b = Conf a (SyncIO a b, b)
 newtype SyncIO a b = SyncIO { runSync :: IO (ConfIO a b) }
 
 treeND :: BAT a => Prog a -> Sit a -> Conf a ()
-treeND p sz = scan (exec (\_ _ _ _ -> ())) (Node sz ()) (den p)
+treeND p sz = scan (exec (\_ _ _ _ -> ())) (Node sz ()) (ast p)
 
 treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> Conf a (Reward, Depth)
-treeDT l p sz = resolve (chooseDT l id) (scan (exec f) (Node sz (0,0)) (den p))
+treeDT l p sz = resolve (chooseDT l id) (scan (exec f) (Node sz (0,0)) (ast p))
    where f (r,d) a s _ = (r + reward a s, d + 1)
 
 treeNDIO :: IOBAT a => Prog a -> Sit a -> ConfIO a ()
-treeNDIO p sz = cnf sz (den p)
+treeNDIO p sz = cnf sz (ast p)
    where cnf s t = scan (exec f) (root s t) t
          root s t = Node s (SyncIO $ return (cnf s t), ())
          f (pl,()) a _ t = (SyncIO $ do c <- runSync pl
@@ -105,7 +105,7 @@ treeNDIO p sz = cnf sz (den p)
                                         return (cnf s' t), ())
 
 treeDTIO :: (DTBAT a, IOBAT a) => Depth -> Prog a -> Sit a -> ConfIO a (Reward, Depth)
-treeDTIO l p sz = cnf sz (den p)
+treeDTIO l p sz = cnf sz (ast p)
    where cnf s t = resolve (chooseDT l snd) (scan (exec f) (root s t) t)
          root s t = Node s (SyncIO $ return (cnf s t), (0,0))
          f (pl,(r,d)) a s t = (SyncIO $ do c <- runSync pl
