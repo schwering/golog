@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-
 -- | Control record for the SCR competition server.
 module TORCS.CarControl where
 

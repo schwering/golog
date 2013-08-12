@@ -11,7 +11,7 @@
 -- When NaN or infinity occurs, the callee should try to compute a valid value
 -- via transitivity. The 'orTrans' function is helpful in this regard.
 --
--- \[1\] http:\/\/kbsg.rwth-aachen.de\/~schwering\/Commonsense-2013\/paper.pdf
+-- \[1\] <http://kbsg.rwth-aachen.de/~schwering/Commonsense-2013/paper.pdf>
 
 module RSTC.Theorems where
 

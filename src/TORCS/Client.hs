@@ -10,6 +10,8 @@ import Network.Socket (Socket, SockAddr, SocketType(Datagram), addrAddress,
 import Network.Socket.ByteString (sendAllTo, recvFrom)
 import Network.BSD (HostName, defaultProtocol)
 import System.Timeout
+import TORCS.CarControl
+import TORCS.CarState
 import TORCS.MessageParser
 import TORCS.PhysicsUtil
 
@@ -37,8 +39,7 @@ class Driver a where
    initialState :: a -> IO (State a)
 
    -- | Handler for incoming sensor readings which returns a new action.
-   -- The 
-   command      :: State a -> String -> IO (State a, String)
+   command      :: State a -> CarState -> IO (State a, CarControl)
 
    -- | Handler for the shutdown event.
    shutdown     :: State a -> IO ()
@@ -46,7 +47,7 @@ class Driver a where
    -- | Handler for the restart event.
    restart      :: State a -> IO (State a)
 
-   name _   = "SCR"
+   name _     = "SCR"
    beamOris _ = map (deg2rad.Deg)
                 [-90,-75,-60,-45,-30,-20,-15,-10,-5,0,5,10,15,20,30,45,60,75,90]
 
@@ -92,7 +93,7 @@ run driver host port =
             do send handle $ name driver ++ stringify "init" beamDegs
                maybeStr <- timeout udpTimeout $ recv handle
                if maybe False ("***identified***\0" ==) maybeStr
-                  then do  putStrLn "Indentified!"
+                  then do  putStrLn "Indentified, starting loop"
                   else do  putStrLn "No response from SCR server yet"
                            greet handle
          loop handle state =
@@ -101,10 +102,10 @@ run driver host port =
                   then do  shutdown state
                            closeHandle handle
                   else
-                     if "***restart***\0" == str
-                        then do  state' <- restart state
-                                 loop handle state'
-                        else do  (state', str') <- command state str
-                                 send handle str'
-                                 loop handle state'
+                  if "***restart***\0" == str
+                  then do  state' <- restart state
+                           loop handle state'
+                  else do  (state', ctrl) <- command state (parseState str)
+                           send handle (stringifyControl ctrl)
+                           loop handle state'
 

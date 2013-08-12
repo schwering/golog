@@ -7,7 +7,7 @@ module Main (main) where
 
 import RSTC.Car
 import Golog.Interpreter
-import Golog.Util
+import Golog.Util hiding (HistBAT(..))
 --import Interpreter.Tree
 --import Interpreter.TreeUtil
 import RSTC.BAT.Base

@@ -2,16 +2,45 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Golog.Util
-   where
+   (HistBAT(..), trans', transStar, transTrace, transTrace', doo, doo') where
 
 import Data.Maybe (listToMaybe)
 import qualified Data.Tree as T
 --import Control.Monad.State.Lazy
 import Golog.Interpreter
 
+-- Class for situations which store a history.
+-- Minimal implementation is 'history' or 'since'.
 class BAT a => HistBAT a where
+   -- | The number of actions executed in the situation since s0.
+   sitlen  :: Sit a -> Int
+
+   -- | The actions executed in the situation since s0, ordered latest action
+   -- first (i.e., in reverse chronological order).
+   history :: Sit a -> [a]
+
+   -- | All actions executed in the first situation since the second situation.
+   -- E.g., since (Do a s) s = [a] should hold.
+   -- The implementation may assume that the second situation is indeed
+   -- predecessor situation of the first one or the same. This assumption avoids
+   -- expensive checks for equality.
+   since   :: Sit a -> Sit a -> [a]
+
+   -- | The last action and the predecessor situation.
+   -- The default implementation is quite expensive as it rebuilds the whole
+   -- situation by applying 'do_'.
+   -- While regressive BATs may have trivial implementations, progressive BATs
+   -- may store the previous situation explicitly to avoid this rebuilding.
    predSit :: Sit a -> Maybe (a, Sit a)
 
+   sitlen      = length . history
+   history s   = since s s0
+   since s2 s1 = take (sitlen s2 - sitlen s1) (history s2)
+   predSit s   = case history s of []   -> Nothing
+                                   a:as -> Just (a, foldr do_ s0 as)
+
+
+--- | Variant of 'trans' which commits to the first option.
 trans' :: Conf a b -> Maybe (Conf a b)
 trans' = listToMaybe . trans
 
@@ -21,13 +50,15 @@ trans' = listToMaybe . trans
 transStar :: Conf a b -> [[Conf a b]]
 transStar c = takeWhile (not.null) $ iterate (concatMap trans) [c]
 
--- Returns a list of lists of configurations where each list contains a sequence
--- of configurations each of which is a result of applying 'trans' to its
--- predecessor.
--- For some reason, this function has some issues with lazy evaluation.
+-- Returns a tree of configurations where each branch indicates the various
+-- opportunities in the respective configuration.
+-- We use a tree instead of lists of lists because the latter for reasons which
+-- I don't understand has some issues with lazy evaluation.
 transTrace :: Conf a b -> T.Tree (Conf a b)
 transTrace c = T.Node c (map transTrace (trans c))
 
+-- | Variant of 'transTrace' which commits to the first option in each
+-- transition.
 transTrace' :: Conf a b -> [Conf a b]
 transTrace' c = c : case trans' c of Just c' -> transTrace' c'
                                      Nothing -> []
@@ -36,6 +67,7 @@ transTrace' c = c : case trans' c of Just c' -> transTrace' c'
 doo :: Conf a b -> [Conf a b]
 doo c = concat $ map (filter final) (transStar c)
 
+-- | Variant of 'doo' which commits to the first option in each configuration.
 doo' :: Conf a b -> Maybe (Conf a b)
 doo' = listToMaybe . doo
 

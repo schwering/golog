@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-
 -- | State record for the SCR competition server.
 module TORCS.CarState where
 

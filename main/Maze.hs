@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts #-}
-{-# LANGUAGE EmptyDataDecls, UndecidableInstances #-}
+{-# LANGUAGE EmptyDataDecls, UndecidableInstances, MultiParamTypeClasses #-}
 
 module Main (main) where
 
@@ -70,20 +70,19 @@ distManhattan (P x1 y1) (P x2 y2) = fromIntegral $ abs (x1 - x2) + abs (y1 - y2)
 
 data Prim a = Up | Down | Left | Right deriving (Show, Eq)
 
-
-{- Regressive BAT: -}
-
-data Regr
-
-class MazeBAT a where
+class HistBAT (Prim a) => MazeBAT a where
    pos          :: Sit (Prim a) -> Point
    unvisited    :: Point -> Sit (Prim a) -> Bool
    visited      :: Sit (Prim a) -> [Point]
-   memory       :: Sit (Prim a) -> [Prim a]
    randomSupply :: MazeBAT a => Sit (Prim a) -> Random.Supply
    rewardSum    :: Sit (Prim a) -> Reward
 
    unvisited p s = p `notElem` visited s
+
+
+{- Regressive BAT: -}
+
+data Regr
 
 instance BAT (Prim Regr) where
    data Sit (Prim Regr) = S0 | Do (Prim Regr) (Sit (Prim Regr)) deriving Show
@@ -91,20 +90,21 @@ instance BAT (Prim Regr) where
    do_ = Do
    poss = allowedAction
 
+instance HistBAT (Prim Regr) where
+   history S0       = []
+   history (Do a s) = a : history s
+
 instance MazeBAT Regr where
-   pos = pos' . memory
+   pos = pos' . history
       where pos' []     = startPos
             pos' (a:as) = newPos a (pos' as)
 
-   visited s = scanr (\f p -> f p) startPos (map newPos (memory s))
-
-   memory S0       = []
-   memory (Do a s) = a : memory s
+   visited s = scanr (\f p -> f p) startPos (map newPos (history s))
 
    rewardSum S0       = 0
    rewardSum (Do a s) = rewardSum s + reward a s
 
-   randomSupply s = foldr (\f rs -> f rs) startRandomSupply (map newRandomSupply (memory s))
+   randomSupply s = foldr (\f rs -> f rs) startRandomSupply (map newRandomSupply (history s))
 
 
 {- Progressive BAT: -}
@@ -121,13 +121,14 @@ instance BAT (Prim Progr) where
    do_  _ (Sit []         _ _ _)  = error "do_: empty point history"
    poss = allowedAction
 
+instance HistBAT (Prim Progr) where
+   history (Sit _ _ m _) = m
+
 instance MazeBAT Progr where
    pos (Sit (p:_) _ _ _) = p
    pos (Sit _     _ _ _) = error "pos: empty point history"
 
    visited (Sit ps _ _ _) = ps
-
-   memory (Sit _ _ m _) = m
 
    rewardSum (Sit _ r _ _) = r
 
@@ -142,7 +143,7 @@ allowedAction a s = p' `isValidNeighborOf` p && unvisited p' s
          p  = pos s
 
 instance (BAT (Prim a), MazeBAT a) => DTBAT (Prim a) where
-   reward a s = (improv - penalty a (memory s) / 9) / normf - 100
+   reward a s = (improv - penalty a (history s) / 9) / normf - 100
       where oldRem = dist goalPos (pos s)
             newRem = dist goalPos (newPos a (pos s)) 
             improv = oldRem - newRem
@@ -164,7 +165,7 @@ instance (BAT (Prim a), MazeBAT a) => DTBAT (Prim a) where
    --abs (dist startPos goalPos - dist (newPos a (pos s)) goalPos)**1 -
    --abs (dist startPos goalPos - dist (pos s) goalPos)**1
 
-instance (BAT (Prim a), MazeBAT a) => IOBAT (Prim a) where
+instance (BAT (Prim a), MazeBAT a) => IOBAT (Prim a) IO where
    syncA a s = do let s' = do_ a s
                   --if a == Down then threadDelay (1*1000*1000) else return ()
                   putStrLn $ (if pos s' == goalPos then " *** " else " ... ") ++
@@ -177,9 +178,6 @@ newPos Up    p = up' p
 newPos Down  p = down' p
 newPos Left  p = left' p
 newPos Right p = right' p
-
-sitlen :: MazeBAT a => Sit (Prim a) -> Int
-sitlen = length . memory
 
 startRandomSupply :: Random.Supply
 startRandomSupply = Random.init 3

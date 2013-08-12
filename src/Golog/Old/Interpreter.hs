@@ -19,7 +19,7 @@
 --   decomposing the program, executing the next atomic action, and continuing
 --   this recursively for the remaining program in 'tree'.
 --
--- \[1\] http:\/\/kbsg.rwth-aachen.de\/~schwering\/CogRob-2012\/paper.pdf
+-- \[1\] <http://kbsg.rwth-aachen.de/~schwering/CogRob-2012/paper.pdf>
 
 module Golog.Old.Interpreter (BAT(..),
                               Reward, Depth, OptiF, Finality(..),

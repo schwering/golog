@@ -7,11 +7,11 @@
 -- use special types for the latter.
 module TORCS.PhysicsUtil where
 
-newtype KmH = KmH Double deriving (Num, Floating, Fractional, Real, RealFloat,
-                                   RealFrac, Eq, Ord)
+newtype KmH = KmH Double
+   deriving (Num, Floating, Fractional, Real, RealFloat, RealFrac, Eq, Ord)
 
-newtype Deg = Deg Double deriving (Num, Floating, Fractional, Real, RealFloat,
-                                   RealFrac, Eq, Ord)
+newtype Deg = Deg Double
+   deriving (Num, Floating, Fractional, Real, RealFloat, RealFrac, Eq, Ord)
 
 instance Read Deg where
    readsPrec i = map (\(x,s') -> (Deg x,s')) . readsPrec i
