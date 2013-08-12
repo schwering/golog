@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
 
 module Golog.Interpreter
   (BAT(..), DTBAT(..), IOBAT(..), Reward, Depth,
@@ -21,8 +21,8 @@ class BAT a where
 class BAT a => DTBAT a where
    reward     :: a -> Sit a -> Reward
 
-class BAT a => IOBAT a where
-   syncA      :: a -> Sit a -> IO (Sit a)
+class (BAT a, Monad m) => IOBAT a m where
+   syncA      :: a -> Sit a -> m (Sit a)
 
 data Atom a       = Prim a | PrimF (Sit a -> a) | Test (Sit a -> Bool)
 data PseudoAtom a = Atom (Atom a) | Complex (Prog a)
@@ -86,8 +86,8 @@ ast p' = rec (ast' p')
 
 data Node a b = Node (Sit a) b | Flop
 type Conf a b = Tree (Node a b)
-type ConfIO a b = Conf a (SyncIO a b, b)
-newtype SyncIO a b = SyncIO { runSync :: IO (ConfIO a b) }
+type ConfIO a b m = Conf a (SyncIO a b m, b)
+newtype SyncIO a b m = SyncIO { runSync :: m (ConfIO a b m) }
 
 treeND :: BAT a => Prog a -> Sit a -> Conf a ()
 treeND p sz = scan (exec (\_ _ _ _ -> ())) (Node sz ()) (ast p)
@@ -96,7 +96,7 @@ treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> Conf a (Reward, Depth)
 treeDT l p sz = resolve (chooseDT l id) (scan (exec f) (Node sz (0,0)) (ast p))
    where f (r,d) a s _ = (r + reward a s, d + 1)
 
-treeNDIO :: IOBAT a => Prog a -> Sit a -> ConfIO a ()
+treeNDIO :: IOBAT a m => Prog a -> Sit a -> ConfIO a () m
 treeNDIO p sz = cnf sz (ast p)
    where cnf s t = scan (exec f) (root s t) t
          root s t = Node s (SyncIO $ return (cnf s t), ())
@@ -104,7 +104,7 @@ treeNDIO p sz = cnf sz (ast p)
                                         s' <- syncA a (sit c)
                                         return (cnf s' t), ())
 
-treeDTIO :: (DTBAT a, IOBAT a) => Depth -> Prog a -> Sit a -> ConfIO a (Reward, Depth)
+treeDTIO :: (DTBAT a, IOBAT a m) => Depth -> Prog a -> Sit a -> ConfIO a (Reward, Depth) m
 treeDTIO l p sz = cnf sz (ast p)
    where cnf s t = resolve (chooseDT l snd) (scan (exec f) (root s t) t)
          root s t = Node s (SyncIO $ return (cnf s t), (0,0))
@@ -151,7 +151,7 @@ sit :: Conf a b -> Sit a
 sit (Val (Node s _) _) = s
 sit _                  = error "sit: invalid conf"
 
-sync :: ConfIO a b -> IO (ConfIO a b)
+sync :: ConfIO a b m -> m (ConfIO a b m)
 sync (Val (Node _ (pl,_)) _) = runSync pl
 sync _                       = error "sync: invalid conf"
 
