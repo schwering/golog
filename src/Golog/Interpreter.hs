@@ -2,7 +2,7 @@
 
 module Golog.Interpreter
   (BAT(..), DTBAT(..), IOBAT(..), Reward, Depth,
-   Atom(..), PseudoAtom(..), Prog(..), Conf,
+   Atom(..), PseudoAtom(..), Prog(..), Conf, ConfIO,
    treeND, treeDT, treeNDIO, treeDTIO, final, trans, sit, sync) where
 
 import Data.List (maximumBy)

@@ -22,7 +22,7 @@ data Handle = Handle Socket SockAddr
 
 -- | Class for SCR driver robots.
 class Driver a where
-   data State a :: *
+   data Context a :: *
 
    -- | Name should be @\"SCR\"@ unless changed in the SCR TORCS robot.
    -- The first argument is dummy.
@@ -36,21 +36,22 @@ class Driver a where
 
    -- | Returns the initial state.
    -- The first argument is dummy.
-   initialState :: a -> IO (State a)
+   initialState :: a -> IO (Context a)
 
    -- | Handler for incoming sensor readings which returns a new action.
-   command      :: State a -> CarState -> IO (State a, CarControl)
+   command      :: Context a -> CarState -> IO (Context a, CarControl)
 
    -- | Handler for the shutdown event.
-   shutdown     :: State a -> IO ()
+   shutdown     :: Context a -> IO ()
 
    -- | Handler for the restart event.
-   restart      :: State a -> IO (State a)
+   restart      :: Context a -> IO (Context a)
 
    name _     = "SCR"
    beamOris _ = map (deg2rad.Deg)
                 [-90,-75,-60,-45,-30,-20,-15,-10,-5,0,5,10,15,20,30,45,60,75,90]
 
+-- | Socket timeout in microseconds (@10^-6 s@).
 udpTimeout :: Int
 udpTimeout = 1000000
 

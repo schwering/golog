@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies, NoMonomorphismRestriction #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 
 -- | A simple BAT for manual comparison between the old and new Golog
 -- interpreters.
@@ -6,7 +7,7 @@ module GologTest where
 
 import Golog.Interpreter
 import qualified Golog.Macro as M
-import Golog.Util
+import Golog.Util hiding (HistBAT(..))
 
 instance BAT Int where
    data Sit Int = S0 | Do Int (Sit Int) deriving Show
@@ -19,7 +20,7 @@ instance DTBAT Int where
    reward a (Do a' _) | a == a'      = -1
    reward a _                        = fromIntegral (max 0 a)
 
-instance IOBAT Int where
+instance Monad m => IOBAT Int m where
    syncA 4 s = return $ do_ 2 s
    syncA a s = return $ do_ a s
 
