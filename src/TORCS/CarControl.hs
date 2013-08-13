@@ -33,13 +33,13 @@ data CarControl = CarControl {
    deriving Show
 
 stringifyControl :: CarControl -> String
-stringifyControl ctrl = stringify1 "accel"  (accel ctrl) ++
-                        stringify1 "brake"  (brake ctrl) ++
+stringifyControl ctrl = stringify1 "accel"  (accel  ctrl) ++
+                        stringify1 "brake"  (brake  ctrl) ++
                         stringify1 "clutch" (clutch ctrl) ++
-                        stringify1 "gear"   (gear ctrl) ++
-                        stringify1 "steer"  (steer ctrl) ++
-                        stringify1 "focus"  (focus ctrl) ++
-                        stringify1 "meta"   (meta ctrl)
+                        stringify1 "gear"   (gear   ctrl) ++
+                        stringify1 "steer"  (steer  ctrl) ++
+                        stringify1 "focus"  (focus  ctrl) ++
+                        stringify1 "meta"   (meta   ctrl)
 
 defaultControl :: CarControl
 defaultControl = CarControl {

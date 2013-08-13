@@ -45,26 +45,26 @@ Library
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 
-Executable Main
-    Hs-Source-Dirs:  main
-    Main-Is:         Main.hs
-    Build-Depends:   base, prgolog, bytestring, ekg
-    GHC-Options:     -Wall -O -rtsopts
-    --GHC-Prof-Options:-prof -auto-all
-
-Executable Maze
-    Hs-Source-Dirs:  main
-    Main-Is:         Maze.hs
-    Build-Depends:   base, prgolog
-    GHC-Options:     -Wall -O -rtsopts
-    --GHC-Prof-Options:-prof -auto-all
-
-Executable Web
-    Hs-Source-Dirs:  main
-    Main-Is:         Web.hs
-    Build-Depends:   base, prgolog, bytestring, wai, warp, enumerator, blaze-builder, http-types
-    GHC-Options:     -Wall -O -rtsopts
-    --GHC-Prof-Options:-prof -auto-all
+-- Executable Main
+--     Hs-Source-Dirs:  main
+--     Main-Is:         Main.hs
+--     Build-Depends:   base, prgolog, bytestring, ekg
+--     GHC-Options:     -Wall -O -rtsopts
+--     --GHC-Prof-Options:-prof -auto-all
+-- 
+-- Executable Maze
+--     Hs-Source-Dirs:  main
+--     Main-Is:         Maze.hs
+--     Build-Depends:   base, prgolog
+--     GHC-Options:     -Wall -O -rtsopts
+--     --GHC-Prof-Options:-prof -auto-all
+-- 
+-- Executable Web
+--     Hs-Source-Dirs:  main
+--     Main-Is:         Web.hs
+--     Build-Depends:   base, prgolog, bytestring, wai, warp, enumerator, blaze-builder, http-types
+--     GHC-Options:     -Wall -O -rtsopts
+--     --GHC-Prof-Options:-prof -auto-all
 
 Executable Driver
     Hs-Source-Dirs:  main

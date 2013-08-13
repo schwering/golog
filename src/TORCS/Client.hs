@@ -5,6 +5,7 @@
 module TORCS.Client (Driver(..), run) where
 
 import Data.ByteString.Char8 (pack, unpack)
+import Data.Maybe (isNothing, fromJust)
 import Network.Socket (Socket, SockAddr, SocketType(Datagram), addrAddress,
                        getAddrInfo, socket, addrFamily, sClose)
 import Network.Socket.ByteString (sendAllTo, recvFrom)
@@ -42,7 +43,7 @@ class Driver a where
    command      :: Context a -> CarState -> IO (Context a, CarControl)
 
    -- | Handler for the shutdown event.
-   shutdown     :: Context a -> IO ()
+   shutdown     :: Context a -> IO (Maybe (Context a))
 
    -- | Handler for the restart event.
    restart      :: Context a -> IO (Context a)
@@ -100,13 +101,16 @@ run driver host port =
          loop handle state =
             do str <- recv handle
                if "***shutdown***\0" == str
-                  then do  shutdown state
-                           closeHandle handle
+                  then do  state' <- shutdown state
+                           if isNothing state'
+                              then do  closeHandle handle
+                              else do  greet handle
+                                       loop handle (fromJust state')
                   else
-                  if "***restart***\0" == str
-                  then do  state' <- restart state
-                           loop handle state'
-                  else do  (state', ctrl) <- command state (parseState str)
-                           send handle (stringifyControl ctrl)
-                           loop handle state'
+                     if "***restart***\0" == str
+                        then do  state' <- restart state
+                                 loop handle state'
+                        else do  (state', ctrl) <- command state (parseState str)
+                                 send handle (stringifyControl ctrl)
+                                 loop handle state'
 

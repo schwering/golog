@@ -68,10 +68,12 @@ module TORCS.SimpleDriver where
 import Control.Concurrent
 import qualified Control.Concurrent.SSem as Sem
 import Data.IORef
-import Data.Maybe (fromMaybe, fromJust)
+import Data.List (find)
+import Data.Maybe (fromMaybe)
 import Golog.Interpreter
+import Golog.Macro
 import Golog.Util
-import Text.Printf
+--import Text.Printf
 import System.Timeout (timeout)
 import TORCS.CarControl
 import TORCS.CarState
@@ -79,13 +81,14 @@ import qualified TORCS.CarControl as Control
 import qualified TORCS.CarState as State
 import TORCS.Client
 import TORCS.PhysicsUtil
+import Debug.Trace
 
 data Prim1 = AntiDrift | AntiBlock |AntiSlip |
              ApproachLeft | DriveCenter | ApproachRight | FollowMaxBeam
    deriving Show
 
 data Prim2 = Accel Double | Brake Double | Clutch Double | Gear Int |
-             Steer Double | Focus Int | Meta Int | Tick
+             Steer Double | Focus Int | Meta Int | Tick (Maybe CarState)
    deriving Show
 
 data SimpleDriver = SimpleDriver
@@ -93,6 +96,8 @@ type Sit1 = Sit Prim1
 type Sit2 = Sit Prim2
 type Conf1 = ConfIO Prim1 (Reward, Depth) IO
 type Conf2 = ConfIO Prim2 () IO
+type Prog1 = Prog Prim1
+type Prog2 = Prog Prim2
 
 instance BAT Prim1 where
    data Sit Prim1 = Sit1 {
@@ -115,7 +120,7 @@ instance BAT Prim1 where
    poss ApproachLeft  s = trackTime (currentState1 s) Zero < 5 &&
                           trackTime (currentState1 s) Neg5 >
                              trackTime (currentState1 s) Zero
-   poss DriveCenter   s = trackTime (currentState1 s) Zero > 5
+   poss DriveCenter   s = True-- trackTime (currentState1 s) Zero > 5
    poss ApproachRight s = trackTime (currentState1 s) Zero < 5 &&
                           trackTime (currentState1 s) Pos5 >
                              trackTime (currentState1 s) Zero
@@ -134,19 +139,29 @@ instance IOBAT Prim1 IO where
    syncA a s =
       do putStrLn $ show a
          c2 <- sync (refine a s (assoc s))
+         putStrLn $ show a ++ " done"
          return $ (do_ a s){assoc = sit c2}
 
 currentState1 :: Sit1 -> CarState
 currentState1 = currentState2 . assoc
 
 refine :: Prim1 -> Sit1 -> Sit2 -> Conf2
-refine AntiDrift     _ s2 = fromJust $ doo' $ treeNDIO Nil s2
-refine AntiBlock     _ s2 = fromJust $ doo' $ treeNDIO Nil s2
-refine AntiSlip      _ s2 = fromJust $ doo' $ treeNDIO Nil s2
-refine ApproachLeft  _ s2 = fromJust $ doo' $ treeNDIO Nil s2
-refine DriveCenter   _ s2 = fromJust $ doo' $ treeNDIO Nil s2
-refine ApproachRight _ s2 = fromJust $ doo' $ treeNDIO Nil s2
-refine FollowMaxBeam _ s2 = fromJust $ doo' $ treeNDIO Nil s2
+refine AntiDrift     _ s2 = refineProg Nil s2
+refine AntiBlock     _ s2 = refineProg Nil s2
+refine AntiSlip      _ s2 = refineProg Nil s2
+refine ApproachLeft  _ s2 = refineProg (steerTrackPos    0.8) s2
+refine DriveCenter   _ s2 = refineProg (steerTrackPos      0) s2
+refine ApproachRight _ s2 = refineProg (steerTrackPos (-0.8)) s2
+refine FollowMaxBeam _ s2 = refineProg (steerAngle longestBeam) s2
+   where longestBeam = toRad $ snd $ maximum $
+                       map (\ori -> (trackTime (currentState2 s2) ori, ori))
+                       [Neg90 .. Pos90]
+
+refineProg :: Prog2 -> Sit2 -> Conf2
+refineProg p s = case doo' $ treeNDIO (plus q `Conc` p) s of
+                 Just c  -> c
+                 Nothing -> error "refineProg: refined execution failed"
+   where q = (transmission `Conc` acceleration) `Seq` tick
 
 instance BAT Prim2 where
    data Sit Prim2 = Sit2 {
@@ -154,37 +169,63 @@ instance BAT Prim2 where
       currentControl2 :: CarControl,
       sensedState     :: IORef CarState,
       newControl      :: IORef CarControl,
-      ticks           :: Sem.SSem
+      ticks           :: Sem.SSem,
+      alreadyAccel    :: Bool,
+      alreadyBrake    :: Bool,
+      alreadyGear     :: Bool,
+      alreadySteer    :: Bool
    }
 
-   s0 = Sit2 defaultState defaultControl undefined undefined undefined
+   s0 = Sit2 defaultState defaultControl
+             undefined undefined undefined
+             False False False False
 
-   do_ (Accel x)  s = modControl (\c -> c{accel = x}) s
-   do_ (Brake x)  s = modControl (\c -> c{brake = x}) s
-   do_ (Clutch x) s = modControl (\c -> c{clutch = x}) s
-   do_ (Gear x)   s = modControl (\c -> c{Control.gear = x}) s
-   do_ (Steer x)  s = modControl (\c -> c{steer = x}) s
-   do_ (Focus x)  s = modControl (\c -> c{Control.focus = x}) s
-   do_ (Meta x)   s = modControl (\c -> c{meta = x}) s
-   do_ Tick       s = modState (simulateState tickDurSec) s
+   do_ (Accel x)       s = modControl (\c -> c{accel         = x}) s{alreadyAccel = True}
+   do_ (Brake x)       s = modControl (\c -> c{brake         = x}) s{alreadyBrake = True}
+   do_ (Clutch x)      s = modControl (\c -> c{clutch        = x}) s
+   do_ (Gear x)        s = modControl (\c -> c{Control.gear  = x}) s{alreadyGear  = True}
+   do_ (Steer x)       s = modControl (\c -> c{steer         = x}) s{alreadySteer = True}
+   do_ (Focus x)       s = modControl (\c -> c{Control.focus = x}) s
+   do_ (Meta x)        s = modControl (\c -> c{meta          = x}) s
+   do_ (Tick (Just x)) s = s{currentState2 = x}
+   do_ (Tick Nothing)  s = modState (simulateState tickDurSec) s{alreadyAccel = False,
+                                                                 alreadyBrake = False,
+                                                                 alreadyGear  = False,
+                                                                 alreadySteer = False}
 
-   poss (Accel _)  _ = True
+   poss (Accel a)  s = True --a < rpm (currentState2 s) / 7500
    poss (Brake _)  _ = True
    poss (Clutch _) _ = True
-   poss (Gear n)   s = abs (n - State.gear (currentState2 s)) == 1
-   poss (Steer _)  s = kmh2ms (speedX (currentState2 s)) > 1
+   poss (Gear n)   s = abs (n - State.gear (currentState2 s)) <= 1
+   poss (Steer _)  s = True-- kmh2ms (speedX (currentState2 s)) > 1
    poss (Focus _)  _ = True
    poss (Meta _)   _ = True
-   poss Tick       _ = True
+   poss (Tick _)   _ = True
+
+instance DTBAT Prim2 where
+   reward (Accel _)  s = if alreadyAccel s then -1 else -0.01
+   reward (Brake _)  s = if alreadyBrake s then -1 else -0.01
+   reward (Clutch _) _ = 0
+   reward (Gear _)   s = if alreadyGear  s then -1 else -0.01
+   reward (Steer _)  s = if alreadySteer s then -1 else -0.01
+   reward (Focus _)  _ = 0
+   reward (Meta _)   _ = 0
+   reward (Tick _)   s = if alreadyAccel s && alreadyBrake s &&
+                            alreadyGear s && alreadySteer s then 0 else -1
 
 instance IOBAT Prim2 IO where
-   syncA Tick s =
-      do Sem.wait (ticks s)
+   syncA (Tick Nothing) s =
+      do putStrLn $ "Tick"
+         Sem.wait (ticks s)
          sensed <- readIORef (sensedState s)
-         return s{currentState2 = sensed}
+         putStrLn $ "Tack"
+         return $ do_ (Tick (Just sensed)) s
+   syncA (Tick (Just _)) _ =
+         error "syncA: Tick (Just _) already synced"
    syncA a s =
       do let s' = do_ a s
          writeIORef (newControl s) (currentControl2 s)
+         --putStrLn $ "Wrote " ++ show (currentControl2 s)
          return s'
 
 modControl :: (CarControl -> CarControl) -> Sit2 -> Sit2
@@ -199,13 +240,84 @@ tickDurSec = 10 / 1000
 tickDurMicroSec :: Int
 tickDurMicroSec = 10 * 1000
 
+tick :: Prog2
+tick = prim (Tick Nothing)
+
+transmission :: Prog2
+transmission = primf (\s -> Gear (case lookup (g s) rpms of
+                                       Just (lo,hi) | rpm' s < lo -> d s
+                                                    | rpm' s > hi -> u s
+                                       _                          -> g s))
+   where rpm' = State.rpm . currentState2
+         g    = State.gear . currentState2
+         u    = (1+) . g
+         d    = (1+) . g
+         rpms = [(0, (-1/0,    1)),
+                 (1, (   0, 5000)),
+                 (2, (2500, 6000)),
+                 (3, (3000, 6000)),
+                 (4, (3000, 6500)),
+                 (5, (3500, 7000)),
+                 (6, (3500,  1/0))]
+
+acceleration :: Prog2
+acceleration = atomic $
+               primf (\s -> action (currentState2 s)) `Seq`
+               primf (\s -> if brake (currentControl2 s) > 0 then Accel 0 else Brake 0)
+   where action state = let x = param state
+                        in if x < 0 then Brake (-x) else Accel x
+         param  state = if kmh2ms (speedX state) < 10 then 0.5 else param' state
+         param' state = max (-1) $ min 1 $ (1 - 1 / (beamT oris)^(2::Int))
+            where msX  = kmh2ms (speedX state)
+                  msY  = kmh2ms (speedY state)
+                  beta = atan2 msY msX
+                  oris = find (\(lo,hi) -> toRad lo <= beta && beta <= toRad hi)
+                         [(lo, succ lo) | lo <- [Neg90 .. pred Pos90]]
+                  beamT (Just (lo,hi)) =
+                         let r = (beta - toRad lo) / (toRad hi - toRad lo)
+                         in r * trackTime state lo + (1-r) * trackTime state hi
+                  beamT Nothing = 1/0
+
+steerAngle :: Double -> Prog2
+steerAngle ori = star action `Seq` success
+   where action = primf (steerAngleAction ori)
+         success = test (\s -> abs (angle (currentState2 s) - ori) < deg2rad 3)
+
+steerAngleAction :: Double -> Sit2 -> Prim2
+steerAngleAction ori s = Steer ori''
+   where state = currentState2 s
+         ori'' = if v > steerSensitivityOffset
+                 then ori' / (steerLock * (v - steerSensitivityOffset))
+                 else ori'
+         ori' = ori * (angle state) * 0.5
+         v    = kmh2ms (speedX state)
+         steerLock = 0.366519 * 3.6
+         steerSensitivityOffset = kmh2ms 80
+
+steerTrackPos :: Double -> Prog2
+steerTrackPos pos = star action `Seq` success
+   where action     = primf (\s -> steerAngleAction (ori (currentState2 s)) s)
+         ori state  = maxAngle * (diff state) / 2
+         diff state = pos - trackPos state
+         maxAngle   = deg2rad 45
+         success    = test (\s -> abs (trackPos (currentState2 s) - pos) < 0.05)
+
 gologAgent :: IORef CarState -> IORef CarControl -> Sem.SSem -> IO ()
-gologAgent stateRef controlRef tickSem =
-   do return ()
-   where s01 = s0{assoc = s02}
-         s02 = s0{sensedState = stateRef,
-                  newControl  = controlRef,
-                  ticks       = tickSem}
+gologAgent stateRef controlRef tickSem = loop conf
+   where loop c = do let cs = trans c
+                     if null cs
+                        then do putStrLn "EOP"
+                        else do let c' = head cs
+                                c'' <- sync c'
+                                loop c''
+         conf   = treeDTIO 3 p s01 :: Conf1
+         p      = star $ Nondet $ map prim [AntiDrift, AntiBlock, AntiSlip,
+                                            ApproachLeft, DriveCenter,
+                                            ApproachRight, FollowMaxBeam]
+         s01    = s0{assoc = s02}
+         s02    = s0{sensedState = stateRef,
+                     newControl  = controlRef,
+                     ticks       = tickSem}
 
 {-
 -- | Puts a new value into an 'MVar' after taking the old value if there is one.
@@ -276,7 +388,7 @@ simulateState t s = s{curLapTime    = curLapTime s + t,
          trackT (alpha, d) = d + v * cos (beta - alpha) * t
          trackPosT         = v * sin (beta + gamma) * t / trackWidth
          trackWidth        = trackDist s Neg90 + trackDist s Pos90
-         ms2kmh' x         = case ms2kmh x of KmH x -> x
+         ms2kmh' x         = case ms2kmh x of KmH x' -> x'
 
 instance Driver SimpleDriver where
    data Context SimpleDriver = Context (IORef CarState) (IORef CarControl)
@@ -291,17 +403,21 @@ instance Driver SimpleDriver where
 
    command ctx@(Context stateRef controlRef tickSem _) state =
       do writeIORef stateRef state
+         --putStrLn $ show state
          Sem.signal tickSem
-         _ <- printf "%.2f s  (%.2f m)    %.2f s  (%.2f m)    %.2f s  (%.2f m)\n"
-              (trackTime state Neg90) (trackDist state Neg90)
-              (trackTime state Zero)  (trackDist state Zero)
-              (trackTime state Pos90) (trackDist state Pos90)
+--         _ <- printf "%.2f s  (%.2f m)    %.2f s  (%.2f m)    %.2f s  (%.2f m)\n"
+--              (trackTime state Neg90) (trackDist state Neg90)
+--              (trackTime state Zero)  (trackDist state Zero)
+--              (trackTime state Pos90) (trackDist state Pos90)
          control <- timeout (tickDurMicroSec) $ readIORef controlRef
+         --putStrLn $ show control
          return (ctx, fromMaybe defaultControl control)
 
-   shutdown (Context _ _ _ gologThread) =
+   shutdown ctx =
       do putStrLn "SHUTDOWN"
-         killThread gologThread
+         --killThread gologThread
+         ctx' <- restart ctx
+         return (Just ctx')
 
    restart (Context stateRef controlRef _ gologThread) =
       do putStrLn "RESTART"

@@ -1,6 +1,6 @@
 module Golog.Macro
   (prim, primf, test,
-   atomic, star, plus, ifThenElse, (==>), (<|>), while,
+   atomic, star, plus, opt, ifThenElse, (==>), (<|>), while,
    pick, withCtrl) where
 
 import Golog.Interpreter
@@ -22,6 +22,9 @@ star p = Nondet [Nil, p `Seq` star p]
 
 plus :: Prog a -> Prog a
 plus p = Nondet [p, p `Seq` plus p]
+
+opt :: Prog a -> Prog a
+opt p = Nondet [Nil, p]
 
 ifThenElse :: (Sit a -> Bool) -> Prog a -> Prog a -> Prog a
 ifThenElse phi p1 p2 = Nondet [test phi `Seq` p1, test (not.phi) `Seq` p2]

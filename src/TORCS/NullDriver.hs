@@ -14,6 +14,7 @@ instance Driver NullDriver where
    command s state = do  putStrLn ("STATE: " ++ show state)
                          return (s, defaultControl{accel=0.75})
    shutdown _        = do  putStrLn "SHUTDOWN"
+                           return Nothing
    restart state     = do  putStrLn "RESTART"
                            return state
 
