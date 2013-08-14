@@ -49,20 +49,20 @@ scan f x0 t0 = Val x0 (scan' x0 t0)
          scan' x (Val y t) = let z = f x y t in Val z (scan' z t)
          scan' x (Alt ts)  = Alt (map (scan' x) ts)
 
-best :: a -> (a -> a -> Ordering) -> (Tree a -> Bool) -> Depth -> Tree a -> a
-best def _   _   _ Empty                 = def
-best def _   _   _ (Alt [])              = def
-best def cmp cut l (Alt ts)              = maximumBy cmp (map (best def cmp cut l) ts)
-best def cmp cut l (Val x t) | l == 0    = x
-                             | cut t     = maximumBy cmp [x, best def cmp cut (l-1) t]
-                             | l > 0     = best def cmp cut (l-1) t
-                             | otherwise = error "best: l < 0"
+best :: (a -> a -> Ordering) -> (Tree a -> Bool) -> Depth -> a -> Tree a -> a
+best _   _   _ x Empty     = x
+best _   _   _ x (Alt [])  = x
+best cmp cut l x (Alt ts)  = maximumBy cmp (map (best cmp cut l x) ts)
+best cmp cut l x (Val y t) | l == 0    = y
+                           | cut t     = best cmp cut (l-1) y t
+                           | l > 0     = best cmp cut (l-1) x t
+                           | otherwise = error "best: l < 0"
 
-resolve :: ([Tree a] -> Tree a) -> Tree a -> Tree a
-resolve _ Empty     = Empty
-resolve _ (Alt [])  = Empty
-resolve f (Alt ts)  = resolve f (f ts)
-resolve f (Val x t) = Val x (resolve f t)
+resolve :: (a -> [Tree a] -> Tree a) -> a -> Tree a -> Tree a
+resolve _ _ Empty     = Empty
+resolve _ _ (Alt [])  = Empty
+resolve f x (Alt ts)  = resolve f x (f x ts)
+resolve f _ (Val x t) = Val x (resolve f x t)
 
 itl :: Tree a -> Tree a -> Tree a
 itl Empty          t2             = t2
@@ -93,9 +93,11 @@ newtype SyncIO a b m = SyncIO { runSync :: m (ConfIO a b m) }
 treeND :: BAT a => Prog a -> Sit a -> Conf a ()
 treeND p sz = scan (exec (\_ _ _ _ -> ())) (Node sz ()) (ast p)
 
-treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> Conf a (Reward, Depth)
-treeDT l p sz = resolve (chooseDT l id) (scan (exec f) (Node sz (0,0)) (ast p))
-   where f (r,d) a s _ = (r + reward a s, d + 1)
+treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> Conf a (Reward,Depth)
+treeDT l p sz = cnf sz (ast p)
+   where cnf s t = resolve (chooseDT l id) Flop (scan (exec f) (root s) t)
+         root s = Node s (0,0)
+         f (r,d) a s _ = (r + reward a s, d + 1)
 
 treeNDIO :: IOBAT a m => Prog a -> Sit a -> ConfIO a () m
 treeNDIO p sz = cnf sz (ast p)
@@ -105,9 +107,10 @@ treeNDIO p sz = cnf sz (ast p)
                                         s' <- syncA a (sit c)
                                         return (cnf s' t), ())
 
-treeDTIO :: (DTBAT a, IOBAT a IO) => Depth -> Prog a -> Sit a -> ConfIO a (Reward, Depth) IO
+treeDTIO :: (DTBAT a, IOBAT a m) => Depth -> Prog a -> Sit a ->
+                                    ConfIO a (Reward,Depth) m
 treeDTIO l p sz = cnf sz (ast p)
-   where cnf s t = resolve (chooseDT l snd) (scan (exec f) (root s t) t)
+   where cnf s t = resolve (chooseDT l snd) Flop (scan (exec f) (root s t) t)
          root s t = Node s (SyncIO $ return (cnf s t), (0,0))
          f (pl,(r,d)) a s t = (SyncIO $ do c <- runSync pl
                                            s' <- syncA a (sit c)
@@ -120,22 +123,19 @@ exec f (Node s pl)  (Prim a)  t | poss a s = Node (do_ a s) (f pl a s t)
 exec f c@(Node s _) (PrimF a) t            = exec f c (Prim (a s)) t
 exec _ _            _         _            = Flop
 
-chooseDT :: DTBAT a => Depth -> (b -> (Reward, Depth)) -> [Conf a b] -> Conf a b
-chooseDT l f = maximumBy (comparing value)
-   where value t = val (best def cmp (final' False) l t)
-            where def             = Flop
-                  val (Node _ pl) = f pl
-                  val Flop        = (-1/0, minBound)
-                  cmp x y         = compare (val x) (val y)
-
-final' :: Bool -> Conf a b -> Bool
-final' _    Empty     = True
-final' _    (Alt [])  = True
-final' next (Alt ts)  = any (final' next) ts
-final' next (Val _ t) = next && final' False t
+chooseDT :: Depth -> (b -> (Reward,Depth)) -> Node a b -> [Conf a b] -> Conf a b
+chooseDT l f def = maximumBy (comparing value)
+   where value t = val (best cmp final l def t)
+         val (Node _ pl) = f pl
+         val Flop        = (-1/0, minBound)
+         cmp x y         = compare (val x) (val y)
 
 final :: Conf a b -> Bool
-final t = final' True t
+final = final' True
+   where final' _    Empty     = True
+         final' _    (Alt [])  = True
+         final' next (Alt ts)  = any (final' next) ts
+         final' next (Val _ t) = next && final' False t
 
 trans :: Conf a b -> [Conf a b]
 trans Empty              = error "trans: invalid conf"

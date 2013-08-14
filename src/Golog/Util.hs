@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Golog.Util
-   (HistBAT(..),
+   (HistBAT(..), sit2list, list2sit,
     trans', transStar, transTrace, transTrace',
     doo, doo', dooSync') where
 
@@ -41,6 +41,11 @@ class BAT a => HistBAT a where
    predSit s   = case history s of []   -> Nothing
                                    a:as -> Just (a, foldr do_ s0 as)
 
+sit2list :: HistBAT a => Sit a -> [a]
+sit2list = reverse . history
+
+list2sit :: BAT a => [a] -> Sit a
+list2sit = foldl (flip do_) s0
 
 --- | Variant of 'trans' which commits to the first option.
 trans' :: Conf a b -> Maybe (Conf a b)
@@ -73,7 +78,7 @@ doo c = concat $ map (filter final) (transStar c)
 doo' :: Conf a b -> Maybe (Conf a b)
 doo' = listToMaybe . doo
 
-dooSync' :: ConfIO a b IO -> IO (Maybe (ConfIO a b IO))
+dooSync' :: Monad m => ConfIO a b m -> m (Maybe (ConfIO a b m))
 dooSync' c | final c   = return (Just c)
            | otherwise = case trans' c of
                               Just c' -> sync c' >>= dooSync'
@@ -131,7 +136,7 @@ showTree d' = showTree' d' 0
          showTree' _ n Empty     = s n ++ "Empty\n"
          showTree' d n (Alt ts)  = s n ++ "Alt\n" ++ concat (map (showTree' (d-1) (n+1)) ts)
          showTree' d n (Val x t) = s n ++ "Val " ++ show x ++ "\n" ++
-                                   ( if not (stop x) then showTree' d (n+1) t else "" )
+                                   ( if not (stop x) then showTree' (d-1) (n+1) t else "" )
          s n = replicate (2*n) ' '
 -}
 
