@@ -94,7 +94,6 @@ exec a = state f
 instance Show a => Show (Atom a) where
    show (Prim a)  = "Prim " ++ show a
    show (PrimF _) = "PrimF <...>"
-   show (Test _)  = "Test <...>"
 
 instance Show a => Show (PseudoAtom a) where
    show (Atom a)    = show a

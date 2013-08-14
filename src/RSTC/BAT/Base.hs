@@ -16,6 +16,7 @@ module RSTC.BAT.Base (Prim(..), NTGCat(..), TTCCat(..),
 
 import RSTC.Car
 import Golog.Interpreter
+import Golog.Macro (TestAction(..))
 import qualified RSTC.Obs as O
 import RSTC.Theorems
 import Util.Interpolation
@@ -33,6 +34,7 @@ data Prim a = Wait (Time a)
             | Start Car String
             | End Car String
             | Msg String
+            | Test (Sit (Prim a) -> Bool)
 
 data NTGCat = VeryFarBehind
             | FarBehind
@@ -56,6 +58,10 @@ data TTCCat = ConvergingFast
             | Diverging
             | DivergingFast
             deriving (Bounded, Eq, Enum, Ord, Show)
+
+
+instance TestAction (Prim a) where
+   testAction = Test
 
 
 class Wrapper w where
@@ -157,6 +163,7 @@ defaultPoss NoOp                 _ = True
 defaultPoss (Start _ _)          _ = True
 defaultPoss (End _ _)            _ = True
 defaultPoss (Msg _)              _ = True
+defaultPoss (Test cond)          s = cond s
 
 defaultReward :: HistState a => Prim a -> Sit (Prim a) -> Reward
 defaultReward (Wait _)         _ = 0
@@ -175,6 +182,7 @@ defaultReward (End _ _)        s = case dropWhile startOrEnd (history s) of (Mat
          startOrEnd (End _ _)    = True
          startOrEnd _            = False
 defaultReward (Msg _)          _ = 0
+defaultReward (Test _)         _ = 0
 
 
 lookahead :: Depth
@@ -292,6 +300,7 @@ convert = list2sit . map (m (wrap . unwrap)) . sit2list
          m _ (Start b msg)    = Start b msg
          m _ (End b msg)      = End b msg
          m _ (Msg msg)        = Msg msg
+         m _ (Test cond)      = Test (\s -> cond (convert s))
 
 
 -- | Returns '1/0' which should be a representation of 'NaN'.

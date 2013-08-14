@@ -27,7 +27,7 @@ picknum bounds val = pso 10 m n defaultParams bounds (Max val)
          n = 1
 
 
-ptest :: String -> Prog a
+ptest :: TestAction a => String -> Prog a
 ptest s = test (const (traceStack s True))
 
 

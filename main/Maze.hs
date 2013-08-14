@@ -68,7 +68,18 @@ distManhattan :: Point -> Point -> Double
 distManhattan (P x1 y1) (P x2 y2) = fromIntegral $ abs (x1 - x2) + abs (y1 - y2)
 
 
-data Prim a = Up | Down | Left | Right deriving (Show, Eq)
+data Prim a = Up | Down | Left | Right | Test (Cond a) deriving (Show, Eq)
+
+newtype Cond a = Cond (Sit (Prim a) -> Bool)
+
+instance Show (Cond a) where
+   show (Cond _) = "Cond <...>"
+
+instance Eq (Cond a) where
+   _ == _ = error "compare: Conditions are not comparable"
+
+instance TestAction (Prim a) where
+   testAction = Test . Cond
 
 class HistBAT (Prim a) => MazeBAT a where
    pos          :: Sit (Prim a) -> Point
@@ -86,8 +97,9 @@ data Regr
 
 instance BAT (Prim Regr) where
    data Sit (Prim Regr) = S0 | Do (Prim Regr) (Sit (Prim Regr)) deriving Show
-   s0  = S0
-   do_ = Do
+   s0 = S0
+   do_ (Test _) s = s
+   do_ a        s = Do a s
    poss = allowedAction
 
 instance HistBAT (Prim Regr) where
@@ -114,11 +126,14 @@ data Progr
 instance BAT (Prim Progr) where
    data Sit (Prim Progr)       = Sit [Point] Reward [Prim Progr] Random.Supply deriving Show
    s0                          = Sit [startPos] 0 [] startRandomSupply
-   do_  a s@(Sit ps@(p:_) r m rs) = Sit (newPos a p : ps)
-                                        (r + reward a s)
-                                        (a : m)
-                                        (newRandomSupply a rs)
-   do_  _ (Sit []         _ _ _)  = error "do_: empty point history"
+
+   do_  (Test _) s                       = s
+   do_  a        s@(Sit ps@(p:_) r m rs) = Sit (newPos a p : ps)
+                                               (r + reward a s)
+                                               (a : m)
+                                               (newRandomSupply a rs)
+   do_  _        (Sit []         _ _ _)  = error "do_: empty point history"
+
    poss = allowedAction
 
 instance HistBAT (Prim Progr) where
@@ -138,29 +153,32 @@ instance MazeBAT Progr where
 {- Common BAT functions: -}
 
 allowedAction :: MazeBAT a => Prim a -> Sit (Prim a) -> Bool
-allowedAction a s = p' `isValidNeighborOf` p && unvisited p' s
+allowedAction (Test (Cond f)) s = f s
+allowedAction a               s = p' `isValidNeighborOf` p && unvisited p' s
    where p' = newPos a p
          p  = pos s
 
 instance (BAT (Prim a), MazeBAT a) => DTBAT (Prim a) where
+   reward (Test _) s = 0
    reward a s = (improv - penalty a (history s) / 9) / normf - 100
       where oldRem = dist goalPos (pos s)
             newRem = dist goalPos (newPos a (pos s)) 
             improv = oldRem - newRem
             normf  = fromIntegral $ sitlen s + 1
-            penalty Up    (Up:_)    = 0
-            penalty Up    (Down:_)  = 2
-            penalty Up    (_:_)     = 1
-            penalty Down  (Down:_)  = 0
-            penalty Down  (Up:_)    = 2
-            penalty Down  (_:_)     = 1
-            penalty Left  (Left:_)  = 0
-            penalty Left  (Right:_) = 2
-            penalty Left  (_:_)     = 1
-            penalty Right (Right:_) = 0
-            penalty Right (Left:_)  = 2
-            penalty Right (_:_)     = 1
-            penalty _     []        = 0
+            penalty Up       (Up:_)    = 0
+            penalty Up       (Down:_)  = 2
+            penalty Up       (_:_)     = 1
+            penalty Down     (Down:_)  = 0
+            penalty Down     (Up:_)    = 2
+            penalty Down     (_:_)     = 1
+            penalty Left     (Left:_)  = 0
+            penalty Left     (Right:_) = 2
+            penalty Left     (_:_)     = 1
+            penalty Right    (Right:_) = 0
+            penalty Right    (Left:_)  = 2
+            penalty Right    (_:_)     = 1
+            penalty (Test _) _         = error "penalty: Test action"
+            penalty _        []        = 0
    --dist (pos s) goalPos - dist (newPos a (pos s)) goalPos
    --abs (dist startPos goalPos - dist (newPos a (pos s)) goalPos)**1 -
    --abs (dist startPos goalPos - dist (pos s) goalPos)**1
@@ -174,19 +192,21 @@ instance (BAT (Prim a), MazeBAT a) => IOBAT (Prim a) IO where
                   return s'
 
 newPos :: (Prim a) -> Point -> Point
-newPos Up    p = up' p
-newPos Down  p = down' p
-newPos Left  p = left' p
-newPos Right p = right' p
+newPos Up       p = up' p
+newPos Down     p = down' p
+newPos Left     p = left' p
+newPos Right    p = right' p
+newPos (Test _) _ = error "newPos: Test action"
 
 startRandomSupply :: Random.Supply
 startRandomSupply = Random.init 3
 
 newRandomSupply :: Prim a -> Random.Supply -> Random.Supply
-newRandomSupply Up    rs = Random.shuffle  7 $ snd $ Random.random $ rs
-newRandomSupply Down  rs = Random.shuffle 13 $ snd $ Random.random $ rs
-newRandomSupply Left  rs = Random.shuffle 19 $ snd $ Random.random $ rs
-newRandomSupply Right rs = Random.shuffle 31 $ snd $ Random.random $ rs
+newRandomSupply Up       rs = Random.shuffle  7 $ snd $ Random.random $ rs
+newRandomSupply Down     rs = Random.shuffle 13 $ snd $ Random.random $ rs
+newRandomSupply Left     rs = Random.shuffle 19 $ snd $ Random.random $ rs
+newRandomSupply Right    rs = Random.shuffle 31 $ snd $ Random.random $ rs
+newRandomSupply (Test _) rs = error "newRandomSupply: Test action"
 
 random :: (BAT (Prim a), MazeBAT a) => Sit (Prim a) -> Int
 random s = fst $ Random.random (randomSupply s)

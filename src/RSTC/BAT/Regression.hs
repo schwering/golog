@@ -34,8 +34,11 @@ instance Wrapper Qty where
 instance RealFloat a => BAT (Prim (Qty a)) where
    data Sit (Prim (Qty a)) = S0 | Do (Prim (Qty a)) (Sit (Prim (Qty a)))
 
-   s0  = S0
-   do_ = Do
+   s0 = S0
+
+   do_ (Test _) s = s
+   do_ a        s = Do a s
+
    poss = defaultPoss
 
 instance RealFloat a => DTBAT (Prim (Qty a)) where

@@ -25,7 +25,7 @@ class BAT a => DTBAT a where
 class (BAT a, Monad m) => IOBAT a m where
    syncA      :: a -> Sit a -> m (Sit a)
 
-data Atom a       = Prim a | PrimF (Sit a -> a) | Test (Sit a -> Bool)
+data Atom a       = Prim a | PrimF (Sit a -> a)
 data PseudoAtom a = Atom (Atom a) | Complex (Prog a)
 data Prog a       = Seq (Prog a) (Prog a)  | Nondet [Prog a]
                   | Conc (Prog a) (Prog a) | PseudoAtom (PseudoAtom a) | Nil
@@ -91,42 +91,34 @@ type ConfIO a b m = Conf a (SyncIO a b m, b)
 newtype SyncIO a b m = SyncIO { runSync :: m (ConfIO a b m) }
 
 treeND :: BAT a => Prog a -> Sit a -> Conf a ()
-treeND p sz = scan (exec (\_ _ _ _ -> ()) (\_ _ _ -> ())) (Node sz ()) (ast p)
+treeND p sz = scan (exec (\_ _ _ _ -> ())) (Node sz ()) (ast p)
 
 treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> Conf a (Reward, Depth)
-treeDT l p sz = resolve (chooseDT l id) (scan (exec f g) (Node sz (0,0)) (ast p))
+treeDT l p sz = resolve (chooseDT l id) (scan (exec f) (Node sz (0,0)) (ast p))
    where f (r,d) a s _ = (r + reward a s, d + 1)
-         g (r,d)   s _ = (r,              d + 1)
 
 treeNDIO :: IOBAT a m => Prog a -> Sit a -> ConfIO a () m
 treeNDIO p sz = cnf sz (ast p)
-   where cnf s t = scan (exec f g) (root s t) t
+   where cnf s t = scan (exec f) (root s t) t
          root s t = Node s (SyncIO $ return (cnf s t), ())
          f (pl,()) a _ t = (SyncIO $ do c <- runSync pl
                                         s' <- syncA a (sit c)
                                         return (cnf s' t), ())
-         g (pl,()) _ t = (SyncIO $ do c <- runSync pl
-                                      return (cnf (sit c) t), ())
 
 treeDTIO :: (DTBAT a, IOBAT a IO) => Depth -> Prog a -> Sit a -> ConfIO a (Reward, Depth) IO
 treeDTIO l p sz = cnf sz (ast p)
-   where cnf s t = resolve (chooseDT l snd) (scan (exec f g) (root s t) t)
+   where cnf s t = resolve (chooseDT l snd) (scan (exec f) (root s t) t)
          root s t = Node s (SyncIO $ return (cnf s t), (0,0))
          f (pl,(r,d)) a s t = (SyncIO $ do c <- runSync pl
                                            s' <- syncA a (sit c)
                                            return (cnf s' t),
                                (r + reward a s, d + 1))
-         g (pl,(r,d)) s t = (SyncIO $ do c <- runSync pl
-                                         return (cnf (sit c) t),
-                             (r, d + 1))
 
 exec :: BAT a => (b -> a -> Sit a -> Tree (Atom a) -> b) ->
-                 (b -> Sit a -> Tree (Atom a) -> b) ->
                  Node a b -> Atom a -> Tree (Atom a) -> Node a b
-exec f g (Node s pl)  (Prim a)  t | poss a s = Node (do_ a s) (f pl a s t)
-exec f g c@(Node s _) (PrimF a) t            = exec f g c (Prim (a s)) t
-exec f g (Node s pl)  (Test h)  t | h s      = Node s (g pl s t)
-exec _ _ _            _         _            = Flop
+exec f (Node s pl)  (Prim a)  t | poss a s = Node (do_ a s) (f pl a s t)
+exec f c@(Node s _) (PrimF a) t            = exec f c (Prim (a s)) t
+exec _ _            _         _            = Flop
 
 chooseDT :: DTBAT a => Depth -> (b -> (Reward, Depth)) -> [Conf a b] -> Conf a b
 chooseDT l f = maximumBy (comparing value)

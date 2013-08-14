@@ -72,6 +72,9 @@ instance BAT (Prim (Qty Double)) where
             (ntg' // [((b, c), O.ntg e b c) | b <- cars, c <- cars])
             (ttc' // [((b, c), O.ttc e b c) | b <- cars, c <- cars])
 
+   do_ (Test cond)          state =
+      state
+
    do_ a                    (State len as time' lane' ntg' ttc') =
       State (len+1) (a:as) time' lane' ntg' ttc'
 
