@@ -69,7 +69,7 @@ import Control.Concurrent
 import qualified Control.Concurrent.SSem as Sem
 import Data.IORef
 import Data.List (find)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, fromJust, isNothing)
 import Golog.Interpreter
 import Golog.Macro
 import Golog.Util
@@ -84,18 +84,45 @@ import TORCS.PhysicsUtil
 import Debug.Trace
 
 data Prim1 = AntiDrift | AntiBlock |AntiSlip |
-             ApproachLeft | DriveCenter | ApproachRight | FollowMaxBeam
-   deriving Show
+             ApproachLeft | DriveCenter | ApproachRight | FollowMaxBeam |
+             Test1 (Sit Prim1 -> Bool)
 
 data Prim2 = Accel Double | Brake Double | Clutch Double | Gear Int |
-             Steer Double | Focus Int | Meta Int | Tick (Maybe CarState)
-   deriving Show
+             Steer Double | Focus Int | Meta Int | Tick (Maybe CarState) |
+             Test2 (Sit Prim2 -> Bool)
+
+instance TestAction Prim1 where
+   testAction = Test1
+
+instance TestAction Prim2 where
+   testAction = Test2
+
+instance Show Prim1 where
+   show AntiDrift     = "AntiDrift"
+   show AntiBlock     = "AntiBlock"
+   show AntiSlip      = "AntiSlip"
+   show ApproachLeft  = "ApproachLeft"
+   show DriveCenter   = "DriveCenter"
+   show ApproachRight = "ApproachRight"
+   show FollowMaxBeam = "FollowMaxBeam"
+   show (Test1 _)     = "Test1 <...>"
+
+instance Show Prim2 where
+   show (Accel x)  = "Accel " ++ show x
+   show (Brake x)  = "Brake " ++ show x
+   show (Clutch x) = "Clutch " ++ show x
+   show (Gear x)   = "Gear " ++ show x
+   show (Steer x)  = "Steer " ++ show x
+   show (Focus x)  = "Focus " ++ show x
+   show (Meta x)   = "Meta " ++ show x
+   show (Tick x)   = "Tick " ++ show x
+   show (Test2 _)  = "Test2 <...>"
 
 data SimpleDriver = SimpleDriver
 type Sit1 = Sit Prim1
 type Sit2 = Sit Prim2
 type Conf1 = ConfIO Prim1 (Reward, Depth) IO
-type Conf2 = ConfIO Prim2 () IO
+type Conf2 = ConfIO Prim2 (Reward, Depth) IO
 type Prog1 = Prog Prim1
 type Prog2 = Prog Prim2
 
@@ -113,6 +140,7 @@ instance BAT Prim1 where
    do_ a@DriveCenter   s = s{assoc = sit $ refine a s (assoc s)}
    do_ a@ApproachRight s = s{assoc = sit $ refine a s (assoc s)}
    do_ a@FollowMaxBeam s = s{assoc = sit $ refine a s (assoc s)}
+   do_ (Test1 _)       s = s
 
    poss AntiDrift     _ = False
    poss AntiBlock     _ = False
@@ -125,6 +153,7 @@ instance BAT Prim1 where
                           trackTime (currentState1 s) Pos5 >
                              trackTime (currentState1 s) Zero
    poss FollowMaxBeam s = trackTime (currentState1 s) Zero < 3
+   poss (Test1 f)  s = f s
 
 instance DTBAT Prim1 where
    reward AntiDrift     _ = 1000
@@ -134,13 +163,17 @@ instance DTBAT Prim1 where
    reward DriveCenter   _ = 1
    reward ApproachRight _ = 1
    reward FollowMaxBeam _ = 10
+   reward (Test1 _)     _ = 0
 
 instance IOBAT Prim1 IO where
    syncA a s =
       do putStrLn $ show a
-         c2 <- sync (refine a s (assoc s))
+         c2 <- dooSync' (refine a s (assoc s))
+         if isNothing c2
+            then fail $ "syncA: refinement of " ++ show a ++ " failed"
+            else return ()
          putStrLn $ show a ++ " done"
-         return $ (do_ a s){assoc = sit c2}
+         return $ (do_ a s){assoc = sit (fromJust c2)}
 
 currentState1 :: Sit1 -> CarState
 currentState1 = currentState2 . assoc
@@ -156,12 +189,12 @@ refine FollowMaxBeam _ s2 = refineProg (steerAngle longestBeam) s2
    where longestBeam = toRad $ snd $ maximum $
                        map (\ori -> (trackTime (currentState2 s2) ori, ori))
                        [Neg90 .. Pos90]
+refine (Test1 _)     _ s2 = error "Test1 is not refinable"
 
 refineProg :: Prog2 -> Sit2 -> Conf2
-refineProg p s = case doo' $ treeNDIO (plus q `Conc` p) s of
-                 Just c  -> c
-                 Nothing -> error "refineProg: refined execution failed"
-   where q = (transmission `Conc` acceleration) `Seq` tick
+refineProg p1 s = treeDTIO 3 p s
+   where p2 = (transmission `Seq` acceleration) `Seq` tick
+         p  = p1 `Conc` star p2
 
 instance BAT Prim2 where
    data Sit Prim2 = Sit2 {
@@ -187,20 +220,26 @@ instance BAT Prim2 where
    do_ (Steer x)       s = modControl (\c -> c{steer         = x}) s{alreadySteer = True}
    do_ (Focus x)       s = modControl (\c -> c{Control.focus = x}) s
    do_ (Meta x)        s = modControl (\c -> c{meta          = x}) s
-   do_ (Tick (Just x)) s = s{currentState2 = x}
+   do_ (Tick (Just x)) s = s{currentState2 = x,
+                             alreadyAccel  = False,
+                             alreadyBrake  = False,
+                             alreadyGear   = False,
+                             alreadySteer  = False}
    do_ (Tick Nothing)  s = modState (simulateState tickDurSec) s{alreadyAccel = False,
                                                                  alreadyBrake = False,
                                                                  alreadyGear  = False,
                                                                  alreadySteer = False}
+   do_ (Test2 _)       s = s
 
-   poss (Accel a)  s = True --a < rpm (currentState2 s) / 7500
-   poss (Brake _)  _ = True
+   poss (Accel _)  s = not (alreadyAccel s) -- a < rpm (currentState2 s) / 7500
+   poss (Brake _)  s = True
    poss (Clutch _) _ = True
-   poss (Gear n)   s = abs (n - State.gear (currentState2 s)) <= 1
-   poss (Steer _)  s = True-- kmh2ms (speedX (currentState2 s)) > 1
+   poss (Gear n)   s = True && abs (n - State.gear (currentState2 s)) <= 1
+   poss (Steer _)  s = not (alreadySteer s) -- kmh2ms (speedX (currentState2 s)) > 1
    poss (Focus _)  _ = True
    poss (Meta _)   _ = True
    poss (Tick _)   _ = True
+   poss (Test2 f)  s = f s
 
 instance DTBAT Prim2 where
    reward (Accel _)  s = if alreadyAccel s then -1 else -0.01
@@ -212,14 +251,17 @@ instance DTBAT Prim2 where
    reward (Meta _)   _ = 0
    reward (Tick _)   s = if alreadyAccel s && alreadyBrake s &&
                             alreadyGear s && alreadySteer s then 0 else -1
+   reward (Test2 _)  _ = 0
 
 instance IOBAT Prim2 IO where
    syncA (Tick Nothing) s =
-      do putStrLn $ "Tick"
+      do putStrLn $ "Current Control: " ++ show (currentControl2 s)
+         putStrLn $ "Tick"
          Sem.wait (ticks s)
          sensed <- readIORef (sensedState s)
+         let s' = do_ (Tick (Just sensed)) s
          putStrLn $ "Tack"
-         return $ do_ (Tick (Just sensed)) s
+         return s'
    syncA (Tick (Just _)) _ =
          error "syncA: Tick (Just _) already synced"
    syncA a s =
