@@ -112,7 +112,7 @@ instance MazeBAT Regr where
 data Progr
 
 instance BAT (Prim Progr) where
-   data Sit (Prim Progr)       = Sit [Point] Reward [Prim Progr] Random.Supply
+   data Sit (Prim Progr)       = Sit [Point] Reward [Prim Progr] Random.Supply deriving Show
    s0                          = Sit [startPos] 0 [] startRandomSupply
    do_  a s@(Sit ps@(p:_) r m rs) = Sit (newPos a p : ps)
                                         (r + reward a s)
@@ -192,22 +192,22 @@ random :: (BAT (Prim a), MazeBAT a) => Sit (Prim a) -> Int
 random s = fst $ Random.random (randomSupply s)
 
 up :: (BAT (Prim a), MazeBAT a) => Sit (Prim a) -> Prim a
-up s = opt (Down,Left,Right,Up) s
+up s = best (Down,Left,Right,Up) s
 
 down :: (BAT (Prim a), MazeBAT a) => Sit (Prim a) -> Prim a
-down s = opt (Up,Left,Right,Down) s
+down s = best (Up,Left,Right,Down) s
 
 left :: (BAT (Prim a), MazeBAT a) => Sit (Prim a) -> Prim a
-left s = opt (Up,Down,Right,Left) s
+left s = best (Up,Down,Right,Left) s
 
 right :: (BAT (Prim a), MazeBAT a) => Sit (Prim a) -> Prim a
-right s = opt (Up,Down,Left,Right) s
+right s = best (Up,Down,Left,Right) s
 
-opt :: (BAT (Prim a), MazeBAT a) => (Prim a,Prim a,Prim a,Prim a) -> Sit (Prim a) -> (Prim a)
-opt (a0,a1,a2,a3) s |  0 <= pct && pct < 10 && poss a0 s = a0
-                    | 10 <= pct && pct < 30 && poss a1 s = a1
-                    | 30 <= pct && pct < 50 && poss a2 s = a2
-                    | otherwise                          = a3
+best :: (BAT (Prim a), MazeBAT a) => (Prim a,Prim a,Prim a,Prim a) -> Sit (Prim a) -> (Prim a)
+best (a0,a1,a2,a3) s |  0 <= pct && pct < 10 && poss a0 s = a0
+                     | 10 <= pct && pct < 30 && poss a1 s = a1
+                     | 30 <= pct && pct < 50 && poss a2 s = a2
+                     | otherwise                          = a3
    where r   = random s
          pct = r `mod` 100
 
@@ -222,8 +222,8 @@ main = do
                             , primf left
                             , primf right]) `Seq`
                test (\s -> pos s == goalPos)
-       tree  = treeDTIO lookahead prog s0
-       confs = transTrace' tree
+       tree  = treeDTIO lookahead prog s0 :: ConfIO (Prim Progr) (Reward, Depth) IO
+       --confs = transTrace' tree
    putStrLn $ show $ startPos
    putStrLn $ show $ goalPos
 {-
@@ -232,10 +232,16 @@ main = do
                   --,case s of Do a s' -> (pos s `elem` visited s', visited s')
                   )) $ map sit confs
 -}
-   let conf = last confs
-   s' <- sync conf
-   putStrLn $ "Actions (sync'ed): " ++ show (sitlen $ sit s')
-   let s = sit $ last $ confs
+   --let conf = last confs
+   Just conf <- dooSync' tree
+   -- The following lines just test that subsequent syncs have no effect:
+   let s = sit conf
+   conf' <- sync conf
+   putStrLn $ case trans' conf of Just _ -> "Just" ; _ -> "Nothing"
+   putStrLn $ case trans' conf' of Just _ -> "Just" ; _ -> "Nothing"
+   putStrLn $ case trans' conf' >>= trans' of Just _ -> "Just" ; _ -> "Nothing"
+   --putStrLn $ "Actions (sync'ed): " ++ show (sitlen $ sit conf')
+   --let s = sit $ last $ confs
    putStrLn $ "Actions: " ++ show (sitlen s)
    draw s
 

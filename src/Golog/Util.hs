@@ -2,7 +2,9 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Golog.Util
-   (HistBAT(..), trans', transStar, transTrace, transTrace', doo, doo') where
+   (HistBAT(..),
+    trans', transStar, transTrace, transTrace',
+    doo, doo', dooSync') where
 
 import Data.Maybe (listToMaybe)
 import qualified Data.Tree as T
@@ -70,6 +72,12 @@ doo c = concat $ map (filter final) (transStar c)
 -- | Variant of 'doo' which commits to the first option in each configuration.
 doo' :: Conf a b -> Maybe (Conf a b)
 doo' = listToMaybe . doo
+
+dooSync' :: ConfIO a b IO -> IO (Maybe (ConfIO a b IO))
+dooSync' c | final c   = return (Just c)
+           | otherwise = case trans' c of
+                              Just c' -> sync c' >>= dooSync'
+                              Nothing -> return Nothing
 
 -- toLists :: Tree a -> [[a]]
 -- toLists Empty     = [[]]
