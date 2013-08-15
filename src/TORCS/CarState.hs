@@ -8,6 +8,7 @@ import TORCS.PhysicsUtil
 -- Each field's comment is copied from the SCR manual.
 data CarState = CarState {
       -- | Angle between the car direction and the direction of the track axis.
+      -- A positive angle indicates that the car is steering to the right.
       -- Range @[-pi,pi]@, unit radians.
       angle         :: Double,
       -- | Time elapsed during current lap.
@@ -142,7 +143,7 @@ defaultState = CarState {
                   speedY         = 0,
                   speedZ         = 0,
                   track          = replicate 19 200,
-                  trackPos       = 0,
+                  trackPos       = 0.33,
                   wheelSpinVel   = replicate 4 0,
                   z              = 0
                }

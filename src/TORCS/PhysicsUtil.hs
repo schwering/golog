@@ -7,10 +7,10 @@
 -- use special types for the latter.
 module TORCS.PhysicsUtil where
 
-newtype KmH = KmH Double
+newtype KmH = KmH { kmh :: Double }
    deriving (Num, Floating, Fractional, Real, RealFloat, RealFrac, Eq, Ord)
 
-newtype Deg = Deg Double
+newtype Deg = Deg { deg :: Double }
    deriving (Num, Floating, Fractional, Real, RealFloat, RealFrac, Eq, Ord)
 
 instance Read Deg where
