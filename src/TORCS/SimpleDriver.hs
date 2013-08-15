@@ -80,6 +80,7 @@ import TORCS.CarState
 import qualified TORCS.CarControl as Control
 import qualified TORCS.CarState as State
 import TORCS.Client
+import TORCS.LUT
 import TORCS.PhysicsUtil
 import Debug.Trace
 
@@ -238,7 +239,7 @@ instance BAT Prim2 where
    poss (Brake _)  s = True
    poss (Clutch _) _ = True
    poss (Gear n)   s = True -- && abs (n - State.gear (currentState2 s)) <= 1
-   poss (Steer _)  s = not (alreadySteer s) -- kmh2ms (speedX (currentState2 s)) > 1
+   poss (Steer _)  s = not (alreadySteer s) -- (speedX (currentState2 s)) > 1
    poss (Focus _)  _ = True
    poss (Meta _)   _ = True
    poss (Tick _)   _ = True
@@ -322,10 +323,10 @@ acceleration = atomic $
                primf (\s -> if alreadyAccel s then Brake 0 else Accel 0)
    where action state = let x = param state
                         in if x < 0 then Brake (-x) else Accel x
-         param  state = if kmh2ms (speedX state) < 10 then 0.5 else param' state
+         param  state = if speedX state < 10 then 0.5 else param' state
          param' state = max (-1) $ min 1 $ (1 - 1 / beam)
-            where msX  = kmh2ms (speedX state)
-                  msY  = kmh2ms (speedY state)
+            where msX  = speedX state
+                  msY  = speedY state
                   beta = atan2 msY msX
                   beam = fromMaybe (1/0) (projectBeam (trackTime state) beta)
 
@@ -341,7 +342,7 @@ steerAngleAction ori s = Steer lock'
                  then lock / (steerLock * (v - steerSensitivityOffset))
                  else lock
          lock = ori * (angle state) / 2
-         v    = kmh2ms (speedX state)
+         v    = speedX state
          steerLock = 0.366519 * 3.6
          steerSensitivityOffset = kmh2ms 80
 
@@ -379,6 +380,9 @@ overwriteMVar :: MVar a -> a -> IO ()
 overwriteMVar mvar x = tryTakeMVar mvar >> putMVar mvar x
 -}
 
+yaw :: CarState -> Double
+yaw state = (-1) * (angle state)
+
 trackTime :: CarState -> BeamOri -> Double
 trackTime state a = trackTime' state !! fromEnum a
 
@@ -409,8 +413,8 @@ track' state = map (\d -> if d >= 200 then 1/0 else d) (track state)
 -- it takes the car to travel the beam's distance in the beam's direction.
 trackTime' :: CarState -> [Double]
 trackTime' state = beamTimes
-   where msX          = kmh2ms (speedX state)
-         msY          = kmh2ms (speedY state)
+   where msX          = speedX state
+         msY          = speedY state
          beta         = atan2 msY msX
          v            = sqrt (msX^(2::Int) + msY^(2::Int))
          beamOriDists = zip (beamOris SimpleDriver) (track' state)
@@ -429,7 +433,7 @@ trackWidth state = case (left, right) of
                         (Just l,  Nothing) -> l / lpos
                         (Nothing, Just r)  -> r / rpos
                         (Nothing, Nothing) -> error "trackWidth: no beam"
-   where gamma = -1 * angle state
+   where gamma = yaw state
          left  = projectBeam (trackDist state) (deg2rad   90  - gamma)
          right = projectBeam (trackDist state) (deg2rad (-90) - gamma)
          pos   = (trackPos state + 1) / 2
@@ -437,20 +441,24 @@ trackWidth state = case (left, right) of
          rpos  = pos
          
 simulateState :: Double -> CarControl -> CarState -> CarState
-simulateState t c s = s{curLapTime    = curLapTime s + t,
+simulateState t c s = s{angle         = angle s + angleT,
+                        curLapTime    = curLapTime s + t,
                         distFromStart = distFromStart s + distT,
                         distRaced     = distRaced s + distT,
                         State.gear    = Control.gear c,
+                        speedX        = speedX s + vXT,
                         track         = map trackT (zip (beamOris SimpleDriver) (track s)),
                         trackPos      = trackPos s + trackPosT }
-   where msX               = kmh2ms (speedX s)
-         msY               = kmh2ms (speedY s)
+   where msX               = speedX s
+         msY               = speedY s
          beta              = atan2 msY msX
          v                 = sqrt (msX^(2::Int) + msY^(2::Int))
-         gamma             = -1 * angle s
+         gamma             = yaw s
          distT             = v * cos (beta + gamma) * t
          trackT (alpha, d) = d - v * cos (beta - alpha) * t
          trackPosT         = v * sin (beta + gamma) * t / trackWidth s
+         angleT            = predictAngleDiff (steer c) t
+         vXT               = predictSpeedXDiff msX (accel c) (brake c) t
 
 instance Driver SimpleDriver where
    data Context SimpleDriver = Context (IORef CarState) (IORef CarControl)
@@ -469,7 +477,7 @@ instance Driver SimpleDriver where
          Sem.signal tickSem
          _ <- printf (kred ++
                       "pos = %.2f  " ++
-                      "angle = %.2f  " ++
+                      "yaw = %.2f  " ++
                       "vX = %.2f  " ++
                       "vY = %.2f  " ++
                       --"track[-90] = %.2f s = %.2f m " ++
@@ -477,9 +485,9 @@ instance Driver SimpleDriver where
                       --"track[90] = %.2f s = %.2f m " ++
                       knrm ++ "\n")
                (trackPos state)
-               (deg $ rad2deg $ angle state)
-               (kmh2ms $ speedX state)
-               (kmh2ms $ speedY state)
+               (deg $ rad2deg $ yaw state)
+               (speedX state)
+               (speedY state)
                --(trackTime state Neg90) (trackDist state Neg90)
                (trackTime state Zero)  (trackDist state Zero)
                --(trackTime state Pos90) (trackDist state Pos90)

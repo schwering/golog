@@ -65,14 +65,17 @@ data CarState = CarState {
       -- Range @[2000,7000]@, unit rpm.
       rpm           :: Double,
       -- | Speed of the car along the longitudinal axis of the car.
-      -- Range @(-inf,+inf)@, unit km\/h.
-      speedX        :: KmH,
+      -- Range @(-inf,+inf)@, unit m\/s.
+      -- NOTE: the SCR bot sends km\/h, we convert it to m\/s at receive-time!
+      speedX        :: Double,
       -- | Speed of the car along the transverse axis of the car.
-      -- Range @(-inf,+inf)@, unit km\/h.
-      speedY        :: KmH,
+      -- Range @(-inf,+inf)@, unit m\/s.
+      -- NOTE: the SCR bot sends km\/h, we convert it to m\/s at receive-time!
+      speedY        :: Double,
       -- | Speed of the car along the Z axis of the car.
-      -- Range @(-inf,+inf)@, unit km\/h.
-      speedZ        :: KmH,
+      -- Range @(-inf,+inf)@, unit m\/s.
+      -- NOTE: the SCR bot sends km\/h, we convert it to m\/s at receive-time!
+      speedZ        :: Double,
       -- | Vector of 19 range finder sensors: each sensors returns the distance
       -- between the track edge and the car within a range of 200 meters. When
       -- noisy option is enabled (see Section 7), sensors are affected by i.i.d.
@@ -115,9 +118,9 @@ parseState str = CarState { angle          = parseMsg1 result "angle"
                           , opponents      = parseMsg  result "opponents"
                           , racePos        = parseMsg1 result "racePos"
                           , rpm            = parseMsg1 result "rpm"
-                          , speedX         = parseMsg1 result "speedX"
-                          , speedY         = parseMsg1 result "speedY"
-                          , speedZ         = parseMsg1 result "speedZ"
+                          , speedX         = kmh2ms $ parseMsg1 result "speedX"
+                          , speedY         = kmh2ms $ parseMsg1 result "speedY"
+                          , speedZ         = kmh2ms $ parseMsg1 result "speedZ"
                           , track          = parseMsg  result "track"
                           , trackPos       = parseMsg1 result "trackPos"
                           , wheelSpinVel   = parseMsg  result "wheelSpinVel"
