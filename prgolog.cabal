@@ -44,7 +44,7 @@ Library
                      src/TORCS/lut_speed.c
                      src/Util/memo_cache.c
                      src/Util/native_pso.c
-    Build-Depends:   array, base, bytestring, containers, network, parsec, random, stm, SafeSemaphore, mtl
+    Build-Depends:   array, base, bytestring, containers, network, parsec, SafeSemaphore
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 

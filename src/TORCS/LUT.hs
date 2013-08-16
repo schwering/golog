@@ -29,4 +29,3 @@ foreign import ccall unsafe "predict_angle_diff"
 foreign import ccall unsafe "predict_speed_x_diff"
    c_predict_speed_x_diff :: CDouble -> CDouble -> CDouble -- speed_x -> accelOrBrake -> speed_x_diff
 
-

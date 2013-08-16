@@ -150,7 +150,7 @@ instance BAT Prim1 where
    poss ApproachLeft  s = trackTime (currentState1 s) Zero < 5 &&
                           trackTime (currentState1 s) Neg5 >
                              trackTime (currentState1 s) Zero
-   poss DriveCenter   s = True-- trackTime (currentState1 s) Zero > 5
+   poss DriveCenter   _ = True-- trackTime (currentState1 s) Zero > 5
    poss ApproachRight s = trackTime (currentState1 s) Zero < 5 &&
                           trackTime (currentState1 s) Pos5 >
                              trackTime (currentState1 s) Zero
@@ -191,7 +191,7 @@ refine FollowMaxBeam _ s2 = refineProg (steerAngle longestBeam) s2
    where longestBeam = beamOriRad $ snd $ maximum $
                        map (\ori -> (trackTime (currentState2 s2) ori, ori))
                        [minBound .. maxBound]
-refine (Test1 _)     _ s2 = error "Test1 is not refinable"
+refine (Test1 _)     _ _  = error "Test1 is not refinable"
 
 refineProg :: Prog2 -> Sit2 -> Conf2
 refineProg p1 s = treeDTIO 3 p s
@@ -215,13 +215,13 @@ instance BAT Prim2 where
              undefined undefined undefined
              False False False False
 
-   do_ (Accel x)       s = modControl (\z -> z{accel = x}) s{alreadyAccel = True}
-   do_ (Brake x)       s = modControl (\z -> z{brake = x}) s{alreadyBrake = True}
-   do_ (Clutch x)      s = modControl (\z -> z{clutch = x}) s
-   do_ (Gear x)        s = modControl (\z -> z{Control.gear = x}) s{alreadyGear = True}
-   do_ (Steer x)       s = modControl (\z -> z{steer = x}) s{alreadySteer = True}
-   do_ (Focus x)       s = modControl (\z -> z{Control.focus = x}) s
-   do_ (Meta x)        s = modControl (\z -> z{meta = x}) s
+   do_ (Accel x)       s = modControl (\y -> y{accel = x}) s{alreadyAccel = True}
+   do_ (Brake x)       s = modControl (\y -> y{brake = x}) s{alreadyBrake = True}
+   do_ (Clutch x)      s = modControl (\y -> y{clutch = x}) s
+   do_ (Gear x)        s = modControl (\y -> y{Control.gear = x}) s{alreadyGear = True}
+   do_ (Steer x)       s = modControl (\y -> y{steer = x}) s{alreadySteer = True}
+   do_ (Focus x)       s = modControl (\y -> y{Control.focus = x}) s
+   do_ (Meta x)        s = modControl (\y -> y{meta = x}) s
    do_ (Tick (Just x)) s = s{currentState2 = x,
                              alreadyAccel  = False,
                              alreadyBrake  = False,
@@ -236,15 +236,15 @@ instance BAT Prim2 where
    do_ (Bounty _)      s = s
 
    poss (Accel _)  s = True || not (alreadyAccel s) -- a < rpm (currentState2 s) / 7500
-   poss (Brake _)  s = True
+   poss (Brake _)  _ = True
    poss (Clutch _) _ = True
-   poss (Gear n)   s = True -- && abs (n - State.gear (currentState2 s)) <= 1
+   poss (Gear _)   _ = True -- && abs (n - State.gear (currentState2 s)) <= 1
    poss (Steer _)  s = not (alreadySteer s) -- (speedX (currentState2 s)) > 1
    poss (Focus _)  _ = True
    poss (Meta _)   _ = True
    poss (Tick _)   _ = True
    poss (Test2 f)  s = f s
-   poss (Bounty _) s = True
+   poss (Bounty _) _ = True
 
 instance DTBAT Prim2 where
    reward (Accel _)  s = if alreadyAccel s then -1 else -0.01

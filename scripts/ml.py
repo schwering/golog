@@ -1,6 +1,6 @@
 import csv
 from functools import partial
-from itertools import product
+#from itertools import product
 import numpy as np
 import pickle
 from sklearn.externals import joblib
@@ -52,6 +52,8 @@ def loaddata(mkdata, mktarget, fn):
 # is the special case of a one-dimensional tuple. Each tuple is handed to the
 # third argument fun, which should convert the tuple, whose elements are
 # integers, to the actual X values handed over to the classifier.
+#
+# Use lut2() for a single array literal LUT.
 def lut(clf, indexes, fun):
         for index in indexes:
                 if type(index) == tuple:
@@ -68,20 +70,42 @@ def lut(clf, indexes, fun):
                 s += " = "+str(y)+";"
                 print s
 
-# def lut_content(clf, ranges, index, fun):
-# 	if len(ranges) == 0:
-# 		???
-#	else:
-#		???
-# 
-# def lut2(clf, ranges, fun):
-# 	d = length(ranges)
-# 	s = "static double lut"
-# 	for r in ranges:
-# 		s += "["+str(len(r))+"]"
-# 	s += " = {\n"
-# 	lut_content(clf, ranges, [], fun)
-# 	s + "};"
+# Generates a lookup-table as C array literal. The ranges parameter should be a
+# list of ranges starting at zero. Their cartesian product is determined and
+# element of it is given as tuple to the fun parameter. This function should
+# compute a tuple which is then handed to the classifier clf for prediction.
+# If there is only one range, the value is passed (not as tuple) to fun and
+# fun should return a single value.
+#
+# The advantage over lut() is that this function returns a single literal.
+# GHC/GCC is much faster with the literal.
+def lut2(clf, ranges, fun):
+	d = len(ranges)
+	s = "static double lut"
+	for r in ranges:
+		s += "["+str(len(r))+"]"
+        s += " = \n"
+	s += lut_content(clf, ranges, [], fun)
+        print s
+
+def lut_content(clf, ranges, index, fun):
+        if len(ranges) == 0:
+                if len(index) == 1:
+                        x = [fun(index[0])]
+                else:
+                        x = list(fun(tuple(index)))
+                y = clf.predict(x)
+                y = y[0]
+                return str(y) +", "
+        else:
+                s = "{ "
+                for i in ranges[0]:
+                        indexcopy = list(index)
+                        indexcopy.append(i)
+                        s += lut_content(clf, ranges[1:], indexcopy, fun)
+                s += " },\n"
+                return s
+
 
 # Effect of acceleration/brake:
 # Input: speedx0, accel0
@@ -123,33 +147,34 @@ else:
         print "Loading estimator from file ..."
         clf = joblib.load(task +".clf.pkl")
 
-# print "Testing estimator on training data (%d examples) ..." % len(trainX)
-# err = 0
-# n = 0
-# for (x,y) in zip(trainX, trainY):
-#         p = clf.predict(x)
-#         err = err + abs(p-y)
-#         n = n + 1
-# err = err / n
-# print "Average error: ", err
-# 
-# print "Testing estimator on validation data (%d examples) ..." % len(testX)
-# err = 0
-# n = 0
-# start = time.clock()
-# for (x,y) in zip(testX, testY):
-#         p = clf.predict(x)
-#         err = err + abs(p-y)
-#         n = n + 1
-# elapsed = time.clock() - start
-# err = err / n
-# print "Average error: ", err
-# print "Elapsed: ", elapsed
-# print "Elapsed per example: ", (elapsed/n)
+print "Testing estimator on training data (%d examples) ..." % len(trainX)
+err = 0
+n = 0
+for (x,y) in zip(trainX, trainY):
+        p = clf.predict(x)
+        err = err + abs(p-y)
+        n = n + 1
+err = err / n
+print "Average error: ", err
 
+print "Testing estimator on validation data (%d examples) ..." % len(testX)
+err = 0
+n = 0
+start = time.clock()
+for (x,y) in zip(testX, testY):
+        p = clf.predict(x)
+        err = err + abs(p-y)
+        n = n + 1
+elapsed = time.clock() - start
+err = err / n
+print "Average error: ", err
+print "Elapsed: ", elapsed
+print "Elapsed per example: ", (elapsed/n)
 
 if task == "speed":
-        lut(clf, product(range(300), range(21)), (lambda (x,y): (float(x)/3.6, float(y)/10-1)))
+        lut2(clf, [range(300), range(21)], (lambda (x,y): (float(x)/3.6, float(y)/10-1)))
+        #lut(clf, product(range(300), range(21)), (lambda (x,y): (float(x)/3.6, float(y)/10-1)))
 elif task == "angle":
-        lut(clf, range(201), (lambda x: float(x)/100-1))
+        lut2(clf, [range(201)], (lambda x: float(x)/100-1))
+        #lut(clf, range(201), (lambda x: float(x)/100-1))
 
