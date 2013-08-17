@@ -1,29 +1,29 @@
-{-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, FlexibleContexts #-}
 
 module Golog.Interpreter
-  (BAT(..), DTBAT(..), IOBAT(..), Reward, Depth,
+  (BAT(..), DTBAT(..), IOBAT(..), Depth,
    Atom(..), PseudoAtom(..), Prog(..), Conf, ConfIO,
    treeND, treeDT, treeNDIO, treeDTIO, final, trans, sit, sync) where
 
+import Control.Monad (liftM)
 import Data.List (maximumBy)
 import Data.Monoid (Monoid(..))
 import Data.Ord (comparing)
 
-type Reward = Double
 type Depth = Int
 
 class BAT a where
-   data Sit a :: *
-   s0         :: Sit a
-   do_        :: a -> Sit a -> Sit a
-   poss       :: a -> Sit a -> Bool
+   data Sit a    :: *
+   s0            :: Sit a
+   do_           :: a -> Sit a -> Sit a
+   poss          :: a -> Sit a -> Bool
 
-class BAT a => DTBAT a where
-   reward     :: a -> Sit a -> Reward
+class (BAT a, Ord (Reward a)) => DTBAT a where
+   data Reward a :: *
+   reward        :: Sit a -> Reward a
 
 class (BAT a, Monad m) => IOBAT a m where
-   syncA      :: a -> Sit a -> m (Sit a)
+   syncA         :: a -> Sit a -> m (Sit a)
 
 data Atom a       = Prim a | PrimF (Sit a -> a)
 data PseudoAtom a = Atom (Atom a) | Complex (Prog a)
@@ -87,48 +87,42 @@ ast p' = rec (ast' p')
 
 data Node a b = Node (Sit a) b | Flop
 type Conf a b = Tree (Node a b)
-type ConfIO a b m = Conf a (SyncIO a b m, b)
-newtype SyncIO a b m = SyncIO { runSync :: m (ConfIO a b m) }
+type ConfIO a m = Conf a (SyncIO a m)
+newtype SyncIO a m = SyncIO { runSync :: m (ConfIO a m) }
 
 treeND :: BAT a => Prog a -> Sit a -> Conf a ()
-treeND p sz = scan (exec (\_ _ _ _ -> ())) (Node sz ()) (ast p)
+treeND p sz = scan (exec (\_ _ _ -> ())) (Node sz ()) (ast p)
 
-treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> Conf a (Reward,Depth)
-treeDT l p sz = cnf sz (ast p)
-   where cnf s t = resolve (chooseDT l id) Flop (scan (exec f) (root s) t)
-         root s = Node s (0,0)
-         f (r,d) a s _ = (r + reward a s, d + 1)
+treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> Conf a ()
+treeDT l p sz = resolveDT l (treeND p sz)
 
-treeNDIO :: IOBAT a m => Prog a -> Sit a -> ConfIO a () m
+treeNDIO :: IOBAT a m => Prog a -> Sit a -> ConfIO a m
 treeNDIO p sz = cnf sz (ast p)
    where cnf s t = scan (exec f) (root s t) t
-         root s t = Node s (SyncIO $ return (cnf s t), ())
-         f (pl,()) a _ t = (SyncIO $ do c <- runSync pl
-                                        s' <- syncA a (sit c)
-                                        return (cnf s' t), ())
+         root s t = Node s (SyncIO $ return (cnf s t))
+         f pl a t = (SyncIO $ do c <- runSync pl
+                                 s' <- syncA a (sit c)
+                                 return (cnf s' t))
 
-treeDTIO :: (DTBAT a, IOBAT a m) => Depth -> Prog a -> Sit a ->
-                                    ConfIO a (Reward,Depth) m
-treeDTIO l p sz = cnf sz (ast p)
-   where cnf s t = resolve (chooseDT l snd) Flop (scan (exec f) (root s t) t)
-         root s t = Node s (SyncIO $ return (cnf s t), (0,0))
-         f (pl,(r,d)) a s t = (SyncIO $ do c <- runSync pl
-                                           s' <- syncA a (sit c)
-                                           return (cnf s' t),
-                               (r + reward a s, d + 1))
+treeDTIO :: (DTBAT a, IOBAT a m) => Depth -> Prog a -> Sit a -> ConfIO a m
+treeDTIO l p sz = f (treeNDIO p sz)
+   where f = fmap g . resolveDT l
+         g (Node s (SyncIO c)) = Node s (SyncIO $ liftM f c)
+         g Flop                = Flop
 
-exec :: BAT a => (b -> a -> Sit a -> Tree (Atom a) -> b) ->
+exec :: BAT a => (b -> a -> Tree (Atom a) -> b) ->
                  Node a b -> Atom a -> Tree (Atom a) -> Node a b
-exec f (Node s pl)  (Prim a)  t | poss a s = Node (do_ a s) (f pl a s t)
+exec f (Node s pl)  (Prim a)  t | poss a s = Node (do_ a s) (f pl a t)
 exec f c@(Node s _) (PrimF a) t            = exec f c (Prim (a s)) t
 exec _ _            _         _            = Flop
 
-chooseDT :: Depth -> (b -> (Reward,Depth)) -> Node a b -> [Conf a b] -> Conf a b
-chooseDT l f def = maximumBy (comparing value)
-   where value t = val (best cmp final l def t)
-         val (Node _ pl) = f pl
-         val Flop        = (-1/0, minBound)
-         cmp x y         = compare (val x) (val y)
+resolveDT :: DTBAT a => Depth -> Conf a b -> Conf a b
+resolveDT l = resolve chooseDT Flop
+   where chooseDT def = maximumBy (comparing value)
+            where value t = val (best cmp final l def t)
+                  val (Node s _) = Just (reward s)
+                  val Flop       = Nothing
+                  cmp x y        = compare (val x) (val y)
 
 final :: Conf a b -> Bool
 final = final' True
@@ -151,7 +145,7 @@ sit :: Conf a b -> Sit a
 sit (Val (Node s _) _) = s
 sit _                  = error "sit: invalid conf"
 
-sync :: ConfIO a b m -> m (ConfIO a b m)
-sync (Val (Node _ (pl,_)) _) = runSync pl
-sync _                       = error "sync: invalid conf"
+sync :: ConfIO a m -> m (ConfIO a m)
+sync (Val (Node _ pl) _) = runSync pl
+sync _                   = error "sync: invalid conf"
 
