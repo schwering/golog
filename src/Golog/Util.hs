@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Golog.Util
-   (HistBAT(..), sit2list, list2sit,
+   (HistBAT(..), defaultPredSit, sit2list, list2sit, append2sit,
     trans', transStar, transTrace, transTrace',
     doo, doo', dooSync') where
 
@@ -38,14 +38,21 @@ class BAT a => HistBAT a where
    sitlen      = length . history
    history s   = since s s0
    since s2 s1 = take (sitlen s2 - sitlen s1) (history s2)
-   predSit s   = case history s of []   -> Nothing
-                                   a:as -> Just (a, foldr do_ s0 as)
+   predSit     = defaultPredSit
+
+defaultPredSit :: HistBAT a => Sit a -> Maybe (a, Sit a)
+defaultPredSit s   = case history s of []   -> Nothing
+                                       a:as -> Just (a, foldr do_ s0 as)
 
 sit2list :: HistBAT a => Sit a -> [a]
 sit2list = reverse . history
 
 list2sit :: BAT a => [a] -> Sit a
-list2sit = foldl (flip do_) s0
+list2sit = append2sit s0
+
+-- | Appends list of actions in given order to situation term as new actions.
+append2sit :: BAT a => Sit a -> [a] -> Sit a
+append2sit = foldl (flip do_)
 
 --- | Variant of 'trans' which commits to the first option.
 trans' :: Conf a b -> Maybe (Conf a b)
@@ -78,7 +85,7 @@ doo c = concat $ map (filter final) (transStar c)
 doo' :: Conf a b -> Maybe (Conf a b)
 doo' = listToMaybe . doo
 
-dooSync' :: Monad m => ConfIO a b m -> m (Maybe (ConfIO a b m))
+dooSync' :: Monad m => ConfIO a m -> m (Maybe (ConfIO a m))
 dooSync' c | final c   = return (Just c)
            | otherwise = case trans' c of
                               Just c' -> sync c' >>= dooSync'

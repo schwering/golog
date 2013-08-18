@@ -12,7 +12,7 @@ import Network.Wai.Handler.Warp
 
 import RSTC.Car
 import Golog.Interpreter
-import Golog.Util hiding (HistBAT(..), sit2list, list2sit)
+import Golog.Util
 import RSTC.BAT.Progression
 import qualified RSTC.Obs as O
 import RSTC.Progs
@@ -103,6 +103,7 @@ toJson NoOp = "{ \"noop\": {} }"
 toJson (Start b s) = "{ \"start\": { \"b\": \"" ++ (show b) ++ "\", \"prog\": \"" ++ s  ++ "\" } }"
 toJson (End b s) = "{ \"end\": { \"b\": \"" ++ (show b) ++ "\", \"prog\": \"" ++ s ++ "\" } }"
 toJson (Msg s) = "{ \"msg\": { \"msg\": \"" ++ s ++ "\" } }"
+toJson (Test _) = "{ \"test\": {} }"
 
 
 laneToNumber :: Lane -> Double

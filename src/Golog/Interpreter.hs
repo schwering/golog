@@ -1,16 +1,14 @@
 {-# LANGUAGE TypeFamilies, MultiParamTypeClasses, FlexibleContexts #-}
 
 module Golog.Interpreter
-  (BAT(..), DTBAT(..), IOBAT(..), Depth,
-   Atom(..), PseudoAtom(..), Prog(..), Conf, ConfIO,
+  (BAT(..), DTBAT(..), IOBAT(..),
+   Atom(..), PseudoAtom(..), Prog(..), Conf, ConfIO, Depth,
    treeND, treeDT, treeNDIO, treeDTIO, final, trans, sit, sync) where
 
 import Control.Monad (liftM)
 import Data.List (maximumBy)
 import Data.Monoid (Monoid(..))
 import Data.Ord (comparing)
-
-type Depth = Int
 
 class BAT a where
    data Sit a    :: *
@@ -29,6 +27,8 @@ data Atom a       = Prim a | PrimF (Sit a -> a)
 data PseudoAtom a = Atom (Atom a) | Complex (Prog a)
 data Prog a       = Seq (Prog a) (Prog a)  | Nondet [Prog a]
                   | Conc (Prog a) (Prog a) | PseudoAtom (PseudoAtom a) | Nil
+
+type Depth = Int
 
 data Tree a = Empty | Alt [Tree a] | Val a (Tree a)
 

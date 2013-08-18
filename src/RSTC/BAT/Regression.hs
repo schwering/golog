@@ -5,7 +5,7 @@
 -- | Basic action theory based on relative temporal measures using regression.
 
 module RSTC.BAT.Regression (Qty, Wrapper(..),
-                            Prim(..), NTGCat(..), TTCCat(..), State(..), HistState(..),
+                            Prim(..), NTGCat(..), TTCCat(..), State(..), HistState,
                             lookahead, ntgDiff, ttcDiff, quality, match,
                             bestAccel, ntgCats, ttcCats, nan,
                             inject, remove) where
@@ -13,6 +13,7 @@ module RSTC.BAT.Regression (Qty, Wrapper(..),
 import RSTC.Car
 import RSTC.BAT.Base
 import Golog.Interpreter
+import Golog.Util
 import qualified RSTC.Obs as O
 import RSTC.Theorems
 import Util.MemoCache
@@ -36,13 +37,18 @@ instance RealFloat a => BAT (Prim (Qty a)) where
 
    s0 = S0
 
-   do_ (Test _) s = s
+   --do_ (Test _) s = s
    do_ a        s = Do a s
 
    poss = defaultPoss
 
-instance RealFloat a => DTBAT (Prim (Qty a)) where
-   reward = defaultReward
+instance DTBAT (Prim (Qty Double)) where
+   newtype Reward (Prim (Qty Double)) = Reward (Double, Depth)
+      deriving (Eq, Ord)
+   reward S0       = Reward (0, 0)
+   reward (Do a s) = Reward (r1+r2, d1+d2)
+      where (r1,d1) = actionReward a s
+            Reward (r2,d2) = reward s
 
 
 instance RealFloat a => State (Qty a) where
@@ -93,13 +99,16 @@ instance RealFloat a => State (Qty a) where
             ttc' S0                 _ _          = nan
 
 
-instance RealFloat a => HistState (Qty a) where
+instance RealFloat a => HistBAT (Prim (Qty a)) where
    history S0       = []
    history (Do a s) = a : history s
 
-   histlen S0       = 0
-   histlen (Do _ s) = 1 + (histlen s)
+   sitlen S0        = 0
+   sitlen (Do _ s)  = 1 + (sitlen s)
 
-   predsit S0       = error "RSTC.BAT.Regression.subsit: S0"
-   predsit (Do _ s) = s
+   predSit S0       = Nothing
+   predSit (Do a s) = Just (a, s)
+
+
+instance RealFloat a => HistState (Qty a)
 

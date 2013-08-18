@@ -11,6 +11,9 @@ data Prim = A | B | C | D deriving (Eq, Show)
 instance BAT Prim where
    data Sit Prim = S0 | Do Prim (Sit Prim)
 
+   s0 = S0
+   do_ = Do
+
    poss D _ = False
    poss _ _ = True
 

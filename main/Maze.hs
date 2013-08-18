@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts #-}
 {-# LANGUAGE EmptyDataDecls, UndecidableInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Main (main) where
 
@@ -86,7 +87,7 @@ class HistBAT (Prim a) => MazeBAT a where
    unvisited    :: Point -> Sit (Prim a) -> Bool
    visited      :: Sit (Prim a) -> [Point]
    randomSupply :: MazeBAT a => Sit (Prim a) -> Random.Supply
-   rewardSum    :: Sit (Prim a) -> Reward
+   reward'      :: Sit (Prim a) -> Reward (Prim a)
 
    unvisited p s = p `notElem` visited s
 
@@ -113,8 +114,8 @@ instance MazeBAT Regr where
 
    visited s = scanr (\f p -> f p) startPos (map newPos (history s))
 
-   rewardSum S0       = 0
-   rewardSum (Do a s) = rewardSum s + reward a s
+   reward' S0       = 0
+   reward' (Do a s) = actionReward a s + reward' s
 
    randomSupply s = foldr (\f rs -> f rs) startRandomSupply (map newRandomSupply (history s))
 
@@ -124,12 +125,12 @@ instance MazeBAT Regr where
 data Progr
 
 instance BAT (Prim Progr) where
-   data Sit (Prim Progr)       = Sit [Point] Reward [Prim Progr] Random.Supply deriving Show
+   data Sit (Prim Progr)       = Sit [Point] (Reward (Prim Progr)) [Prim Progr] Random.Supply deriving Show
    s0                          = Sit [startPos] 0 [] startRandomSupply
 
    do_  (Test _) s                       = s
    do_  a        s@(Sit ps@(p:_) r m rs) = Sit (newPos a p : ps)
-                                               (r + reward a s)
+                                               (r + actionReward a s)
                                                (a : m)
                                                (newRandomSupply a rs)
    do_  _        (Sit []         _ _ _)  = error "do_: empty point history"
@@ -145,7 +146,7 @@ instance MazeBAT Progr where
 
    visited (Sit ps _ _ _) = ps
 
-   rewardSum (Sit _ r _ _) = r
+   reward' (Sit _ r _ _) = r
 
    randomSupply (Sit _ _ _ rs) = rs
 
@@ -158,9 +159,9 @@ allowedAction a               s = p' `isValidNeighborOf` p && unvisited p' s
    where p' = newPos a p
          p  = pos s
 
-instance (BAT (Prim a), MazeBAT a) => DTBAT (Prim a) where
-   reward (Test _) s = 0
-   reward a s = (improv - penalty a (history s) / 9) / normf - 100
+actionReward :: MazeBAT a => Prim a -> Sit (Prim a) -> Reward (Prim a)
+actionReward (Test _) s = 0
+actionReward a s = Reward $ (improv - penalty a (history s) / 9) / normf - 100
       where oldRem = dist goalPos (pos s)
             newRem = dist goalPos (newPos a (pos s)) 
             improv = oldRem - newRem
@@ -183,12 +184,16 @@ instance (BAT (Prim a), MazeBAT a) => DTBAT (Prim a) where
    --abs (dist startPos goalPos - dist (newPos a (pos s)) goalPos)**1 -
    --abs (dist startPos goalPos - dist (pos s) goalPos)**1
 
+instance (BAT (Prim a), MazeBAT a) => DTBAT (Prim a) where
+   newtype Reward (Prim a) = Reward Double deriving (Eq, Ord, Num, Real, Fractional, RealFrac, Floating, RealFloat, Show)
+   reward = reward'
+
 instance (BAT (Prim a), MazeBAT a) => IOBAT (Prim a) IO where
    syncA a s = do let s' = do_ a s
                   --if a == Down then threadDelay (1*1000*1000) else return ()
                   putStrLn $ (if pos s' == goalPos then " *** " else " ... ") ++
                              show a ++ ": " ++
-                             show (pos s', dist goalPos (pos s'), rewardSum s')
+                             show (pos s', dist goalPos (pos s'), reward s')
                   return s'
 
 newPos :: (Prim a) -> Point -> Point
@@ -236,19 +241,19 @@ lookahead = 5
 
 main :: IO ()
 main = do
-   let prog :: Prog (Prim Progr)
+   let prog :: Prog (Prim Regr)
        prog  = star (Nondet [ primf up
                             , primf down
                             , primf left
                             , primf right]) `Seq`
                test (\s -> pos s == goalPos)
-       tree  = treeDTIO lookahead prog s0 :: ConfIO (Prim Progr) (Reward, Depth) IO
+       tree  = treeDTIO lookahead prog s0 :: ConfIO (Prim Regr) IO
        --confs = transTrace' tree
    putStrLn $ show $ startPos
    putStrLn $ show $ goalPos
 {-
    mapM_ (\s -> putStrLn $ (if pos s == goalPos then " *** " else " ... ") ++
-            show (pos s, dist goalPos (pos s), rewardSum s
+            show (pos s, dist goalPos (pos s), reward s
                   --,case s of Do a s' -> (pos s `elem` visited s', visited s')
                   )) $ map sit confs
 -}
@@ -256,12 +261,6 @@ main = do
    Just conf <- dooSync' tree
    -- The following lines just test that subsequent syncs have no effect:
    let s = sit conf
-   conf' <- sync conf
-   putStrLn $ case trans' conf of Just _ -> "Just" ; _ -> "Nothing"
-   putStrLn $ case trans' conf' of Just _ -> "Just" ; _ -> "Nothing"
-   putStrLn $ case trans' conf' >>= trans' of Just _ -> "Just" ; _ -> "Nothing"
-   --putStrLn $ "Actions (sync'ed): " ++ show (sitlen $ sit conf')
-   --let s = sit $ last $ confs
    putStrLn $ "Actions: " ++ show (sitlen s)
    draw s
 

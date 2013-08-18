@@ -7,11 +7,11 @@ module Main (main) where
 
 import RSTC.Car
 import Golog.Interpreter
-import Golog.Util hiding (HistBAT(..), sit2list, list2sit)
+import Golog.Util
 --import Interpreter.Tree
 --import Interpreter.TreeUtil
 import RSTC.BAT.Base
-import RSTC.BAT.Progression
+import RSTC.BAT.Regression
 import qualified RSTC.Obs as O
 import RSTC.Progs
 --import RSTC.Theorems
@@ -19,7 +19,7 @@ import RSTC.Progs
 import qualified Util.MemoCache
 
 --import Data.List (sortBy)
---import Data.Maybe
+import Data.Maybe (fromJust)
 --import Control.Applicative
 import Text.Printf
 import GHC.Stats
@@ -45,6 +45,7 @@ instance Show a => Show (Prim (Qty a)) where
    show (Start b s) = "Start " ++ show b ++ " " ++ s
    show (End b s) = "End " ++ show b ++ " " ++ s
    show (Msg s) = "Msg " ++ s
+   show (Test _) = "Test <...>"
 
 {-
 instance Show Finality where
@@ -169,8 +170,8 @@ printFluents s = case reverse (sit2list s)
 
 traceCsv :: Sit (Prim (Qty Double)) -> [String]
 traceCsv ss = header : (reverse (map (concat . interleave delim . map (show.unwrap) . csv) (subsits ss)))
-   where subsits s = case history s of Match _ : _ -> s : subsits (predsit s)
-                                       _ : _       -> subsits (predsit s)
+   where subsits s = case history s of Match _ : _ -> s : subsits (snd $ fromJust $ predSit s)
+                                       _ : _       -> subsits (snd $ fromJust $ predSit s)
                                        _           -> []
          header = "time" ++ delim ++
                   concat (interleave delim (

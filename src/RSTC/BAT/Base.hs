@@ -7,16 +7,17 @@
 -- | Common base of BAT implementations using regression and progression.
 
 module RSTC.BAT.Base (Prim(..), NTGCat(..), TTCCat(..),
-                      Wrapper(..), State(..), HistState(..),
+                      Wrapper(..), State(..), HistState,
                       lookahead, ntgDiff, ttcDiff, quality, match,
                       bestAccel, ntgCats, ttcCats, nan,
-                      defaultPoss, defaultReward,
+                      defaultPoss, actionReward,
                       remove, inject,
                       convert) where
 
 import RSTC.Car
 import Golog.Interpreter
 import Golog.Macro (TestAction(..))
+import Golog.Util
 import qualified RSTC.Obs as O
 import RSTC.Theorems
 import Util.Interpolation
@@ -76,7 +77,9 @@ class RealFloat a => State a where
    ntg  :: Sit (Prim a) -> Car -> Car -> NTG a
    ttc  :: Sit (Prim a) -> Car -> Car -> TTC a
 
+class (State a, HistBAT (Prim a)) => HistState a
 
+{-
 -- | Defines some common operations of situation-like types.
 --
 -- Minimal complete definition: history.
@@ -116,6 +119,18 @@ inject n a s = list2sit (reverse (take n l ++ [a] ++ drop n l))
 
 -- | Removes the action 'n' actions ago in the situation term.
 remove :: HistState a => Int -> Sit (Prim a) -> Sit (Prim a)
+remove n s = list2sit (reverse (take n l ++ drop (n+1) l))
+   where l = reverse (sit2list s)
+-}
+
+-- | Injects a new action 'n' actions ago in the situation term.
+inject :: HistBAT a => Int -> (a) -> Sit a -> Sit a
+inject n a s = list2sit (reverse (take n l ++ [a] ++ drop n l))
+   where l = reverse (sit2list s)
+
+
+-- | Removes the action 'n' actions ago in the situation term.
+remove :: HistBAT a => Int -> Sit a -> Sit a
 remove n s = list2sit (reverse (take n l ++ drop (n+1) l))
    where l = reverse (sit2list s)
 
@@ -165,24 +180,26 @@ defaultPoss (End _ _)            _ = True
 defaultPoss (Msg _)              _ = True
 defaultPoss (Test cond)          s = cond s
 
-defaultReward :: HistState a => Prim a -> Sit (Prim a) -> Reward
-defaultReward (Wait _)         _ = 0
-defaultReward (Accel _ _)      _ = -0.01
-defaultReward (LaneChange _ _) _ = -0.01
-defaultReward (Init _)         _ = 0
-defaultReward (Prematch _)     _ = 0
-defaultReward (Match e)        s = 1 - sum ntgDiffs / genericLength ntgDiffs
-   where ntgDiffs = map realToFrac [abs (ntgDiff s e b c) | b <- cars, c <- cars, b /= c]
-defaultReward Abort            _ = 0
-defaultReward NoOp             _ = 0
-defaultReward (Start _ _)      s = max 0 (1000 - 2 * (fromIntegral (histlen s)))
-defaultReward (End _ _)        s = case dropWhile startOrEnd (history s) of (Match _ : _) -> 2 * (fromIntegral (histlen s - 1))
-                                                                            _             -> 0
+
+actionReward :: HistState a =>
+                Prim a -> Sit (Prim a) -> (Double, Depth)
+actionReward (Wait _)         _ = (0, 1)
+actionReward (Accel _ _)      _ = (-0.01, 1)
+actionReward (LaneChange _ _) _ = (-0.01, 1)
+actionReward (Init _)         _ = (0, 1)
+actionReward (Prematch _)     _ = (0, 1)
+actionReward (Match e)        s = (1 - sum (ntgDiffs e s) / genericLength (ntgDiffs e s), 1)
+   where ntgDiffs e' s' = map realToFrac [abs (ntgDiff s' e' b c) | b <- cars, c <- cars, b /= c]
+actionReward Abort            _ = (0, 1)
+actionReward NoOp             _ = (0, 1)
+actionReward (Start _ _)      s = (max 0 (1000 - 2 * (fromIntegral (sitlen s))), 1)
+actionReward (End _ _)        s = case dropWhile startOrEnd (history s) of (Match _ : _) -> (2 * (fromIntegral (sitlen s - 1)), 1)
+                                                                           _             -> (0, 1)
    where startOrEnd (Start _ _)  = True
          startOrEnd (End _ _)    = True
          startOrEnd _            = False
-defaultReward (Msg _)          _ = 0
-defaultReward (Test _)         _ = 0
+actionReward (Msg _)          _ = (0, 1)
+actionReward (Test _)         _ = (0, 1)
 
 
 lookahead :: Depth
@@ -287,7 +304,7 @@ noDupe _ _  = error "RSTC.BAT.Base.noDupe: neither Accel nor LaneChange"
 -- This function relies on 'sit2list' and 'list2sit' of the 'HistState'
 -- implementations of the two BAT implementations.
 convert :: (Wrapper w1, Wrapper w2, HistState (w1 a), HistState (w2 a)) =>
-   Sit (Prim (w1 a)) -> Sit (Prim (w2 a))
+           Sit (Prim (w1 a)) -> Sit (Prim (w2 a))
 convert = list2sit . map (m (wrap . unwrap)) . sit2list
    where m f (Wait t)         = Wait (f t)
          m f (Accel b q)      = Accel b (f q)

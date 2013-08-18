@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, GeneralizedNewtypeDeriving #-}
 
 -- | A Golog-controlled SCR driver.
 --
@@ -86,11 +86,11 @@ import Debug.Trace
 
 data Prim1 = AntiDrift | AntiBlock |AntiSlip |
              ApproachLeft | DriveCenter | ApproachRight | FollowMaxBeam |
-             Test1 (Sit Prim1 -> Bool)
+             Test1 (Sit1 -> Bool)
 
 data Prim2 = Accel Double | Brake Double | Clutch Double | Gear Int |
              Steer Double | Focus Int | Meta Int | Tick (Maybe CarState) |
-             Test2 (Sit Prim2 -> Bool) | Bounty (Sit Prim2 -> Reward)
+             Test2 (Sit2 -> Bool) | Bounty (Sit2 -> Reward2)
 
 instance TestAction Prim1 where
    testAction = Test1
@@ -123,26 +123,29 @@ instance Show Prim2 where
 data SimpleDriver = SimpleDriver
 type Sit1 = Sit Prim1
 type Sit2 = Sit Prim2
-type Conf1 = ConfIO Prim1 (Reward, Depth) IO
-type Conf2 = ConfIO Prim2 (Reward, Depth) IO
+type Reward1 = Reward Prim1
+type Reward2 = Reward Prim2
+type Conf1 = ConfIO Prim1 IO
+type Conf2 = ConfIO Prim2 IO
 type Prog1 = Prog Prim1
 type Prog2 = Prog Prim2
 
 instance BAT Prim1 where
    data Sit Prim1 = Sit1 {
+      rew1  :: Reward1,
       assoc :: Sit2
    }
 
-   s0 = Sit1 s0
+   s0 = Sit1 0 s0
 
-   do_ a@AntiDrift     s = s{assoc = sit $ refine a s (assoc s)}
-   do_ a@AntiBlock     s = s{assoc = sit $ refine a s (assoc s)}
-   do_ a@AntiSlip      s = s{assoc = sit $ refine a s (assoc s)}
-   do_ a@ApproachLeft  s = s{assoc = sit $ refine a s (assoc s)}
-   do_ a@DriveCenter   s = s{assoc = sit $ refine a s (assoc s)}
-   do_ a@ApproachRight s = s{assoc = sit $ refine a s (assoc s)}
-   do_ a@FollowMaxBeam s = s{assoc = sit $ refine a s (assoc s)}
-   do_ (Test1 _)       s = s
+   do_ a@AntiDrift     s = s{rew1 = rew1 s + rew1A a s, assoc = sit $ refine a s (assoc s)}
+   do_ a@AntiBlock     s = s{rew1 = rew1 s + rew1A a s, assoc = sit $ refine a s (assoc s)}
+   do_ a@AntiSlip      s = s{rew1 = rew1 s + rew1A a s, assoc = sit $ refine a s (assoc s)}
+   do_ a@ApproachLeft  s = s{rew1 = rew1 s + rew1A a s, assoc = sit $ refine a s (assoc s)}
+   do_ a@DriveCenter   s = s{rew1 = rew1 s + rew1A a s, assoc = sit $ refine a s (assoc s)}
+   do_ a@ApproachRight s = s{rew1 = rew1 s + rew1A a s, assoc = sit $ refine a s (assoc s)}
+   do_ a@FollowMaxBeam s = s{rew1 = rew1 s + rew1A a s, assoc = sit $ refine a s (assoc s)}
+   do_ a@(Test1 _)     s = s{rew1 = rew1 s + rew1A a s}
 
    poss AntiDrift     _ = False
    poss AntiBlock     _ = False
@@ -157,15 +160,11 @@ instance BAT Prim1 where
    poss FollowMaxBeam s = trackTime (currentState1 s) Zero < 3
    poss (Test1 f)  s = f s
 
+
 instance DTBAT Prim1 where
-   reward AntiDrift     _ = 1000
-   reward AntiBlock     _ = 500
-   reward AntiSlip      _ = 100
-   reward ApproachLeft  _ = 1
-   reward DriveCenter   _ = 1
-   reward ApproachRight _ = 1
-   reward FollowMaxBeam _ = 10
-   reward (Test1 _)     _ = 0
+   newtype Reward Prim1 = Reward1 Double
+      deriving (Eq, Ord, Num, Real, Fractional, RealFrac, Floating, RealFloat)
+   reward = rew1
 
 instance IOBAT Prim1 IO where
    syncA a s =
@@ -176,6 +175,16 @@ instance IOBAT Prim1 IO where
             else return ()
          putStrLn $ show a ++ " done"
          return $ (do_ a s){assoc = sit (fromJust c2)}
+
+rew1A :: Prim1 -> Sit1 -> Reward1
+rew1A AntiDrift     _ = 1000
+rew1A AntiBlock     _ = 500
+rew1A AntiSlip      _ = 100
+rew1A ApproachLeft  _ = 1
+rew1A DriveCenter   _ = 1
+rew1A ApproachRight _ = 1
+rew1A FollowMaxBeam _ = 10
+rew1A (Test1 _)     _ = 0
 
 currentState1 :: Sit1 -> CarState
 currentState1 = currentState2 . assoc
@@ -205,6 +214,7 @@ instance BAT Prim2 where
       sensedState     :: IORef CarState,
       newControl      :: IORef CarControl,
       ticks           :: Sem.SSem,
+      rew2            :: Reward2,
       alreadyAccel    :: Bool,
       alreadyBrake    :: Bool,
       alreadyGear     :: Bool,
@@ -213,27 +223,29 @@ instance BAT Prim2 where
 
    s0 = Sit2 defaultState defaultControl
              undefined undefined undefined
-             False False False False
+             0 False False False False
 
-   do_ (Accel x)       s = modControl (\y -> y{accel = x}) s{alreadyAccel = True}
-   do_ (Brake x)       s = modControl (\y -> y{brake = x}) s{alreadyBrake = True}
-   do_ (Clutch x)      s = modControl (\y -> y{clutch = x}) s
-   do_ (Gear x)        s = modControl (\y -> y{Control.gear = x}) s{alreadyGear = True}
-   do_ (Steer x)       s = modControl (\y -> y{steer = x}) s{alreadySteer = True}
-   do_ (Focus x)       s = modControl (\y -> y{Control.focus = x}) s
-   do_ (Meta x)        s = modControl (\y -> y{meta = x}) s
-   do_ (Tick (Just x)) s = s{currentState2 = x,
-                             alreadyAccel  = False,
-                             alreadyBrake  = False,
-                             alreadyGear   = False,
-                             alreadySteer  = False}
-   do_ (Tick Nothing)  s = modState (simulateState tickDurSec (currentControl2 s))
-                           s{alreadyAccel = False,
-                             alreadyBrake = False,
-                             alreadyGear  = False,
-                             alreadySteer = False}
-   do_ (Test2 _)       s = s
-   do_ (Bounty _)      s = s
+   do_ a@(Accel x)       s = modControl (\y -> y{accel = x}) s{alreadyAccel = True, rew2 = rew2 s + rew2A a s}
+   do_ a@(Brake x)       s = modControl (\y -> y{brake = x}) s{alreadyBrake = True, rew2 = rew2 s + rew2A a s}
+   do_ a@(Clutch x)      s = modControl (\y -> y{clutch = x}) s{rew2 = rew2 s + rew2A a s}
+   do_ a@(Gear x)        s = modControl (\y -> y{Control.gear = x}) s{alreadyGear = True, rew2 = rew2 s + rew2A a s}
+   do_ a@(Steer x)       s = modControl (\y -> y{steer = x}) s{alreadySteer = True, rew2 = rew2 s + rew2A a s}
+   do_ a@(Focus x)       s = modControl (\y -> y{Control.focus = x}) s{rew2 = rew2 s + rew2A a s}
+   do_ a@(Meta x)        s = modControl (\y -> y{meta = x}) s{rew2 = rew2 s + rew2A a s}
+   do_ a@(Tick (Just x)) s = s{currentState2 = x,
+                               alreadyAccel  = False,
+                               alreadyBrake  = False,
+                               alreadyGear   = False,
+                               alreadySteer  = False,
+                               rew2 = rew2 s + rew2A a s}
+   do_ a@(Tick Nothing)  s = modState (simulateState tickDurSec (currentControl2 s))
+                             s{alreadyAccel = False,
+                               alreadyBrake = False,
+                               alreadyGear  = False,
+                               alreadySteer = False,
+                               rew2 = rew2 s + rew2A a s}
+   do_ a@(Test2 _)       s = s{rew2 = rew2 s + rew2A a s}
+   do_ a@(Bounty _)      s = s{rew2 = rew2 s + rew2A a s}
 
    poss (Accel _)  s = True || not (alreadyAccel s) -- a < rpm (currentState2 s) / 7500
    poss (Brake _)  _ = True
@@ -247,17 +259,9 @@ instance BAT Prim2 where
    poss (Bounty _) _ = True
 
 instance DTBAT Prim2 where
-   reward (Accel _)  s = if alreadyAccel s then -1 else -0.01
-   reward (Brake _)  s = if alreadyBrake s then -1 else -0.01
-   reward (Clutch _) _ = 0
-   reward (Gear _)   s = if alreadyGear  s then -1 else -0.01
-   reward (Steer _)  s = if alreadySteer s then -1 else -0.01
-   reward (Focus _)  _ = 0
-   reward (Meta _)   _ = 0
-   reward (Tick _)   s = if alreadyAccel s && alreadyBrake s &&
-                            alreadyGear s && alreadySteer s then 0 else -1
-   reward (Test2 _)  _ = 0
-   reward (Bounty f) s = f s
+   newtype Reward Prim2 = Reward2 Double
+      deriving (Eq, Ord, Num, Real, Fractional, RealFrac, Floating, RealFloat)
+   reward = rew2
 
 instance IOBAT Prim2 IO where
    syncA (Tick Nothing) s =
@@ -282,6 +286,19 @@ instance IOBAT Prim2 IO where
          writeIORef (newControl s) (currentControl2 s)
          return s'
 
+rew2A :: Prim2 -> Sit2 -> Reward2
+rew2A (Accel _)  s = if alreadyAccel s then -1 else -0.01
+rew2A (Brake _)  s = if alreadyBrake s then -1 else -0.01
+rew2A (Clutch _) _ = 0
+rew2A (Gear _)   s = if alreadyGear  s then -1 else -0.01
+rew2A (Steer _)  s = if alreadySteer s then -1 else -0.01
+rew2A (Focus _)  _ = 0
+rew2A (Meta _)   _ = 0
+rew2A (Tick _)   s = if alreadyAccel s && alreadyBrake s &&
+                        alreadyGear s && alreadySteer s then 0 else -1
+rew2A (Test2 _)  _ = 0
+rew2A (Bounty f) s = f s
+
 modControl :: (CarControl -> CarControl) -> Sit2 -> Sit2
 modControl f s = s{currentControl2 = f (currentControl2 s)}
 
@@ -297,7 +314,7 @@ tickDurMicroSec = 10 * 1000
 tick :: Prog2
 tick = prim (Tick Nothing)
 
-bounty :: (Sit2 -> Reward) -> Prog2
+bounty :: (Sit2 -> Reward2) -> Prog2
 bounty = prim . Bounty
 
 transmission :: Prog2
@@ -352,7 +369,7 @@ steerTrackPos pos = star action `Seq` success
          ori state  = maxAngle * (diff state) / 2
          diff state = pos - trackPos state
          maxAngle   = deg2rad 45
-         success    = bounty (\s -> 1 / abs (trackPos (currentState2 s) - pos))
+         success    = bounty (\s -> Reward2 $ 1 / abs (trackPos (currentState2 s) - pos))
 
 gologAgent :: IORef CarState -> IORef CarControl -> Sem.SSem -> IO ()
 gologAgent stateRef controlRef tickSem = loop conf
