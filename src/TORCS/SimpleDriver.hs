@@ -80,7 +80,6 @@ import TORCS.CarState
 import qualified TORCS.CarControl as Control
 import qualified TORCS.CarState as State
 import TORCS.Client
-import TORCS.LUT
 import TORCS.PhysicsUtil
 import Debug.Trace
 
@@ -88,15 +87,8 @@ data Prim1 = AntiDrift | AntiBlock |AntiSlip |
              ApproachLeft | DriveCenter | ApproachRight | FollowMaxBeam |
              Test1 (Sit1 -> Bool)
 
-data Prim2 = Accel Double | Brake Double | Clutch Double | Gear Int |
-             Steer Double | Focus Int | Meta Int | Tick (Maybe CarState) |
-             Test2 (Sit2 -> Bool) | Bounty (Sit2 -> Reward2)
-
 instance TestAction Prim1 where
    testAction = Test1
-
-instance TestAction Prim2 where
-   testAction = Test2
 
 instance Show Prim1 where
    show AntiDrift     = "AntiDrift"
@@ -107,18 +99,6 @@ instance Show Prim1 where
    show ApproachRight = "ApproachRight"
    show FollowMaxBeam = "FollowMaxBeam"
    show (Test1 _)     = "Test1 <...>"
-
-instance Show Prim2 where
-   show (Accel x)  = "Accel " ++ show x
-   show (Brake x)  = "Brake " ++ show x
-   show (Clutch x) = "Clutch " ++ show x
-   show (Gear x)   = "Gear " ++ show x
-   show (Steer x)  = "Steer " ++ show x
-   show (Focus x)  = "Focus " ++ show x
-   show (Meta x)   = "Meta " ++ show x
-   show (Tick x)   = "Tick " ++ show x
-   show (Test2 _)  = "Test2 <...>"
-   show (Bounty _) = "Bounty <...>"
 
 data SimpleDriver = SimpleDriver
 type Sit1 = Sit Prim1
@@ -193,9 +173,9 @@ refine :: Prim1 -> Sit1 -> Sit2 -> Conf2
 refine AntiDrift     _ s2 = refineProg Nil s2
 refine AntiBlock     _ s2 = refineProg Nil s2
 refine AntiSlip      _ s2 = refineProg Nil s2
-refine ApproachLeft  _ s2 = refineProg (steerTrackPos    0.8) s2
-refine DriveCenter   _ s2 = refineProg (steerTrackPos      0) s2
-refine ApproachRight _ s2 = refineProg (steerTrackPos (-0.8)) s2
+refine ApproachLeft  _ s2 = refineProg (prim $ SetTrajectory   0.8 ) s2
+refine DriveCenter   _ s2 = refineProg (prim $ SetTrajectory   0   ) s2
+refine ApproachRight _ s2 = refineProg (prim $ SetTrajectory (-0.8)) s2
 refine FollowMaxBeam _ s2 = refineProg (steerAngle longestBeam) s2
    where longestBeam = beamOriRad $ snd $ maximum $
                        map (\ori -> (trackTime (currentState2 s2) ori, ori))
@@ -203,9 +183,29 @@ refine FollowMaxBeam _ s2 = refineProg (steerAngle longestBeam) s2
 refine (Test1 _)     _ _  = error "Test1 is not refinable"
 
 refineProg :: Prog2 -> Sit2 -> Conf2
-refineProg p1 s = treeDTIO 3 p s
-   where p2 = transmission `Seq` acceleration `Seq` tick
-         p  = p1 `Conc` plus p2
+refineProg p' s = treeDTIO 3 p s
+   where p = transmission `Seq` acceleration `Seq` steerTrajectory `Seq` tick
+
+data Prim2 = Accel Double | Brake Double | Clutch Double | Gear Int |
+             Steer Double | Focus Int | Meta Int |
+             SetTrajectory Double | Tick (Maybe CarState) |
+             Test2 (Sit2 -> Bool) | Bounty (Sit2 -> Reward2)
+
+instance TestAction Prim2 where
+   testAction = Test2
+
+instance Show Prim2 where
+   show (Accel x)         = "Accel " ++ show x
+   show (Brake x)         = "Brake " ++ show x
+   show (Clutch x)        = "Clutch " ++ show x
+   show (Gear x)          = "Gear " ++ show x
+   show (Steer x)         = "Steer " ++ show x
+   show (Focus x)         = "Focus " ++ show x
+   show (Meta x)          = "Meta " ++ show x
+   show (SetTrajectory x) = "SetTrajectory " ++ show x
+   show (Tick x)          = "Tick " ++ show x
+   show (Test2 _)         = "Test2 <...>"
+   show (Bounty _)        = "Bounty <...>"
 
 instance BAT Prim2 where
    data Sit Prim2 = Sit2 {
@@ -215,6 +215,7 @@ instance BAT Prim2 where
       newControl      :: IORef CarControl,
       ticks           :: Sem.SSem,
       rew2            :: Reward2,
+      trajectory      :: Double,
       alreadyAccel    :: Bool,
       alreadyBrake    :: Bool,
       alreadyGear     :: Bool,
@@ -223,40 +224,43 @@ instance BAT Prim2 where
 
    s0 = Sit2 defaultState defaultControl
              undefined undefined undefined
-             0 False False False False
+             0 0 False False False False
 
-   do_ a@(Accel x)       s = modControl (\y -> y{accel = x}) s{alreadyAccel = True, rew2 = rew2 s + rew2A a s}
-   do_ a@(Brake x)       s = modControl (\y -> y{brake = x}) s{alreadyBrake = True, rew2 = rew2 s + rew2A a s}
-   do_ a@(Clutch x)      s = modControl (\y -> y{clutch = x}) s{rew2 = rew2 s + rew2A a s}
-   do_ a@(Gear x)        s = modControl (\y -> y{Control.gear = x}) s{alreadyGear = True, rew2 = rew2 s + rew2A a s}
-   do_ a@(Steer x)       s = modControl (\y -> y{steer = x}) s{alreadySteer = True, rew2 = rew2 s + rew2A a s}
-   do_ a@(Focus x)       s = modControl (\y -> y{Control.focus = x}) s{rew2 = rew2 s + rew2A a s}
-   do_ a@(Meta x)        s = modControl (\y -> y{meta = x}) s{rew2 = rew2 s + rew2A a s}
-   do_ a@(Tick (Just x)) s = s{currentState2 = x,
-                               alreadyAccel  = False,
-                               alreadyBrake  = False,
-                               alreadyGear   = False,
-                               alreadySteer  = False,
-                               rew2 = rew2 s + rew2A a s}
-   do_ a@(Tick Nothing)  s = modState (simulateState tickDurSec (currentControl2 s))
-                             s{alreadyAccel = False,
-                               alreadyBrake = False,
-                               alreadyGear  = False,
-                               alreadySteer = False,
-                               rew2 = rew2 s + rew2A a s}
-   do_ a@(Test2 _)       s = s{rew2 = rew2 s + rew2A a s}
-   do_ a@(Bounty _)      s = s{rew2 = rew2 s + rew2A a s}
+   do_ a@(Accel x)         s = modControl (\y -> y{accel = x}) s{alreadyAccel = True, rew2 = rew2 s + rew2A a s}
+   do_ a@(Brake x)         s = modControl (\y -> y{brake = x}) s{alreadyBrake = True, rew2 = rew2 s + rew2A a s}
+   do_ a@(Clutch x)        s = modControl (\y -> y{clutch = x}) s{rew2 = rew2 s + rew2A a s}
+   do_ a@(Gear x)          s = modControl (\y -> y{Control.gear = x}) s{alreadyGear = True, rew2 = rew2 s + rew2A a s}
+   do_ a@(Steer x)         s = modControl (\y -> y{steer = x}) s{alreadySteer = True, rew2 = rew2 s + rew2A a s}
+   do_ a@(Focus x)         s = modControl (\y -> y{Control.focus = x}) s{rew2 = rew2 s + rew2A a s}
+   do_ a@(Meta x)          s = modControl (\y -> y{meta = x}) s{rew2 = rew2 s + rew2A a s}
+   do_ a@(SetTrajectory x) s = s{trajectory = x,
+                                 rew2 = rew2 s + rew2A a s}
+   do_ a@(Tick (Just x))   s = s{currentState2 = x,
+                                 alreadyAccel  = False,
+                                 alreadyBrake  = False,
+                                 alreadyGear   = False,
+                                 alreadySteer  = False,
+                                 rew2 = rew2 s + rew2A a s}
+   do_ a@(Tick Nothing)    s = modState (simulateState tickDurSec (currentControl2 s))
+                               s{alreadyAccel = False,
+                                 alreadyBrake = False,
+                                 alreadyGear  = False,
+                                 alreadySteer = False,
+                                 rew2 = rew2 s + rew2A a s}
+   do_ a@(Test2 _)         s = s{rew2 = rew2 s + rew2A a s}
+   do_ a@(Bounty _)        s = s{rew2 = rew2 s + rew2A a s}
 
-   poss (Accel _)  s = True || not (alreadyAccel s) -- a < rpm (currentState2 s) / 7500
-   poss (Brake _)  _ = True
-   poss (Clutch _) _ = True
-   poss (Gear _)   _ = True -- && abs (n - State.gear (currentState2 s)) <= 1
-   poss (Steer _)  s = not (alreadySteer s) -- (speedX (currentState2 s)) > 1
-   poss (Focus _)  _ = True
-   poss (Meta _)   _ = True
-   poss (Tick _)   _ = True
-   poss (Test2 f)  s = f s
-   poss (Bounty _) _ = True
+   poss (Accel _)         s = True || not (alreadyAccel s) -- a < rpm (currentState2 s) / 7500
+   poss (Brake _)         _ = True
+   poss (Clutch _)        _ = True
+   poss (Gear _)          _ = True -- && abs (n - State.gear (currentState2 s)) <= 1
+   poss (Steer _)         s = not (alreadySteer s) -- (speedX (currentState2 s)) > 1
+   poss (Focus _)         _ = True
+   poss (SetTrajectory _) _ = True
+   poss (Meta _)          _ = True
+   poss (Tick _)          _ = True
+   poss (Test2 f)         s = f s
+   poss (Bounty _)        _ = True
 
 instance DTBAT Prim2 where
    newtype Reward Prim2 = Reward2 Double
@@ -287,17 +291,18 @@ instance IOBAT Prim2 IO where
          return s'
 
 rew2A :: Prim2 -> Sit2 -> Reward2
-rew2A (Accel _)  s = if alreadyAccel s then -1 else -0.01
-rew2A (Brake _)  s = if alreadyBrake s then -1 else -0.01
-rew2A (Clutch _) _ = 0
-rew2A (Gear _)   s = if alreadyGear  s then -1 else -0.01
-rew2A (Steer _)  s = if alreadySteer s then -1 else -0.01
-rew2A (Focus _)  _ = 0
-rew2A (Meta _)   _ = 0
-rew2A (Tick _)   s = if alreadyAccel s && alreadyBrake s &&
-                        alreadyGear s && alreadySteer s then 0 else -1
-rew2A (Test2 _)  _ = 0
-rew2A (Bounty f) s = f s
+rew2A (Accel _)         s = if alreadyAccel s then -1 else -0.01
+rew2A (Brake _)         s = if alreadyBrake s then -1 else -0.01
+rew2A (Clutch _)        _ = 0
+rew2A (Gear _)          s = if alreadyGear  s then -1 else -0.01
+rew2A (Steer _)         s = if alreadySteer s then -1 else -0.01
+rew2A (Focus _)         _ = 0
+rew2A (Meta _)          _ = 0
+rew2A (SetTrajectory _) _ = 0
+rew2A (Tick _)          s = Reward2 $ distRaced st + 10 * abs (trajectory s - trackPos st)
+   where st = currentState2 s
+rew2A (Test2 _)         _ = 0
+rew2A (Bounty f)        s = f s
 
 modControl :: (CarControl -> CarControl) -> Sit2 -> Sit2
 modControl f s = s{currentControl2 = f (currentControl2 s)}
@@ -342,10 +347,10 @@ acceleration = atomic $
                         in if x < 0 then Brake (-x) else Accel x
          param  state = if speedX state < 10 then 0.5 else param' state
          param' state = max (-1) $ min 1 $ (1 - 1 / beam)
-            where msX  = speedX state
-                  msY  = speedY state
-                  beta = atan2 msY msX
-                  beam = fromMaybe (1/0) (projectBeam (trackTime state) beta)
+            where msX   = speedX state
+                  msY   = speedY state
+                  theta = atan2 msY msX
+                  beam  = fromMaybe (1/0) (projectBeam (trackTime state) theta)
 
 steerAngle :: Double -> Prog2
 steerAngle ori = star action `Seq` success
@@ -356,11 +361,10 @@ steerAngleAction :: Double -> Sit2 -> Prim2
 steerAngleAction ori s = Steer lock'
    where state = currentState2 s
          lock' = if v > steerSensitivityOffset
-                 then lock / (steerLock * (v - steerSensitivityOffset))
+                 then lock / (steerLock * 3.6 * (v - steerSensitivityOffset))
                  else lock
          lock = ori * (angle state) / 2
          v    = speedX state
-         steerLock = 0.366519 * 3.6
          steerSensitivityOffset = kmh2ms 80
 
 steerTrackPos :: Double -> Prog2
@@ -370,6 +374,12 @@ steerTrackPos pos = star action `Seq` success
          diff state = pos - trackPos state
          maxAngle   = deg2rad 45
          success    = bounty (\s -> Reward2 $ 1 / abs (trackPos (currentState2 s) - pos))
+
+steerTrajectory :: Prog2
+steerTrajectory = primf (\s -> steerAngleAction (ori s) s)
+   where ori s  = maxAngle * diff s / 2
+         diff s = trajectory s - trackPos (currentState2 s)
+         maxAngle = deg2rad 45
 
 gologAgent :: IORef CarState -> IORef CarControl -> Sem.SSem -> IO ()
 gologAgent stateRef controlRef tickSem = loop conf
@@ -397,9 +407,6 @@ overwriteMVar :: MVar a -> a -> IO ()
 overwriteMVar mvar x = tryTakeMVar mvar >> putMVar mvar x
 -}
 
-yaw :: CarState -> Double
-yaw state = (-1) * (angle state)
-
 trackTime :: CarState -> BeamOri -> Double
 trackTime state a = trackTime' state !! fromEnum a
 
@@ -416,33 +423,41 @@ track' state = map (\d -> if d >= 200 then 1/0 else d) (track state)
 -- 'beamOris'.
 --
 -- Imagine the car's velocity in X and Y direction is a vector V and the
--- vector's angle from the positive X axis is @beta@.
+-- vector's angle from the positive X axis is @theta@.
 -- Furthermore let there be a laser beam with angle @alpha@ indicate that the
 -- track ends in @d@.
 --
 -- Since alpha is relative to the car's X axis, but the car's movement is
--- rotated by beta from the X axis, the car's movement is rotated by
--- @beta - alpha@ from the /beam/.
+-- rotated by theta from the X axis, the car's movement is rotated by
+-- @theta - alpha@ from the /beam/.
 --
 -- Therefore we project the car's velocity @v@ onto this beam by multiplying
--- @v * cos (beta - alpha)@.
+-- @v * cos (theta - alpha)@.
 -- Finally we divide the beam's length @d@ by this velocity to compute the time
 -- it takes the car to travel the beam's distance in the beam's direction.
 trackTime' :: CarState -> [Double]
 trackTime' state = beamTimes
    where msX          = speedX state
          msY          = speedY state
-         beta         = atan2 msY msX
+         theta        = atan2 msY msX
          v            = sqrt (msX^(2::Int) + msY^(2::Int))
          beamOriDists = zip (beamOris SimpleDriver) (track' state)
-         beamTimes    = map (\(alpha,d) -> d / (v * cos (beta - alpha))) beamOriDists
+         beamTimes    = map (\(alpha,d) -> d / (v * cos (theta - alpha))) beamOriDists
 
 projectBeam :: (BeamOri -> Double) -> Double -> Maybe Double
-projectBeam beams beta = fmap project best
+projectBeam beams theta = fmap project best
    where best = find cand [(lo, succ lo) | lo <- [minBound .. pred maxBound]]
-         cand (lo,hi) = beamOriRad lo <= beta && beta <= beamOriRad hi
-         project (lo,hi) = (1-r) * beams lo + r * beams hi
-            where r = (beta - beamOriRad lo) / (beamOriRad hi - beamOriRad lo)
+         cand (lo,hi) = beamOriRad lo < theta && theta <= beamOriRad hi
+         project (lo,hi) = (if r /= 1 then x else 0) + (if r /= 0 then y else 0)
+            where r = (theta - beamOriRad lo) / (beamOriRad hi - beamOriRad lo)
+                  x = (1-r) * beams lo
+                  y = r * beams hi
+
+
+rotateBeams :: (BeamOri -> Double) -> Double -> [Double]
+rotateBeams beams theta = map projectBeam' [minBound..maxBound]
+   where projectBeam' alpha = fromMaybe (beams alpha) (projectedBeam alpha)
+         projectedBeam alpha = projectBeam beams (beamOriRad alpha - theta)
 
 trackWidth :: CarState -> Double
 trackWidth state = case (left, right) of
@@ -450,32 +465,60 @@ trackWidth state = case (left, right) of
                         (Just l,  Nothing) -> l / lpos
                         (Nothing, Just r)  -> r / rpos
                         (Nothing, Nothing) -> error "trackWidth: no beam"
-   where gamma = yaw state
+   where gamma = -1 * angle state
          left  = projectBeam (trackDist state) (deg2rad   90  - gamma)
          right = projectBeam (trackDist state) (deg2rad (-90) - gamma)
          pos   = (trackPos state + 1) / 2
          lpos  = 1 - pos
          rpos  = pos
-         
+
 simulateState :: Double -> CarControl -> CarState -> CarState
 simulateState t c s = s{angle         = angle s + angleT,
                         curLapTime    = curLapTime s + t,
-                        distFromStart = distFromStart s + distT,
-                        distRaced     = distRaced s + distT,
+                        distFromStart = distFromStart s + xR',
+                        distRaced     = distRaced s + xR',
                         State.gear    = Control.gear c,
-                        speedX        = speedX s + vXT,
-                        track         = map trackT (zip (beamOris SimpleDriver) (track s)),
+                        speedX        = speedX s + aX * t,
+                        speedY        = speedY s + aY * t,
+                        track         = trackT,
                         trackPos      = trackPos s + trackPosT }
-   where msX               = speedX s
-         msY               = speedY s
-         beta              = atan2 msY msX
-         v                 = sqrt (msX^(2::Int) + msY^(2::Int))
-         gamma             = yaw s
-         distT             = v * cos (beta + gamma) * t
-         trackT (alpha, d) = d - v * cos (beta - alpha) * t
-         trackPosT         = v * sin (beta + gamma) * t / trackWidth s
-         angleT            = predictAngleDiff (steer c) t
-         vXT               = predictSpeedXDiff msX (accel c) (brake c) t
+   where -- Ackermann drive:
+         xC'       = speedX s * t
+         thetaW'   = tan (steer c * steerLock) / wheelBase * xC'
+         xW'       = cos thetaW' * xC'
+         yW'       = sin thetaW' * xC'
+         -- Car is already rotated by theta, so we project Ackermann drive onto
+         -- the road coordinate system:
+         theta     = -1 * angle s
+         xR'       = xW' * cos theta - yW' * sin theta
+         yR'       = xW' * sin theta + yW' * cos theta
+         distT     = sqrt (xW'*xW' + yW'*yW')
+         angleT    = angle s - thetaW'
+         -- Progress the laser beams
+         trackT    = map shortenBeams (zip (beamOris SimpleDriver) rotatedBeams)
+         rotatedBeams = rotateBeams (trackDist s) thetaW'
+         shortenBeams (alpha, d) = d - distT * cos (thetaW' - alpha)
+         trackPosT = yR' / trackWidth s
+         -- Very naive model of acceleration with maximum acceleration 10 m/s^2,
+         -- maximum deceleration 20 m/s^2:
+         aX = accel c * sin (speedX s / kmh2ms 300) * 10 - brake c * 20
+         aY = yW' / t
+         -- Old approach: use learnt data to predict next position.
+         --thetaS            = atan2 (speedY s) (speedX s)
+         --v                 = sqrt (speedX s ^ (2::Int) + speedY s ^ (2::Int))
+         --distT             = v * cos (theta + yaw s) * t
+         --trackT (alpha, d) = d - v * cos (theta - alpha) * t
+         --trackPosT         = v * sin (theta + yaw s) * t / trackWidth s
+         --angleT            = predictAngleDiff (steer c) t
+         --vXT               = predictSpeedXDiff (speedX s) (accel c) (brake c) (Control.gear c) t
+
+-- | Distance from front to rear axis in meters.
+wheelBase :: Double
+wheelBase = 2.64
+
+-- | Maximum steering angle in radians.
+steerLock :: Double
+steerLock = deg2rad 21.0
 
 instance Driver SimpleDriver where
    data Context SimpleDriver = Context (IORef CarState) (IORef CarControl)
@@ -493,22 +536,24 @@ instance Driver SimpleDriver where
          --putStrLn $ show state
          Sem.signal tickSem
          _ <- printf (kred ++
+                      "time = %.2f  " ++
                       "pos = %.2f  " ++
-                      "yaw = %.2f  " ++
+                      "angle = %.2f  " ++
                       "vX = %.2f  " ++
                       "vY = %.2f  " ++
-                      --"track[-90] = %.2f s = %.2f m " ++
+                      "track[-5] = %.2f s = %.2f m " ++
                       "track[0] = %.2f s = %.2f m " ++
-                      --"track[90] = %.2f s = %.2f m " ++
+                      "track[5] = %.2f s = %.2f m " ++
                       knrm ++ "\n")
+               (curLapTime state)
                (trackPos state)
-               (deg $ rad2deg $ yaw state)
+               (deg $ rad2deg $ angle state)
                (speedX state)
                (speedY state)
-               --(trackTime state Neg90) (trackDist state Neg90)
+               (trackTime state Neg5) (trackDist state Neg5)
                (trackTime state Zero)  (trackDist state Zero)
-               --(trackTime state Pos90) (trackDist state Pos90)
-         putStrLn (kmag ++ show (track state) ++ knrm)
+               (trackTime state Pos5) (trackDist state Pos5)
+         --putStrLn (kmag ++ show (track state) ++ knrm)
          control <- timeout (tickDurMicroSec) $ readIORef controlRef
          --putStrLn $ show control
          return (ctx, fromMaybe defaultControl control)

@@ -29,7 +29,7 @@ Library
                      TORCS.CarControl
                      TORCS.CarState
                      TORCS.Client
-                     TORCS.LUT
+                     --TORCS.LUT
                      TORCS.MessageParser
                      TORCS.NullDriver
                      TORCS.PhysicsUtil
@@ -40,8 +40,8 @@ Library
                      Util.Random
     Other-Modules:
     C-Sources:       src/RSTC/obs.c
-                     src/TORCS/lut_angle.c
-                     src/TORCS/lut_speed.c
+                     --src/TORCS/lut_angle.c
+                     --src/TORCS/lut_speed.c
                      src/Util/memo_cache.c
                      src/Util/native_pso.c
     Build-Depends:   array, base, bytestring, containers, network, parsec, SafeSemaphore

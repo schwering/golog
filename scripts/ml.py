@@ -1,31 +1,37 @@
 import csv
 from functools import partial
+import gzip
 #from itertools import product
-import numpy as np
 import pickle
 from sklearn.externals import joblib
 from sklearn.svm import SVR
 import sys
 import time
 
-# What to do? "angle" or "speed"
+# What to do? "angle", "yaw", or "speed"
 task = sys.argv[1]
 
 print "Task is %s." % task
 
 # The files with training data and validation data sets.
-trainfn = 'logs/torcs-driving-data'
-testfn = 'logs/torcs-driving-data-2'
+trainfn = 'logs/torcs-driving-data-3.gz'
+testfn = 'logs/torcs-driving-data-4.gz'
 
 # Loads a data file. The mkdata and mktarget functions are supposed to create
 # the input and output for a given example. The example is handed to mkdata and
 # mktarget as dictionary with keys speedx[01] (m/s), speedx[01] (m/s), angle[01]
-# (rad, positive value means car steers to the right), accel0 (range -1 to +1,
-# -1 means full brake, 1 full acceleration), steer0 (range -1 to +1, -1 means
-# full right, +1 full left), and time (s). The values speed[xy]1 and angle1
-# refer to the car's state after accel0 and steer0 take effect for time seconds.
+# (rad, positive value means car steers to the right), yaw[01] (rad, positive
+# value means car steers to the left, does not take road angle into account),
+# accel0 (range -1 to +1, -1 means full brake, 1 full acceleration), steer0
+# (range -1 to +1, -1 means full right, +1 full left), and time (s). The values
+# speed[xy]1, angle1, yaw1 refer to the car's state after accel0 and steer0
+# take effect for time seconds.
 def loaddata(mkdata, mktarget, fn):
-        with open(fn, 'rb') as csvfile:
+        if fn.endswith('.gz'):
+                o = gzip.open
+        else:
+                o = open
+        with o(fn, 'rb') as csvfile:
                 data = []
                 target = []
                 r = csv.reader(csvfile, delimiter='\t', quotechar='\\')
@@ -38,9 +44,13 @@ def loaddata(mkdata, mktarget, fn):
                                         'speedy1' : numbers[3],
                                         'angle0'  : numbers[4],
                                         'angle1'  : numbers[5],
-                                        'accel0'  : numbers[6] - numbers[7],
-                                        'steer0'  : numbers[8],
-                                        'time'    : numbers[9]
+                                        'yaw0'    : numbers[6],
+                                        'yaw1'    : numbers[7],
+                                        'gear0'   : numbers[8],
+                                        'accel0'  : numbers[9],
+                                        'brake0'  : numbers[10],
+                                        'steer0'  : numbers[11],
+                                        'time'    : numbers[12]
                                 }
                         data.append(mkdata(example))
                         target.append(mktarget(example))
@@ -111,11 +121,11 @@ def lut_content(clf, ranges, index, fun):
 # Input: speedx0, accel0
 # Output: speedx1 - speedx0
 def mkspeeddata(example):
-        return [example['speedx0'], example['accel0']]
+        return [example['speedx0'], example['accel0'], example['brake0'], example['gear0']]
 def mkspeedtarget(example):
         return example['speedx1'] - example['speedx0']
 
-# Effect of braking:
+# Effect of steering:
 # Input: steer0
 # Output: angle1 - angle0
 def mkangledata(example):
@@ -123,10 +133,20 @@ def mkangledata(example):
 def mkangletarget(example):
         return example['angle1'] - example['angle0']
 
+# Effect of steering:
+# Input: steer0
+# Output: yaw1 - yaw0
+def mkyawdata(example):
+        return [example['steer0']]
+def mkyawtarget(example):
+        return example['yaw1'] - example['yaw0']
+
 if task == "speed":
         load = partial(loaddata, mkspeeddata, mkspeedtarget)
 elif task == "angle":
         load = partial(loaddata, mkangledata, mkangletarget)
+elif task == "yaw":
+        load = partial(loaddata, mkyawdata, mkyawtarget)
 
 print "Loading training data ..."
 (trainX, trainY) = load(trainfn)
@@ -136,8 +156,6 @@ print "Loading test data ..."
 
 if len(sys.argv) <= 2 or sys.argv[2] != "load":
         print "Training estimator (%d examples) ..." % len(trainX)
-        n_samples, n_features = 10, 5
-        np.random.seed(0)
         clf = SVR(C=2.0, epsilon=0.01)
         clf.fit(trainX, trainY)
 
@@ -171,10 +189,13 @@ print "Average error: ", err
 print "Elapsed: ", elapsed
 print "Elapsed per example: ", (elapsed/n)
 
-if task == "speed":
-        lut2(clf, [range(300), range(21)], (lambda (x,y): (float(x)/3.6, float(y)/10-1)))
-        #lut(clf, product(range(300), range(21)), (lambda (x,y): (float(x)/3.6, float(y)/10-1)))
-elif task == "angle":
-        lut2(clf, [range(201)], (lambda x: float(x)/100-1))
-        #lut(clf, range(201), (lambda x: float(x)/100-1))
-
+# if task == "speed":
+#         lut2(clf, [range(300), range(21)], (lambda (x,y): (float(x)/3.6, float(y)/10-1)))
+#         #lut(clf, product(range(300), range(21)), (lambda (x,y): (float(x)/3.6, float(y)/10-1)))
+# elif task == "angle":
+#         lut2(clf, [range(201)], (lambda x: float(x)/100-1))
+#         #lut(clf, range(201), (lambda x: float(x)/100-1))
+# # elif task == "yaw":
+#         lut2(clf, [range(201)], (lambda x: float(x)/100-1))
+#         #lut(clf, range(201), (lambda x: float(x)/100-1))
+# 
