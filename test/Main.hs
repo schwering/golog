@@ -4,6 +4,7 @@ module Main (main) where
 import qualified Golog.InterpreterTest
 import qualified Golog.Old.InterpreterTest
 import qualified RSTC.TheoremsTest
+import qualified TORCS.GologDriverTest
 --import qualified Util.ExtFracTest
 import qualified Util.InterpolationTest
 import qualified Util.NativePSOTest
@@ -16,6 +17,7 @@ main = do passed <- return True
           passed <- liftM2 (&&) (return passed) Golog.InterpreterTest.runTests
           passed <- liftM2 (&&) (return passed) Golog.Old.InterpreterTest.runTests
           passed <- liftM2 (&&) (return passed) RSTC.TheoremsTest.runTests
+          passed <- liftM2 (&&) (return passed) TORCS.GologDriverTest.runTests
           --passed <- liftM2 (&&) (return passed) Util.ExtFracTest.runTests
           passed <- liftM2 (&&) (return passed) Util.InterpolationTest.runTests
           passed <- liftM2 (&&) (return passed) Util.NativePSOTest.runTests
