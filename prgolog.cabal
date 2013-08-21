@@ -29,9 +29,11 @@ Library
                      TORCS.CarControl
                      TORCS.CarState
                      TORCS.Client
+                     TORCS.Driver
                      TORCS.GologDriver
                      --TORCS.LUT
                      TORCS.MessageParser
+                     TORCS.OpenGL
                      TORCS.PhysicsUtil
                      TORCS.SimpleDriver
                      Util.Interpolation
@@ -44,7 +46,7 @@ Library
                      --src/TORCS/lut_speed.c
                      src/Util/memo_cache.c
                      src/Util/native_pso.c
-    Build-Depends:   array, base, bytestring, containers, network, parsec, SafeSemaphore
+    Build-Depends:   array, base, bytestring, containers, network, GLUT, OpenGL, parsec, SafeSemaphore
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 
@@ -73,7 +75,7 @@ Executable Driver
     Hs-Source-Dirs:  main
     Main-Is:         Driver.hs
     Build-Depends:   base, prgolog
-    GHC-Options:     -Wall -O -rtsopts
+    GHC-Options:     -Wall -O -rtsopts -threaded
     --GHC-Prof-Options:-prof -auto-all
 
 Executable Test

@@ -80,6 +80,7 @@ import TORCS.CarState
 import qualified TORCS.CarControl as Control
 import qualified TORCS.CarState as State
 import TORCS.Client
+import TORCS.OpenGL
 import TORCS.PhysicsUtil
 import Debug.Trace
 
@@ -148,7 +149,7 @@ instance DTBAT Prim1 where
 
 instance IOBAT Prim1 IO where
    syncA a s =
-      do putStrLn $ show a
+      do --putStrLn $ show a
          c2 <- dooSync' (refine a s (assoc s))
          if isNothing c2
             then fail $ "syncA: refinement of " ++ show a ++ " failed"
@@ -269,16 +270,16 @@ instance DTBAT Prim2 where
 
 instance IOBAT Prim2 IO where
    syncA (Tick Nothing) s =
-      do _ <- printf (kblu ++
-                      "accel = %.2f  " ++
-                      "brake = %.2f  " ++
-                      "gear = %d  " ++
-                      "steer = %.2f  " ++
-                      knrm ++ "\n")
-                     (accel (currentControl2 s))
-                     (brake (currentControl2 s))
-                     (Control.gear (currentControl2 s))
-                     (steer (currentControl2 s))
+      do --_ <- printf (kblu ++
+         --             "accel = %.2f  " ++
+         --             "brake = %.2f  " ++
+         --             "gear = %d  " ++
+         --             "steer = %.2f  " ++
+         --             knrm ++ "\n")
+         --            (accel (currentControl2 s))
+         --            (brake (currentControl2 s))
+         --            (Control.gear (currentControl2 s))
+         --            (steer (currentControl2 s))
          Sem.wait (ticks s)
          sensed <- readIORef (sensedState s)
          let s' = do_ (Tick (Just sensed)) s
@@ -345,14 +346,13 @@ acceleration :: Prog2
 acceleration = atomic $
                primf (\s -> action (currentState2 s)) `Seq`
                primf (\s -> if alreadyAccel s then Brake 0 else Accel 0)
-   where action state = let x = param state
-                        in if x < 0 then Brake (-x) else Accel x
-         param  state = if speedX state < 10 then 0.5 else param' state
-         param' state = max (-1) $ min 1 $ (1 - 1 / beam)
-            where msX   = speedX state
-                  msY   = speedY state
+   where action cs = let x = param cs in if x < 0 then Brake (-x) else Accel x
+         param  cs = if speedX cs < 10 then 0.5 else param' cs
+         param' cs = max (-1) $ min 1 $ (1 - 1 / beam)
+            where msX   = speedX cs
+                  msY   = speedY cs
                   theta = atan2 msY msX
-                  beam  = fromMaybe (1/0) (projectBeam (trackTime state) theta)
+                  beam  = fromMaybe (1/0) (projectBeam (trackTime cs) theta)
 
 steerAngle :: Double -> Prog2
 steerAngle lock  = star action `Seq` success
@@ -362,20 +362,20 @@ steerAngle lock  = star action `Seq` success
 steerAngleAction :: Double -> Sit2 -> Prim2
 steerAngleAction lock s = Steer lock'
    where lock' = lock / (speedX (currentState2 s))**0.5
-         --state = currentState2 s
+         --cs = currentState2 s
          --lock' = if v > steerSensitivityOffset
          --        then lock / (steerLock * 3.6 * (v - steerSensitivityOffset))
          --        else lock * abs lock
-         --v    = speedX state
+         --v    = speedX cs
          --steerSensitivityOffset = kmh2ms 80
 
 steerTrackPos :: Double -> Prog2
 steerTrackPos pos = star action `Seq` success
-   where action      = primf (\s -> steerAngleAction (lock (currentState2 s)) s)
-         lock state  = maxAngle * (diff state) / 2
-         diff state  = pos - trackPos state
-         maxAngle    = deg2rad 45
-         success     = bounty (\s -> Reward2 $ 1 / abs (trackPos (currentState2 s) - pos))
+   where action   = primf (\s -> steerAngleAction (lock (currentState2 s)) s)
+         lock cs  = maxAngle * (diff cs) / 2
+         diff cs  = pos - trackPos cs
+         maxAngle = deg2rad 45
+         success  = bounty (\s -> Reward2 $ 1 / abs (trackPos (currentState2 s) - pos))
 
 steerTrajectory :: Prog2
 steerTrajectory = primf (\s -> steerAngleAction (lock s) s)
@@ -385,36 +385,42 @@ steerTrajectory = primf (\s -> steerAngleAction (lock s) s)
          diff s   = tgtPos s - curPos s
          maxAngle = deg2rad 45
 
-sig :: Floating a => a -> a
-sig x = 1 / (1 + exp (-x))
+trajectoryTo :: CarState -> Double -> Double -> Double
+trajectoryTo cs yTo = sigf n . m2rel
+   where yFrom     = trackPos cs
+         yDiff     = yTo - yFrom
+         sigf  m x = sig m x * yDiff + yFrom
+         sigf' m x = sig' m x * yDiff
+         maxSlope  = tan (maxSteeringAngle cs)
+         curSlope  = tan (-1 * angle cs)
+         n         = binSearch ((flip sigf') 0) (  1, 10) 0.01 maxSlope
+         x1        = binSearch (sigf' n)        (-10,  0) 0.05 curSlope
+         x2        = binSearch (sigf' n)        (  0, 10) 0.05 0
+         m2rel x   = (x - distRaced cs) / (trackWidth cs / 2) - x1
 
-sig' :: Floating a => a -> a
-sig' x = sig x * (1 - sig x)
+sig :: Floating a => a -> a -> a
+sig n x = 1 / (1 + exp (-x / n))
 
-{-
-findSigStart :: Double -> Double
-findSigStart rad
-   where y  = tan rad
-         yp = map sig' [0, -0.
--}
+sig' :: Floating a => a -> a -> a
+sig' n x = sig n x * (1 - sig n x) / n
 
 -- | Binary search on a function which must be monotonically nondecreasing on
 -- the given interval for a wanted domain value within the interval.
 -- Search aborts when the interval size falls below of the resolution parameter
 -- @res@. Too small resolutions are dangerous due to floating point imprecision.
 -- This could lead to infinite loops.
-binSearch :: (Show a, Show b, Fractional a, Ord a, Num b, Ord b) => (a -> b) -> (a, a) -> a -> b -> a
+binSearch :: (Fractional a, Ord a, Num b, Ord b) => (a -> b) -> (a, a) -> a -> b -> a
 binSearch f (lo',hi') res y | res <= 0      = error "binSearch: non-positive resolution"
                             | f lo' > f hi' = binSearch (((-1)*).f) (lo',hi') res (-y)
                             | otherwise     = bs (lo',hi')
    where bs (lo,hi) | hi - lo < res = x
                     | y >= f x      = binSearch f (x,hi) res y
                     | y <= f x      = binSearch f (lo,x) res y
-                    | otherwise     = error $ "binSearch: impossible case " ++ show x ++ " " ++ show (f x)
+                    | otherwise     = error $ "binSearch: impossible case"
             where x = (lo + hi) / 2
 
 gologAgent :: IORef CarState -> IORef CarControl -> Sem.SSem -> IO ()
-gologAgent stateRef controlRef tickSem = loop conf
+gologAgent csRef ccRef tickSem = loop conf
    where loop c = do let cs = trans c
                      if null cs
                         then do putStrLn "EOP"
@@ -426,8 +432,8 @@ gologAgent stateRef controlRef tickSem = loop conf
                                             ApproachLeft, DriveCenter,
                                             ApproachRight, FollowMaxBeam]
          s01    = s0{assoc = s02}
-         s02    = s0{sensedState = stateRef,
-                     newControl  = controlRef,
+         s02    = s0{sensedState = csRef,
+                     newControl  = ccRef,
                      ticks       = tickSem}
 
 {-
@@ -441,16 +447,16 @@ overwriteMVar mvar x = tryTakeMVar mvar >> putMVar mvar x
 
 -- | Same as 'trackTime' but a functional interface.
 trackTime :: CarState -> BeamOri -> Double
-trackTime state a = trackTime' state !! fromEnum a
+trackTime cs a = trackTime' cs !! fromEnum a
 
 -- | Same as 'track'' but a functional interface.
 trackDist :: CarState -> BeamOri -> Double
-trackDist state a = track' state !! fromEnum a
+trackDist cs a = track' cs !! fromEnum a
 
 -- | The track laser beams where the maximum reading @200@ is replaced by
 -- infinity.
 track' :: CarState -> [Double]
-track' state = map (\d -> if d >= 200 then 1/0 else d) (track state)
+track' cs = map (\d -> if d >= 200 then 1/0 else d) (track cs)
 
 -- | Computes the time in seconds it takes for the car to reach the end of the
 -- track in the direction to with the @i@th laser beam points according to
@@ -470,12 +476,12 @@ track' state = map (\d -> if d >= 200 then 1/0 else d) (track state)
 -- Finally we divide the beam's length @d@ by this velocity to compute the time
 -- it takes the car to travel the beam's distance in the beam's direction.
 trackTime' :: CarState -> [Double]
-trackTime' state = beamTimes
-   where msX          = speedX state
-         msY          = speedY state
+trackTime' cs = beamTimes
+   where msX          = speedX cs
+         msY          = speedY cs
          theta        = atan2 msY msX
          v            = sqrt (msX^(2::Int) + msY^(2::Int))
-         beamOriDists = zip (beamOris GologDriver) (track' state)
+         beamOriDists = zip (beamOris GologDriver) (track' cs)
          beamTimes    = map (\(alpha,d) -> d / (v * cos (theta - alpha))) beamOriDists
 
 -- | Interpolates those two @beams@ which enclose the angle @theta@ and returns
@@ -501,15 +507,15 @@ rotateBeams beams theta = map projectBeam' [minBound..maxBound]
 
 -- | Computes the track width in meters based on the laser beam measurements.
 trackWidth :: CarState -> Double
-trackWidth state = case (left, right) of
-                        (Just l,  Just r)  -> l + r
-                        (Just l,  Nothing) -> l / lpos
-                        (Nothing, Just r)  -> r / rpos
-                        (Nothing, Nothing) -> error "trackWidth: no beam"
-   where gamma = -1 * angle state
-         left  = projectBeam (trackDist state) (deg2rad   90  - gamma)
-         right = projectBeam (trackDist state) (deg2rad (-90) - gamma)
-         pos   = (trackPos state + 1) / 2
+trackWidth cs = case (left, right) of
+                     (Just l,  Just r)  -> l + r
+                     (Just l,  Nothing) -> l / lpos
+                     (Nothing, Just r)  -> r / rpos
+                     (Nothing, Nothing) -> error "trackWidth: no beam"
+   where gamma = -1 * angle cs
+         left  = projectBeam (trackDist cs) (deg2rad   90  - gamma)
+         right = projectBeam (trackDist cs) (deg2rad (-90) - gamma)
+         pos   = (trackPos cs + 1) / 2
          lpos  = 1 - pos
          rpos  = pos
 
@@ -561,43 +567,47 @@ wheelBase = 2.64
 steerLock :: Double
 steerLock = deg2rad 21.0
 
+maxSteeringAngle :: CarState -> Double
+maxSteeringAngle cs | speedX cs > 1 = 1 / speedX cs * steerLock
+                    | otherwise     = steerLock
+
 instance Driver GologDriver where
    data Context GologDriver = Context (IORef CarState) (IORef CarControl)
-                                       Sem.SSem ThreadId
+                                      Sem.SSem ThreadId ThreadId
 
-   initialState _ = do  stateRef <- newIORef defaultState
-                        controlRef <- newIORef defaultControl
+   initialState _ = do  csRef <- newIORef defaultState
+                        ccRef <- newIORef defaultControl
                         tickSem <- Sem.new 0
-                        gologThread <- forkIO $
-                                       gologAgent stateRef controlRef tickSem
-                        return (Context stateRef controlRef tickSem gologThread)
+                        gologThread <- forkIO $ gologAgent csRef ccRef tickSem
+                        visThread <- forkOS $ visualize csRef ccRef
+                        return (Context csRef ccRef tickSem gologThread visThread)
 
-   command ctx@(Context stateRef controlRef tickSem _) state =
-      do writeIORef stateRef state
-         --putStrLn $ show state
+   command ctx@(Context csRef ccRef tickSem _ _) cs =
+      do writeIORef csRef cs
+         --putStrLn $ show cs
          Sem.signal tickSem
-         _ <- printf (kred ++
-                      "time = %.2f  " ++
-                      "pos = %.2f  " ++
-                      "angle = %.2f  " ++
-                      "vX = %.2f  " ++
-                      "vY = %.2f  " ++
-                      "track[-5] = %.2f s = %.2f m " ++
-                      "track[0] = %.2f s = %.2f m " ++
-                      "track[5] = %.2f s = %.2f m " ++
-                      knrm ++ "\n")
-               (curLapTime state)
-               (trackPos state)
-               (deg $ rad2deg $ angle state)
-               (speedX state)
-               (speedY state)
-               (trackTime state Neg5) (trackDist state Neg5)
-               (trackTime state Zero)  (trackDist state Zero)
-               (trackTime state Pos5) (trackDist state Pos5)
-         --putStrLn (kmag ++ show (track state) ++ knrm)
-         control <- timeout (tickDurMicroSec) $ readIORef controlRef
-         --putStrLn $ show control
-         return (ctx, fromMaybe defaultControl control)
+--         _ <- printf (kred ++
+--                      "time = %.2f  " ++
+--                      "pos = %.2f  " ++
+--                      "angle = %.2f  " ++
+--                      "vX = %.2f  " ++
+--                      "vY = %.2f  " ++
+--                      "track[-5] = %.2f s = %.2f m " ++
+--                      "track[0] = %.2f s = %.2f m " ++
+--                      "track[5] = %.2f s = %.2f m " ++
+--                      knrm ++ "\n")
+--               (curLapTime cs)
+--               (trackPos cs)
+--               (deg $ rad2deg $ angle cs)
+--               (speedX cs)
+--               (speedY cs)
+--               (trackTime cs Neg5) (trackDist cs Neg5)
+--               (trackTime cs Zero)  (trackDist cs Zero)
+--               (trackTime cs Pos5) (trackDist cs Pos5)
+         --putStrLn (kmag ++ show (track cs) ++ knrm)
+         cc <- timeout (tickDurMicroSec) $ readIORef ccRef
+         --putStrLn $ show cc
+         return (ctx, fromMaybe defaultControl cc)
 
    shutdown ctx =
       do putStrLn "SHUTDOWN"
@@ -605,13 +615,55 @@ instance Driver GologDriver where
          ctx' <- restart ctx
          return (Just ctx')
 
-   restart (Context stateRef controlRef _ gologThread) =
+   restart (Context csRef ccRef _ gologThread visThread) =
       do putStrLn "RESTART"
          killThread gologThread
          tickSem <- Sem.new 0
-         newGologThread <- forkIO $
-                           gologAgent stateRef controlRef tickSem
-         return (Context stateRef controlRef tickSem newGologThread)
+         writeIORef csRef defaultState
+         writeIORef ccRef defaultControl
+         newGologThread <- forkIO $ gologAgent csRef ccRef tickSem
+         return (Context csRef ccRef tickSem newGologThread visThread)
+
+
+{------ Visualization ------}
+
+visualize :: IORef CarState -> IORef CarControl -> IO ()
+visualize csRef ccRef = runOpenGL (shapes csRef ccRef)
+
+shapes :: IORef CarState -> IORef CarControl -> IO [Shape]
+shapes csRef ccRef = do
+   cs <- readIORef csRef
+   cc <- readIORef ccRef
+   return $ shapes' cs cc
+
+
+shapes' :: CarState -> CarControl -> [Shape]
+shapes' cs cc = map (translate (0,-0.8)) $
+                map (scale (1/10)) $
+                [car, wheelFR, wheelFL, wheelRR, wheelRL] ++
+                beams ++ rotatedBeams ++ trackLeft ++ trackRight
+   where car = rotate yaw $ mkRect' blue (0,0) (fst fr - fst fl, snd fl - snd rl + 1)
+         wheelFR = rotate yaw $ translate fr $ rotate phi $ wheel
+         wheelFL = rotate yaw $ translate fl $ rotate phi $ wheel
+         wheelRR = rotate yaw $ translate rr $ wheel
+         wheelRL = rotate yaw $ translate rl $ wheel
+         wheel = mkRect' white (0,0) (0.3,0.55)
+         fl = (-0.840000,  1.220000)
+         fr = ( 0.840000,  1.220000)
+         rl = (-0.800000, -1.420000)
+         rr = ( 0.800000, -1.420000)
+         yaw = -1 * angle cs
+         phi = steer cc * steerLock
+         beams = map (rotate yaw) $
+                 map (\(ori,d) -> rotate ori $ mkLine red (0,0) (0,d)) $
+                 zip (beamOris GologDriver) (track' cs)
+         rotatedBeams = map (\(ori,d) -> rotate ori $ mkLine green (0,0) (0,d)) $
+                 zip (beamOris GologDriver) (rotateBeams (trackDist cs) yaw)
+         trackLeft = [mkLine blue (-d,-2) (-d,2)]
+            where d = (-1 * trackPos cs + 1) * trackWidth cs / 2
+         trackRight = [mkLine blue (d,-2) (d,2)]
+            where d = (trackPos cs + 1) * trackWidth cs / 2
+
 
 knrm, kred, kgrn, kyel, kblu, kmag, kcyn, kwht :: String
 knrm = "\x1B[0m"
