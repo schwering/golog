@@ -386,17 +386,19 @@ steerTrajectory = primf (\s -> steerAngleAction (lock s) s)
          maxAngle = deg2rad 45
 
 trajectoryTo :: CarState -> Double -> Double -> Double
-trajectoryTo cs yTo = sigf n . m2rel
+trajectoryTo cs yTo = sigf_ n . m2rel
    where yFrom     = trackPos cs
          yDiff     = yTo - yFrom
+         yAlready  = sigf n x1
+         sigf_ m x = (sigf m x - yAlready) * (yTo - yAlready) + yAlready
          sigf  m x = sig m x * yDiff + yFrom
          sigf' m x = sig' m x * yDiff
          maxSlope  = tan (maxSteeringAngle cs)
          curSlope  = tan (-1 * angle cs)
-         n         = binSearch ((flip sigf') 0) (  1, 10) 0.01 maxSlope
-         x1        = binSearch (sigf' n)        (-10,  0) 0.05 curSlope
-         x2        = binSearch (sigf' n)        (  0, 10) 0.05 0
-         m2rel x   = (x - distRaced cs) / (trackWidth cs / 2) - x1
+         n         = 0.5-- binSearch ((flip sigf') 0) (  1, 10) 0.01 maxSlope
+         x1        = binSearch (sigf' n)        (-2, 0) 0.05 curSlope
+         x2        = binSearch (sigf' n)        ( 0, 2) 0.05 0
+         m2rel x   = (x - distRaced cs) / (trackWidth cs / 2) + x1
 
 sig :: Floating a => a -> a -> a
 sig n x = 1 / (1 + exp (-x / n))
@@ -488,14 +490,16 @@ trackTime' cs = beamTimes
 -- the weighted average of these two beams. If there is no pair of enclosing
 -- beams, @Nothing@ is returned.
 projectBeam :: (BeamOri -> Double) -> Double -> Maybe Double
-projectBeam beams theta = fmap project best
+projectBeam beams theta = best >>= project
    where best = find cand [(lo, succ lo) | lo <- [minBound .. pred maxBound]]
          cand (lo,hi) = beamOriRad lo <= theta && theta <= beamOriRad hi
-         project (lo,hi) = (if r /= 1 then x else 0) + (if r /= 0 then y else 0)
-            where r = if hi == lo then 1
-                      else (theta - beamOriRad lo) / (beamOriRad hi - beamOriRad lo)
-                  x = (1-r) * beams lo
-                  y = r * beams hi
+         project (lo,hi) | r == 0           = Just (beams lo)
+                         | r == 1           = Just (beams hi)
+                         | not (isNaN wavg) = Just wavg
+                         | otherwise        = Nothing
+            where r | hi == lo  = 1
+                    | otherwise = (theta - beamOriRad lo) / (beamOriRad hi - beamOriRad lo)
+                  wavg = (1 - r) * beams lo + r * beams hi
 
 -- | Rotates the @beams@ anti-clockwise by angle @theta@. The typical use-case
 -- is that the car rotated by clockwise angle @theta@ and we want to project the
@@ -638,32 +642,52 @@ shapes csRef ccRef = do
 
 
 shapes' :: CarState -> CarControl -> [Shape]
-shapes' cs cc = map (translate (0,-0.8)) $
-                map (scale (1/10)) $
-                [car, wheelFR, wheelFL, wheelRR, wheelRL] ++
-                beams ++ rotatedBeams ++ trackLeft ++ trackRight
-   where car = rotate yaw $ mkRect' blue (0,0) (fst fr - fst fl, snd fl - snd rl + 1)
-         wheelFR = rotate yaw $ translate fr $ rotate phi $ wheel
-         wheelFL = rotate yaw $ translate fl $ rotate phi $ wheel
-         wheelRR = rotate yaw $ translate rr $ wheel
-         wheelRL = rotate yaw $ translate rl $ wheel
-         wheel = mkRect' white (0,0) (0.3,0.55)
-         fl = (-0.840000,  1.220000)
-         fr = ( 0.840000,  1.220000)
-         rl = (-0.800000, -1.420000)
-         rr = ( 0.800000, -1.420000)
-         yaw = -1 * angle cs
-         phi = steer cc * steerLock
-         beams = map (rotate yaw) $
-                 map (\(ori,d) -> rotate ori $ mkLine red (0,0) (0,d)) $
-                 zip (beamOris GologDriver) (track' cs)
-         rotatedBeams = map (\(ori,d) -> rotate ori $ mkLine green (0,0) (0,d)) $
-                 zip (beamOris GologDriver) (rotateBeams (trackDist cs) yaw)
-         trackLeft = [mkLine blue (-d,-2) (-d,2)]
-            where d = (-1 * trackPos cs + 1) * trackWidth cs / 2
-         trackRight = [mkLine blue (d,-2) (d,2)]
-            where d = (trackPos cs + 1) * trackWidth cs / 2
-
+shapes' cs' cc' = replaceInfByOne $
+                  map (translate (0,-0.8)) $
+                  map (scale (1/20)) $
+                  makeCar cs' cc' ++
+                  makeCar' 1 cs' cc' ++
+                  beams cs' ++
+                  trackLines cs'
+   where track2draw cs y = (-y + trackPos cs) * trackWidth cs / 2
+         -- Car and wheels.
+         makeCar cs cc = [car, wheelFR, wheelFL, wheelRR, wheelRL]
+            where yaw = -1 * angle cs
+                  phi = steer cc * steerLock
+                  car = rotate yaw $ mkRect' blue (0,0) (fst fr - fst fl, snd fl - snd rl + 1)
+                  wheelFR = rotate yaw $ translate fr $ rotate phi $ wheel
+                  wheelFL = rotate yaw $ translate fl $ rotate phi $ wheel
+                  wheelRR = rotate yaw $ translate rr $ wheel
+                  wheelRL = rotate yaw $ translate rl $ wheel
+                  wheel = mkRect' white (0,0) (0.3,0.55)
+                  fl = (-0.840000,  1.220000)
+                  fr = ( 0.840000,  1.220000)
+                  rl = (-0.800000, -1.420000)
+                  rr = ( 0.800000, -1.420000)
+         -- Beams for track distance.
+         beams cs = rawBeams ++ rotatedBeams
+            where yaw = -1 * angle cs
+                  rawBeams = map (rotate yaw) $
+                             map (\(ori,d) -> rotate ori $ mkLine red (0,0) (0,d)) $
+                             map (replaceInfBy 1000) $
+                             zip (beamOris GologDriver) (track' cs)
+                  rotatedBeams = map (\(ori,d) -> rotate ori $ mkLine green (0,0) (0,d)) $
+                             map (replaceInfBy 1000) $
+                             zip (beamOris GologDriver) (rotateBeams (trackDist cs) yaw)
+            -- Track end and trajectory.
+         trackLines cs = [trackLeft, trackRight, traj] ++
+                         [mkLine white (0,-1/0) (0,1/0)] ++
+                         [mkLine white (-1/0,0) (1/0,0)]
+            where trackLeft = mkLine magenta (track2draw cs 1, -100) (track2draw cs 1, 100)
+                  trackRight = mkLine magenta (track2draw cs (-1), -100) (track2draw cs (-1), 100)
+                  traj = mkPolyline cyan $
+                         map (\x -> (track2draw cs (t (distRaced cs + x)), x)) [0,1..100]
+                  t = trajectoryTo cs 1.0
+         -- Predicted car in one second.
+         makeCar' t cs cc = map (translate (x,y)) (makeCar cs1 cc)
+            where cs1 = simulateState t cc cs
+                  x   = track2draw cs (trackPos cs1 - trackPos cs)
+                  y   = distRaced cs1 - distRaced cs
 
 knrm, kred, kgrn, kyel, kblu, kmag, kcyn, kwht :: String
 knrm = "\x1B[0m"

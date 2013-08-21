@@ -35,8 +35,8 @@ instance Show Deg where
    show (Deg d) = show d
 
 deg2rad :: Deg -> Double
-deg2rad (Deg deg') = deg' * 0.017453292519943295
+deg2rad (Deg deg') = deg' / 180 * pi
 
 rad2deg :: Double -> Deg
-rad2deg rad = Deg (rad / 0.017453292519943295)
+rad2deg rad = Deg (rad / pi * 180)
 
