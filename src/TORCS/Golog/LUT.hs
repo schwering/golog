@@ -2,7 +2,7 @@
 
 -- | Lookup-tables for angle and speed.
 
-module TORCS.LUT (predictAngleDiff, predictSpeedXDiff) where
+module TORCS.Golog.LUT (predictAngleDiff, predictSpeedXDiff) where
 
 import Foreign.C
 

@@ -19,7 +19,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "RSTC/obs.h"
+#include "../src/RSTC/obs.h"
 
 #define SERVER_MODE
 #define HOST "localhost"

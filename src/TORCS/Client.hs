@@ -1,6 +1,6 @@
 -- | Client loop for SCR robots.
 -- An instance of the 'Driver' class should be handed to the 'run' function.
-module TORCS.Client (Driver(..), BeamOri(..), run, beamOriRad) where
+module TORCS.Client (Driver(..), run) where
 
 import Data.ByteString.Char8 (pack, unpack)
 import Data.Maybe (isNothing, fromJust)

@@ -57,6 +57,8 @@ data CarState = CarState {
       -- cover all the space around the car, spanning clockwise from @+pi@ up to
       -- @-pi@ with respect to the car axis.
       -- Range @[0,200]@, unit meters.
+      -- NOTE: we reverse the order so that the beams start at @+pi@ and end at
+      -- @-pi@, i.e., the beams go counter-clockwise.
       opponents     :: [Double],
       -- | Position in the race with respect to other cars.
       -- Range @{1,2,...}@, unit positions.
@@ -115,7 +117,7 @@ parseState str = CarState { angle          = parseMsg1 result "angle"
                           , fuel           = parseMsg1 result "fuel"
                           , gear           = parseMsg1 result "gear"
                           , lastLapTime    = parseMsg1 result "lastLapTime"
-                          , opponents      = parseMsg  result "opponents"
+                          , opponents      = reverse $ parseMsg  result "opponents"
                           , racePos        = parseMsg1 result "racePos"
                           , rpm            = parseMsg1 result "rpm"
                           , speedX         = kmh2ms $ parseMsg1 result "speedX"

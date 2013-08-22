@@ -7,8 +7,8 @@ all: dist replay
 dist: prgolog.cabal
 	cabal configure $(PROFILING)
 
-replay: src/replay.c
-	cc -Wall -o replay src/replay.c
+replay: scripts/replay.c
+	cc -Wall -o replay scripts/replay.c
 
 doc:
 	cabal haddock --hyperlink-source

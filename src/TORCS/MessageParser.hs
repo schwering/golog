@@ -13,11 +13,17 @@ stringify :: Show a => Tag -> [a] -> String
 stringify tag values = "(" ++ tag ++ concatMap ((" "++).show) values ++ ")"
 
 parseMsg1 :: Read a => ParseResult -> Tag -> a
-parseMsg1 result tag = case parseMsg result tag of x:_ -> x
+parseMsg1 result tag =
+   case parseMsg result tag of
+        x:_ -> x
+        _   -> error "parseMsg1: empty parsing result"
 
 parseMsg :: Read a => ParseResult -> Tag -> [a]
-parseMsg (Right result) tag = let Just values = lookup tag result
-                              in map read values
+parseMsg (Right result) tag =
+   case lookup tag result of
+        Just values -> map read values
+        Nothing     -> error $ "parseMsg: tag "++tag++" not found"
+parseMsg (Left _) _ = error "parseMsg: parser error"
 
 parseMsg' :: String -> ParseResult
 parseMsg' input = parse csrMsg source input

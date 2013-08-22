@@ -2,10 +2,10 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module TORCS.GologDriverTest where
+module TORCS.Golog.SimulationTest where
 
 import TORCS.CarState
-import TORCS.GologDriver
+import TORCS.Golog.Simulation
 import Test.QuickCheck.All
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen

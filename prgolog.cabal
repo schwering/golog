@@ -30,8 +30,12 @@ Library
                      TORCS.CarState
                      TORCS.Client
                      TORCS.Driver
-                     TORCS.GologDriver
-                     --TORCS.LUT
+                     TORCS.Golog.Control
+                     TORCS.Golog.Driver
+                     TORCS.Golog.Sensors
+                     TORCS.Golog.Simulation
+                     TORCS.Golog.Visualization
+                     --TORCS.Golog.LUT
                      TORCS.MessageParser
                      TORCS.OpenGL
                      TORCS.PhysicsUtil
@@ -78,10 +82,10 @@ Executable Driver
     GHC-Options:     -Wall -O -rtsopts -threaded
     --GHC-Prof-Options:-prof -auto-all
 
---Executable Test
---    Hs-Source-Dirs:  test
---    Main-Is:         Main.hs
---    -- Type:             detailed-1.0
---    --Test-Module:      Test
---    Build-Depends:    base, QuickCheck, random, prgolog
+Executable Test
+    Hs-Source-Dirs:  test
+    Main-Is:         Main.hs
+    -- Type:             detailed-1.0
+    --Test-Module:      Test
+    Build-Depends:    base, QuickCheck, random, prgolog
 
