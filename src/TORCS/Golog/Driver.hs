@@ -74,9 +74,11 @@ import Text.Printf
 import TORCS.CarControl
 import TORCS.CarState
 import TORCS.Client
-import TORCS.Golog.Control
+import TORCS.Golog.BAT.WarmUp
+import TORCS.Golog.Sensors hiding (beamOris)
 import qualified TORCS.Golog.Sensors as Sensors
 import TORCS.Golog.Visualization
+import TORCS.PhysicsUtil
 
 data GD
 
@@ -98,37 +100,38 @@ instance Driver GD where
       do writeIORef csRef cs
          --putStrLn $ show cs
          Sem.signal tickSem
---         _ <- printf (kred ++
---                      "time = %.2f  " ++
---                      "pos = %.2f  " ++
---                      "angle = %.2f  " ++
---                      "vX = %.2f  " ++
---                      "vY = %.2f  " ++
---                      "track[-5] = %.2f s = %.2f m " ++
---                      "track[0] = %.2f s = %.2f m " ++
---                      "track[5] = %.2f s = %.2f m " ++
---                      knrm ++ "\n")
---               (curLapTime cs)
---               (trackPos cs)
---               (deg $ rad2deg $ angle cs)
---               (speedX cs)
---               (speedY cs)
---               (trackTime cs Neg5) (trackDist cs Neg5)
---               (trackTime cs Zero)  (trackDist cs Zero)
---               (trackTime cs Pos5) (trackDist cs Pos5)
+         --_ <- printf (kred ++
+         --             "time = %.2f  " ++
+         --             "pos = %.2f  " ++
+         --             "angle = %.2f  " ++
+         --             "vX = %.2f  " ++
+         --             "vY = %.2f  " ++
+         --             "track[-5] = %.2f s = %.2f m " ++
+         --             "track[0] = %.2f s = %.2f m " ++
+         --             "track[5] = %.2f s = %.2f m " ++
+         --             knrm ++ "\n")
+         --      (curLapTime cs)
+         --      (trackPos cs)
+         --      (deg $ rad2deg $ angle cs)
+         --      (speedX cs)
+         --      (speedY cs)
+         --      (trackTime cs Neg5) (trackDist cs Neg5)
+         --      (trackTime cs Zero)  (trackDist cs Zero)
+         --      (trackTime cs Pos5) (trackDist cs Pos5)
          --putStrLn (kmag ++ show (track cs) ++ knrm)
          cc <- timeout (tickDurMicroSec) $ readIORef ccRef
          maybe (return ()) (\cc' -> do
-            printf (kblu ++
-                    "accel = %.2f  " ++
-                    "brake = %.2f  " ++
-                    "gear = %d  " ++
-                    "steer = %.2f  " ++
-                    knrm ++ "\n")
-                   (accelCmd cc')
-                   (brakeCmd cc')
-                   (gearCmd cc')
-                   (steerCmd cc')) cc
+            return ()) cc
+            --printf (kblu ++
+            --        "accel = %.2f  " ++
+            --        "brake = %.2f  " ++
+            --        "gear = %d  " ++
+            --        "steer = %.2f  " ++
+            --        knrm ++ "\n")
+            --       (accelCmd cc')
+            --       (brakeCmd cc')
+            --       (gearCmd cc')
+            --       (steerCmd cc')) cc
          return (ctx, fromMaybe defaultControl cc)
 
    shutdown ctx =
@@ -147,4 +150,7 @@ instance Driver GD where
          return (Context csRef ccRef tickSem newGologThread visThread)
 
    beamOris _ = Sensors.beamOris
+
+tickDurMicroSec :: Int
+tickDurMicroSec = 10 * 1000
 

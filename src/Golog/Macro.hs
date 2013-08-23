@@ -1,7 +1,8 @@
 module Golog.Macro
   (TestAction(..),
    prim, primf, test,
-   atomic, star, plus, opt, ifThen, ifThenElse, (==>), (<|>), while,
+   atomic, star, plus, loop, opt,
+   ifThen, ifThenElse, if_, then_, else_, while,
    pick, withCtrl) where
 
 import Golog.Interpreter
@@ -27,25 +28,29 @@ star p = Nondet [Nil, p `Seq` star p]
 plus :: Prog a -> Prog a
 plus p = Nondet [p, p `Seq` plus p]
 
+loop :: Prog a -> Prog a
+loop p = p `Seq` loop p
+
 opt :: Prog a -> Prog a
 opt p = Nondet [Nil, p]
-
-ifThen :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
-ifThen phi p1 = ifThenElse phi p1 Nil
 
 ifThenElse :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a -> Prog a
 ifThenElse phi p1 p2 = Nondet [test phi `Seq` p1, test (not.phi) `Seq` p2]
 
-data IfBranch a = IfBranch (Prog a) (Prog a)
+ifThen :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
+ifThen phi p1 = if_ phi (then_ p1) (else_ Nil)
 
-infixl 6 ==>
-infixl 7 <|>
+newtype IfBranch a = IfBranch (Prog a)
+newtype ElseBranch a = ElseBranch (Prog a)
 
-(==>) :: TestAction a => (Sit a -> Bool) -> IfBranch a -> Prog a
-(==>) phi (IfBranch p1 p2) = ifThenElse phi p1 p2
+if_ :: TestAction a => (Sit a -> Bool) -> IfBranch a -> ElseBranch a -> Prog a
+if_ phi (IfBranch p1) (ElseBranch p2) = ifThenElse phi p1 p2
 
-(<|>) :: Prog a -> Prog a -> IfBranch a
-(<|>) = IfBranch
+then_ :: Prog a -> IfBranch a
+then_ = IfBranch
+
+else_ :: Prog a -> ElseBranch a
+else_ = ElseBranch
 
 while :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
 while phi p = star (test phi `Seq` p) `Seq` test (not.phi)

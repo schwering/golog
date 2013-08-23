@@ -33,6 +33,7 @@ Library
                      TORCS.Golog.BAT.GearBox
                      TORCS.Golog.BAT.Perception
                      TORCS.Golog.BAT.Traction
+                     TORCS.Golog.BAT.WarmUp
                      TORCS.Golog.Control
                      TORCS.Golog.Driver
                      TORCS.Golog.Sensors

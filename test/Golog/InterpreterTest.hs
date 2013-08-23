@@ -54,7 +54,6 @@ instance BAT Prim where
 
 instance DTBAT Prim where
    newtype Reward Prim = Reward' { rew :: Int } deriving (Eq, Ord)
-   reward S0' = Reward' 0
    reward (Do' C s@(Do' A _)) = Reward' $ 1000 + rew (reward s)
    reward (Do' D s@(Do' B _)) = Reward' $ 1000 + rew (reward s)
    reward (Do' _ s)           = Reward' $    0 + rew (reward s)

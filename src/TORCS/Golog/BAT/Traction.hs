@@ -3,7 +3,7 @@
 -- | A low-level BAT for acceleration, deceleration and steering.
 -- The numeric commands are filtered to keep the car stable.
 module TORCS.Golog.BAT.Traction
-  (Sit, accel, brake, brakeWet, steer, fillCc) where
+  (A, mkS0, accel, brake, brakeWet, steer, sense, fillCc) where
 
 import Data.IORef
 import Golog.Interpreter
@@ -43,6 +43,9 @@ instance BAT A where
    poss (Test f) s = f s
    poss _        _ = True
 
+mkS0 :: IORef CarControl -> Sit A
+mkS0 ccRef' = s0{ccRef = ccRef'}
+
 updateCc :: A -> CarControl -> CarControl
 updateCc (Accel x) cc' = cc'{accelCmd = x}
 updateCc (Brake x) cc' = cc'{brakeCmd = x}
@@ -50,8 +53,10 @@ updateCc (Steer x) cc' = cc'{steerCmd = x}
 updateCc (Sense _) cc' = cc'
 updateCc (Test _)  cc' = cc'
 
-fillCc :: CarControl -> Sit A -> CarControl
-fillCc cc' s = cc'{accelCmd = accelCmd (cc s),
+-- | Updates the given 'CarControl' with the portion controlled by this BAT.
+-- That is, it sets the current 'accelCmd, 'brakeCmd', 'steerCmd'.
+fillCc :: Sit A -> CarControl -> CarControl
+fillCc s cc' = cc'{accelCmd = accelCmd (cc s),
                    brakeCmd = brakeCmd (cc s),
                    steerCmd = steerCmd (cc s)}
 
@@ -62,34 +67,51 @@ instance IOBAT A IO where
                   return $ do_ a s
 
 accel :: Double -> Prog A
-accel x = primf action
-   where action s | abs (currentSteeringAngle (cc s)) > maxSteeringAngle (cs s) = Accel (avgAccel s / 2)
-                  | otherwise                                                   = Accel x
+accel x = accel' (const x)
+
+-- | Accelerates unless the steering angle is too steep.
+accel' :: (Sit A -> Double) -> Prog A
+accel' x = primf action
+   where action s | speedX (cs s) > 5 && abs (currentSteeringAngle (cc s)) > maxSteeringAngle (cs s) = Accel (avgAccel s / 2)
+                  | otherwise                                                                        = Accel (x s)
+
+brake :: Double -> Prog A
+brake x = brake' (const x)
 
 -- | Braking action where ABS only takes action if the slip is greater than 90%
 -- and the car is steering non-negligibly.
-brake :: Double -> Prog A
-brake x = primf action
-   where action s | x < kmh2ms 10                                          = Brake x
-                  | wheelSlip (cs s) > 0.9 && abs (steerCmd (cc s)) > 0.05 = Brake (avgBrake s / 2)
-                  | otherwise                                              = Brake x
+brake' :: (Sit A -> Double) -> Prog A
+brake' x = primf action
+   where action s | speedX (cs s) < kmh2ms 10                              = Brake (x s)
+                  | wheelSlip (cs s) > 0.2 && abs (steerCmd (cc s)) > 0.02 = Brake (avgBrake s / 2)
+                  | wheelSlip (cs s) > 0.8                                 = Brake (avgBrake s / 2)
+                  | otherwise                                              = Brake (x s)
+
+brakeWet :: Double -> Prog A
+brakeWet x = brakeWet' (const x)
 
 -- | Braking action where ABS takes action if the slip is greater than 25%.
 -- It seems as if in TORCS locked wheels brake very well, so this ABS may be too
 -- defensive.
-brakeWet :: Double -> Prog A
-brakeWet x = primf action
-   where action s | x < kmh2ms 10           = Brake x
-                  | wheelSlip (cs s) > 0.25 = Brake (avgBrake s / 2)
-                  | otherwise               = Brake x
+brakeWet' :: (Sit A -> Double) -> Prog A
+brakeWet' x = primf action
+   where action s | speedX (cs s) < kmh2ms 10 = Brake (x s)
+                  | wheelSlip (cs s) > 0.25   = Brake (avgBrake s / 2)
+                  | otherwise                 = Brake (x s)
+
+steer :: Double -> Prog A
+steer x = steer' (const x)
 
 -- | Steers to the left (@+1@) or to the left (@-1@).
 -- If the steering is considered too strong with respect to the
 -- 'maxSteeringAngle', the car is decelerated.
-steer :: Double -> Prog A
-steer x = primf action `Seq` ifThen tooMuchSteering slowDown
-   where action s | tooMuchSteering s = Accel (avgAccel s / 2)
-                  | otherwise         = Accel x
-         tooMuchSteering s = abs x > maxSteeringAngle (cs s)
-         slowDown = brake 1 `Seq` accel 0
+steer' :: (Sit A -> Double) -> Prog A
+steer' x = primf action `Seq` if_ tooMuchSteering (then_ slowDown) (else_ Nil)
+   where action s = Steer (x s)
+         tooMuchSteering s = currentSteeringAngle (cc s) > maxSteeringAngle (cs s)
+         slowDown = brake' (\s -> max 0.1 (brakeCmd (cc s))) `Seq` accel 0
+
+-- | Informs the BAT about the new 'CarState'.
+sense :: CarState -> Prog A
+sense cs' = prim $ Sense cs'
 

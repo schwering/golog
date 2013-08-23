@@ -144,8 +144,8 @@ avgRearWheelSpeed cs = (v 3 + v 4) / 2
 
 -- | The maximum (heuristically) steering angle at the current speed.
 maxSteeringAngle :: CarState -> Double
-maxSteeringAngle cs | speedX cs > 1 = 1 / speedX cs * steerLock
-                    | otherwise     = steerLock
+maxSteeringAngle cs | speedX cs > 10 = 1 / speedX cs * steerLock
+                    | otherwise      = steerLock
 
 currentSteeringAngle :: CarControl -> Double
 currentSteeringAngle cc = steerCmd cc * steerLock

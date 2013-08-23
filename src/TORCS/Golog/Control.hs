@@ -235,9 +235,6 @@ modState f s = s{currentState2 = f (currentState2 s)}
 tickDurSec :: Double
 tickDurSec = 10 / 1000
 
-tickDurMicroSec :: Int
-tickDurMicroSec = 10 * 1000
-
 tick :: Prog2
 tick = prim (Tick Nothing)
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
 
 -- | Low-level BAT for automatic transmission.
-module TORCS.Golog.BAT.GearBox (Sit, transmission, fillCc) where
+module TORCS.Golog.BAT.GearBox (A, mkS0, transmission, sense, fillCc) where
 
 import Data.IORef
 import Golog.Interpreter
@@ -9,7 +9,7 @@ import Golog.Macro
 import TORCS.CarControl
 import TORCS.CarState
 
-data A = Gear Int
+data A = Gear Int | Sense CarState
 
 instance BAT A where
    data Sit A = Sit {
@@ -21,16 +21,25 @@ instance BAT A where
 
    s0 = Sit defaultState defaultControl undefined 0
 
-   do_ a@(Gear x) s = s{cc = updateCc a (cc s),
-                        lastTime = if x == gearCmd (cc s) then lastTime s else 0}
+   do_ a@(Gear x)  s = s{cc = updateCc a (cc s),
+                         lastTime = if x == gearCmd (cc s)
+                                    then lastTime s
+                                    else curLapTime (cs s)}
+   do_ (Sense cs') s = s{cs = cs'}
 
    poss _ _ = True
 
-updateCc :: A -> CarControl -> CarControl
-updateCc (Gear x) cc' = cc'{gearCmd = x}
+mkS0 :: IORef CarControl -> Sit A
+mkS0 ccRef' = s0{ccRef = ccRef'}
 
-fillCc :: CarControl -> Sit A -> CarControl
-fillCc cc' s = cc'{gearCmd = gearCmd (cc s)}
+updateCc :: A -> CarControl -> CarControl
+updateCc (Gear x)  cc' = cc'{gearCmd = x}
+updateCc (Sense _) cc' = cc'
+
+-- | Updates the given 'CarControl' with the portion controlled by this BAT.
+-- That is, it sets the current 'gearCmd'.
+fillCc :: Sit A -> CarControl -> CarControl
+fillCc s cc' = cc'{gearCmd = gearCmd (cc s)}
 
 instance IOBAT A IO where
    syncA a s = do cc' <- readIORef (ccRef s)
@@ -50,7 +59,7 @@ transmission = primf action
                  Just (lo,hi) | rpm (cs s) < lo               -> gearDown (cs s)
                               | rpm (cs s) > hi && changeOk s -> gearUp (cs s)
                  _                                            -> gear (cs s)
-         changeOk s = now s <= 0 || now s - lastTime s > 1
+         changeOk s = now s - lastTime s > 1 -- min duration before shifting up
          rpms 0     = Just (-1/0,    1)
          rpms 1     = Just (   0, 5000)
          rpms 2     = Just (2500, 6000)
@@ -62,4 +71,8 @@ transmission = primf action
          gearUp     = (+1) . gear
          gearDown   = (+ (-1)) . gear
          now        = curLapTime . cs
+
+-- | Informs the BAT about the new 'CarState'.
+sense :: CarState -> Prog A
+sense cs' = prim $ Sense cs'
 
