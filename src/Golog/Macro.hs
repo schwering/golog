@@ -1,7 +1,7 @@
 module Golog.Macro
   (TestAction(..),
    prim, primf, test,
-   atomic, star, plus, opt, ifThenElse, (==>), (<|>), while,
+   atomic, star, plus, opt, ifThen, ifThenElse, (==>), (<|>), while,
    pick, withCtrl) where
 
 import Golog.Interpreter
@@ -29,6 +29,9 @@ plus p = Nondet [p, p `Seq` plus p]
 
 opt :: Prog a -> Prog a
 opt p = Nondet [Nil, p]
+
+ifThen :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
+ifThen phi p1 = ifThenElse phi p1 Nil
 
 ifThenElse :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a -> Prog a
 ifThenElse phi p1 p2 = Nondet [test phi `Seq` p1, test (not.phi) `Seq` p2]

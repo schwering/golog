@@ -2,8 +2,6 @@ module TORCS.Golog.Simulation where
 
 import TORCS.CarControl
 import TORCS.CarState
-import qualified TORCS.CarControl as Control
-import qualified TORCS.CarState as State
 import TORCS.Golog.Sensors
 import TORCS.PhysicsUtil
 
@@ -48,14 +46,14 @@ simulateState t c s = s{angle         = angle s + angleT,
                         curLapTime    = curLapTime s + t,
                         distFromStart = distFromStart s + xR',
                         distRaced     = distRaced s + xR',
-                        State.gear    = Control.gear c,
+                        gear          = gearCmd c,
                         speedX        = speedX s + aX * t,
                         speedY        = speedY s + aY * t,
                         track         = trackT,
                         trackPos      = trackPos s + trackPosT }
    where -- Ackermann drive:
          xC'       = speedX s * t
-         thetaW'   = tan (steer c * steerLock) / wheelBase * xC'
+         thetaW'   = tan (steerCmd c * steerLock) / wheelBase * xC'
          xW'       = cos thetaW' * xC'
          yW'       = sin thetaW' * xC'
          -- Car is already rotated by theta, so we project Ackermann drive onto
@@ -72,7 +70,7 @@ simulateState t c s = s{angle         = angle s + angleT,
          trackPosT = yR' / trackWidth s
          -- Very naive model of acceleration with maximum acceleration 10 m/s^2,
          -- maximum deceleration 20 m/s^2:
-         aX = accel c * sin (speedX s / kmh2ms 300) * 10 - brake c * 20
+         aX = accelCmd c * sin (speedX s / kmh2ms 300) * 10 - brakeCmd c * 20
          aY = yW' / t
          -- Old approach: use learnt data to predict next position.
          --thetaS            = atan2 (speedY s) (speedX s)
@@ -81,5 +79,5 @@ simulateState t c s = s{angle         = angle s + angleT,
          --trackT (alpha, d) = d - v * cos (theta - alpha) * t
          --trackPosT         = v * sin (theta + yaw s) * t / trackWidth s
          --angleT            = predictAngleDiff (steer c) t
-         --vXT               = predictSpeedXDiff (speedX s) (accel c) (brake c) (Control.gear c) t
+         --vXT               = predictSpeedXDiff (speedX s) (accelCmd c) (brakeCmd c) (gearCmd c) t
 

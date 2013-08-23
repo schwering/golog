@@ -16,7 +16,6 @@ shapes csRef ccRef = do
    cc <- readIORef ccRef
    return $ shapes' cs cc
 
-
 shapes' :: CarState -> CarControl -> [Shape]
 shapes' cs' cc' = replaceInfByOne $
                   map (translate (0,-0.8)) $
@@ -29,7 +28,7 @@ shapes' cs' cc' = replaceInfByOne $
          -- Car and wheels.
          makeCar cs cc = [car, wheelFR, wheelFL, wheelRR, wheelRL]
             where yaw = -1 * angle cs
-                  phi = steer cc * steerLock
+                  phi = steerCmd cc * steerLock
                   car = rotate yaw $ mkRect' blue (0,0) (fst fr - fst fl, snd fl - snd rl + 1)
                   wheelFR = rotate yaw $ translate fr $ rotate phi $ wheel
                   wheelFL = rotate yaw $ translate fl $ rotate phi $ wheel

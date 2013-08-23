@@ -30,6 +30,9 @@ Library
                      TORCS.CarState
                      TORCS.Client
                      TORCS.Driver
+                     TORCS.Golog.BAT.GearBox
+                     TORCS.Golog.BAT.Perception
+                     TORCS.Golog.BAT.Traction
                      TORCS.Golog.Control
                      TORCS.Golog.Driver
                      TORCS.Golog.Sensors

@@ -4,6 +4,7 @@ module TORCS.Golog.Sensors where
 
 import Data.List (find)
 import Data.Maybe (fromMaybe)
+import TORCS.CarControl
 import TORCS.CarState
 import TORCS.PhysicsUtil
 
@@ -68,10 +69,7 @@ track' cs = map (\d -> if d >= 200 then 1/0 else d) (track cs)
 -- it takes the car to travel the beam's distance in the beam's direction.
 trackTime' :: CarState -> [Double]
 trackTime' cs = beamTimes
-   where msX          = speedX cs
-         msY          = speedY cs
-         theta        = atan2 msY msX
-         v            = sqrt (msX^(2::Int) + msY^(2::Int))
+   where (theta, v)   = speed cs
          beamOriDists = zip beamOris (track' cs)
          beamTimes    = map (\(alpha,d) -> d / (v * cos (theta - alpha))) beamOriDists
 
@@ -129,7 +127,32 @@ wheelRadius = [0.3306, 0.3306, 0.3276, 0.3276]
 avgWheelSpeed :: CarState -> Double
 avgWheelSpeed cs = sum (map (uncurry (*)) (zip (wheelSpinVel cs) wheelRadius)) / 4
 
+-- | The current slip. If the car moves by @4 m@, but the wheels only rotate
+-- a @4 m@, the slip is @1 - 4 / 5 = 0.2@.
+wheelSlip :: CarState -> Double
+wheelSlip cs = 1 - avgWheelSpeed cs / speedX cs
+
+-- | The average speed of the front wheels.
+avgFrontWheelSpeed :: CarState -> Double
+avgFrontWheelSpeed cs = (v 0 + v 1) / 2
+   where v i = (wheelRadius !! i) * (wheelSpinVel cs !! i)
+
+-- | The average speed of the rear wheels.
+avgRearWheelSpeed :: CarState -> Double
+avgRearWheelSpeed cs = (v 3 + v 4) / 2
+   where v i = (wheelRadius !! i) * (wheelSpinVel cs !! i)
+
+-- | The maximum (heuristically) steering angle at the current speed.
 maxSteeringAngle :: CarState -> Double
 maxSteeringAngle cs | speedX cs > 1 = 1 / speedX cs * steerLock
                     | otherwise     = steerLock
+
+currentSteeringAngle :: CarControl -> Double
+currentSteeringAngle cc = steerCmd cc * steerLock
+
+-- | Returns the direction in and speed at which the car is moving.
+speed :: CarState -> (Double, Double)
+speed cs = (atan2 msY msX, sqrt (msX*msX + msY*msY))
+   where msX = speedX cs
+         msY = speedY cs
 

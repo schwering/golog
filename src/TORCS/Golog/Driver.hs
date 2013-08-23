@@ -70,6 +70,7 @@ import qualified Control.Concurrent.SSem as Sem
 import Data.IORef
 import Data.Maybe (fromMaybe)
 import System.Timeout (timeout)
+import Text.Printf
 import TORCS.CarControl
 import TORCS.CarState
 import TORCS.Client
@@ -117,7 +118,17 @@ instance Driver GD where
 --               (trackTime cs Pos5) (trackDist cs Pos5)
          --putStrLn (kmag ++ show (track cs) ++ knrm)
          cc <- timeout (tickDurMicroSec) $ readIORef ccRef
-         --putStrLn $ show cc
+         maybe (return ()) (\cc' -> do
+            printf (kblu ++
+                    "accel = %.2f  " ++
+                    "brake = %.2f  " ++
+                    "gear = %d  " ++
+                    "steer = %.2f  " ++
+                    knrm ++ "\n")
+                   (accelCmd cc')
+                   (brakeCmd cc')
+                   (gearCmd cc')
+                   (steerCmd cc')) cc
          return (ctx, fromMaybe defaultControl cc)
 
    shutdown ctx =

@@ -8,14 +8,10 @@ import Data.Maybe (fromMaybe, fromJust, isNothing)
 import Golog.Interpreter
 import Golog.Macro
 import Golog.Util
-import Text.Printf
 import TORCS.CarControl
 import TORCS.CarState
-import qualified TORCS.CarControl as Control
-import qualified TORCS.CarState as State
 import TORCS.Golog.Sensors
 import TORCS.Golog.Simulation
-import TORCS.Golog.Visualization
 import TORCS.PhysicsUtil
 
 data Prim1 = AntiDrift | AntiBlock |AntiSlip |
@@ -160,13 +156,13 @@ instance BAT Prim2 where
              undefined undefined undefined
              0 (const 0) False False False False
 
-   do_ a@(Accel x)         s = modControl (\y -> y{accel = x}) s{alreadyAccel = True, rew2 = rew2 s + rew2A a s}
-   do_ a@(Brake x)         s = modControl (\y -> y{brake = x}) s{alreadyBrake = True, rew2 = rew2 s + rew2A a s}
-   do_ a@(Clutch x)        s = modControl (\y -> y{clutch = x}) s{rew2 = rew2 s + rew2A a s}
-   do_ a@(Gear x)          s = modControl (\y -> y{Control.gear = x}) s{alreadyGear = True, rew2 = rew2 s + rew2A a s}
-   do_ a@(Steer x)         s = modControl (\y -> y{steer = x}) s{alreadySteer = True, rew2 = rew2 s + rew2A a s}
-   do_ a@(Focus x)         s = modControl (\y -> y{Control.focus = x}) s{rew2 = rew2 s + rew2A a s}
-   do_ a@(Meta x)          s = modControl (\y -> y{meta = x}) s{rew2 = rew2 s + rew2A a s}
+   do_ a@(Accel x)         s = modControl (\y -> y{accelCmd = x}) s{alreadyAccel = True, rew2 = rew2 s + rew2A a s}
+   do_ a@(Brake x)         s = modControl (\y -> y{brakeCmd = x}) s{alreadyBrake = True, rew2 = rew2 s + rew2A a s}
+   do_ a@(Clutch x)        s = modControl (\y -> y{clutchCmd = x}) s{rew2 = rew2 s + rew2A a s}
+   do_ a@(Gear x)          s = modControl (\y -> y{gearCmd = x}) s{alreadyGear = True, rew2 = rew2 s + rew2A a s}
+   do_ a@(Steer x)         s = modControl (\y -> y{steerCmd = x}) s{alreadySteer = True, rew2 = rew2 s + rew2A a s}
+   do_ a@(Focus x)         s = modControl (\y -> y{focusCmd = x}) s{rew2 = rew2 s + rew2A a s}
+   do_ a@(Meta x)          s = modControl (\y -> y{metaCmd = x}) s{rew2 = rew2 s + rew2A a s}
    do_ a@(SetTrajectory x) s = s{trajectory = const x,
                                  rew2 = rew2 s + rew2A a s}
    do_ a@(Tick (Just x))   s = s{currentState2 = x,
@@ -203,18 +199,7 @@ instance DTBAT Prim2 where
 
 instance IOBAT Prim2 IO where
    syncA (Tick Nothing) s =
-      do _ <- printf (kblu ++
-                      "accel = %.2f  " ++
-                      "brake = %.2f  " ++
-                      "gear = %d  " ++
-                      "steer = %.2f = %.2f  " ++
-                      knrm ++ "\n")
-                     (accel (currentControl2 s))
-                     (brake (currentControl2 s))
-                     (Control.gear (currentControl2 s))
-                     (steer (currentControl2 s))
-                     (steer (currentControl2 s) * steerLock)
-         Sem.wait (ticks s)
+      do Sem.wait (ticks s)
          sensed <- readIORef (sensedState s)
          let s' = do_ (Tick (Just sensed)) s
          return s'
@@ -264,8 +249,8 @@ transmission = primf (\s -> Gear (case lookup (g s) rpms of
                                        Just (lo,hi) | rpm' s < lo -> d s
                                                     | rpm' s > hi -> u s
                                        _                          -> g s))
-   where rpm' = State.rpm . currentState2
-         g    = State.gear . currentState2
+   where rpm' = rpm . currentState2
+         g    = gear . currentState2
          u    = (+1) . g
          d    = (+ (-1)) . g
          rpms = [(0, (-1/0,    1)),
@@ -293,7 +278,7 @@ acceleration = atomic $
                            beam  = fromMaybe (1/0) (projectBeam (trackTime cs) theta)
                   filterDiff x = x - diff / 4
                      where diff = abs (trackPos cs - wantedTrackPos s)
-                  filterSteer x = x - steer cc
+                  filterSteer x = x - steerCmd cc
 
 wantedTrackPos :: Sit2 -> Double
 wantedTrackPos s = trajectory s (distRaced (currentState2 s))
@@ -342,7 +327,7 @@ steerTrajectory = primf (\s -> Steer (lock s))
 
 steerTrajectory' :: Prog2
 steerTrajectory' = primf (\s -> Steer (lock s))
-   where lock s   = steer (currentControl2 s) + signum (diff s) * 0.001
+   where lock s   = steerCmd (currentControl2 s) + signum (diff s) * 0.001
          curPos s = trackPos (currentState2 s)
          tgtPos s = trajectory s (distRaced (currentState2 s))
          diff s   = tgtPos s - curPos s

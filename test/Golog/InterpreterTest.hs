@@ -44,6 +44,27 @@ instance Monad m => IOBAT Int m where
    -- the final configuration, because then no preconditions are checked.
    syncA a s = return $ do_ (a+2) s
 
+data Prim = A | B | C | D deriving (Eq, Ord, Show)
+
+instance BAT Prim where
+   data Sit Prim = S0' | Do' Prim (Sit Prim) deriving (Eq, Ord, Show)
+   s0  = S0'
+   do_ = Do'
+   poss _ _ = True
+
+instance DTBAT Prim where
+   newtype Reward Prim = Reward' { rew :: Int } deriving (Eq, Ord)
+   reward S0' = Reward' 0
+   reward (Do' C s@(Do' A _)) = Reward' $ 1000 + rew (reward s)
+   reward (Do' D s@(Do' B _)) = Reward' $ 1000 + rew (reward s)
+   reward (Do' _ s)           = Reward' $    0 + rew (reward s)
+   reward S0'                 = Reward' $    0
+
+instance Monad m => IOBAT Prim m where
+   syncA A s = return $ do_ B s
+   syncA B s = return $ do_ A s
+   syncA a s = return $ do_ a s
+
 trans'' = head . trans
 
 p :: Int -> Prog Int
@@ -123,6 +144,11 @@ prop_dtsync3 = let t = treeDTIO 3 (p 1 `Seq` Nondet [p i `Seq` p (i+1) | i <- [1
                in fmap sit (doo' t >>= sync) == Just (do_ 7 (do_ 6 (do_ 3 s0)))
 prop_dtsync4 = let t = treeDTIO 3 (p 1 `Seq` Nondet [p i `Seq` p (i+1) | i <- [1..5]]) s0
                in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooSync' t))
+prop_dtsync5 = let t = treeDTIO 3 (prim A `Seq` Nondet [prim C, prim D]) s0
+               in fmap sit (fromJust (dooSync' t)) == Just (do_ D (do_ B s0))
+prop_dtsync6 = let t = treeDTIO 3 (prim A `Seq` Nondet [prim C, prim D]) s0
+               in fmap sit (doo' t >>= sync) == Just (do_ C (do_ B s0))
+
 
 runTests :: IO Bool
 runTests = $quickCheckAll

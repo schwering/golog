@@ -9,9 +9,7 @@ module TORCS.SimpleDriver where
 --import Debug.Trace
 import Text.Printf
 import TORCS.CarControl
-import qualified TORCS.CarControl as C
 import TORCS.CarState
-import qualified TORCS.CarState as S
 import TORCS.Client
 import TORCS.PhysicsUtil
 
@@ -47,10 +45,10 @@ instance Driver SimpleDriver where
                                   "gear = %d  " ++
                                   "steer = %.2f  " ++
                                   knrm ++ "\n")
-                                 (accel cc')
-                                 (brake cc')
-                                 (C.gear cc')
-                                 (steer cc')
+                                 (accelCmd cc')
+                                 (brakeCmd cc')
+                                 (gearCmd cc')
+                                 (steerCmd cc')
                      return (s', cc')
 
    shutdown _ = do   putStrLn "Bye bye!"
@@ -101,7 +99,7 @@ getGear cs | g < 1                             = 1
            | g < 6 && r >= gearUp !! (g - 1)   = g + 1
            | g > 1 && r <= gearDown !! (g - 1) = g - 1
            | otherwise                         = g
-   where g = S.gear cs
+   where g = gear cs
          r = rpm cs
 
 getSteer :: CarState -> Double
@@ -129,23 +127,23 @@ drive d cs | stuck d > stuckTime = (d', cc')
    where d' = if abs (angle cs) > stuckAngle
               then d{stuck = stuck d + 1}
               else d{stuck = 0}
-         cc' = CarControl{steer   = s,
-                          C.gear  = g,
-                          accel   = 1,
-                          brake   = 0,
-                          clutch  = 0,
-                          meta    = 0,
-                          C.focus = 0}
+         cc' = CarControl{steerCmd   = s,
+                          gearCmd    = g,
+                          accelCmd   = 1,
+                          brakeCmd   = 0,
+                          clutchCmd  = 0,
+                          metaCmd    = 0,
+                          focusCmd   = 0}
             where g = if angle cs * trackPos cs > 0 then 1 else -1
                   s = x * angle cs / steerLock
                   x = if angle cs * trackPos cs > 0 then 1 else -1
-         cc'' = CarControl{steer   = min 1 $ max (-1) $ getSteer cs,
-                           C.gear  = getGear cs,
-                           accel   = a,
-                           brake   = b,
-                           clutch  = 0,
-                           meta    = 0,
-                           C.focus = 0}
+         cc'' = CarControl{steerCmd   = min 1 $ max (-1) $ getSteer cs,
+                           gearCmd    = getGear cs,
+                           accelCmd   = a,
+                           brakeCmd   = b,
+                           clutchCmd  = 0,
+                           metaCmd    = 0,
+                           focusCmd   = 0}
             where ab = getAccel cs
                   a = if ab > 0 then ab else 0
                   b = if ab > 0 then 0 else max 0 (filterABS cs (-1 * ab))
