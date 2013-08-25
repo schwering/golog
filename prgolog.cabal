@@ -54,7 +54,7 @@ Library
                      --src/TORCS/lut_speed.c
                      src/Util/memo_cache.c
                      src/Util/native_pso.c
-    Build-Depends:   array, base, bytestring, containers, network, GLUT, OpenGL, parsec, SafeSemaphore
+    Build-Depends:   array, base, bytestring, containers, network, GLUT, OpenGL, parsec, SafeSemaphore, time
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 

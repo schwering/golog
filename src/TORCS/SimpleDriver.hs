@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, EmptyDataDecls #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
@@ -13,7 +13,10 @@ import TORCS.CarState
 import TORCS.Client
 import TORCS.PhysicsUtil
 
-data SimpleDriver = SimpleDriver
+data SimpleDriver
+
+simpleDriver :: SimpleDriver
+simpleDriver = undefined
 
 instance Driver SimpleDriver where
    data Context SimpleDriver = Context {stuck :: Int}
@@ -21,34 +24,34 @@ instance Driver SimpleDriver where
    initialState _ =  return Context {stuck = 0}
 
    command s cs = do let (s', cc') = (drive s cs)
-                     _ <- printf (kred ++
-                                  "time = %.2f  " ++
-                                  "pos = %.2f  " ++
-                                  "angle = %.2f  " ++
-                                  "vX = %.2f  " ++
-                                  "vY = %.2f  " ++
-                                  "track[-5] = %.2f s = %.2f m " ++
-                                  "track[0] = %.2f s = %.2f m " ++
-                                  "track[5] = %.2f s = %.2f m " ++
-                                  knrm ++ "\n")
-                                 (curLapTime cs)
-                                 (trackPos cs)
-                                 (deg $ rad2deg $ angle cs)
-                                 (speedX cs)
-                                 (speedY cs)
-                                 (track cs !!  8) (track cs !!  8)
-                                 (track cs !!  9) (track cs !!  9)
-                                 (track cs !! 10) (track cs !! 10)
-                     _ <- printf (kblu ++
-                                  "accel = %.2f  " ++
-                                  "brake = %.2f  " ++
-                                  "gear = %d  " ++
-                                  "steer = %.2f  " ++
-                                  knrm ++ "\n")
-                                 (accelCmd cc')
-                                 (brakeCmd cc')
-                                 (gearCmd cc')
-                                 (steerCmd cc')
+                     --_ <- printf (kred ++
+                     --             "time = %.2f  " ++
+                     --             "pos = %.2f  " ++
+                     --             "angle = %.2f  " ++
+                     --             "vX = %.2f  " ++
+                     --             "vY = %.2f  " ++
+                     --             "track[-5] = %.2f s = %.2f m " ++
+                     --             "track[0] = %.2f s = %.2f m " ++
+                     --             "track[5] = %.2f s = %.2f m " ++
+                     --             knrm ++ "\n")
+                     --            (curLapTime cs)
+                     --            (trackPos cs)
+                     --            (deg $ rad2deg $ angle cs)
+                     --            (speedX cs)
+                     --            (speedY cs)
+                     --            (track cs !!  8) (track cs !!  8)
+                     --            (track cs !!  9) (track cs !!  9)
+                     --            (track cs !! 10) (track cs !! 10)
+                     --_ <- printf (kblu ++
+                     --             "accel = %.2f  " ++
+                     --             "brake = %.2f  " ++
+                     --             "gear = %d  " ++
+                     --             "steer = %.2f  " ++
+                     --             knrm ++ "\n")
+                     --            (accelCmd cc')
+                     --            (brakeCmd cc')
+                     --            (gearCmd cc')
+                     --            (steerCmd cc')
                      return (s', cc')
 
    shutdown _ = do   putStrLn "Bye bye!"
@@ -69,7 +72,7 @@ stuckAngle = 0.523598775
 
 -- Accel and Brake Constants
 maxSpeedDist = 70
-maxSpeed = kmh2ms 300
+maxSpeed = kmh2ms 150
 sin5 = 0.08716
 cos5 = 0.99619
 

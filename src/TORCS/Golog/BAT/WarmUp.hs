@@ -70,12 +70,14 @@ refineT Tick  _ _  = error "refineT: unrefinable action"
 
 instance IOBAT A IO where
    syncA a@Drive s =
-      do gc' <- sync (refineG a s (sit (gc s)))
-         tc' <- sync (refineT a s (sit (tc s)))
-         return (do_ a s){gc = gc', tc = tc'}
+      do let s' = do_ a s
+         gc' <- sync (gc s')
+         tc' <- sync (tc s')
+         return s'{gc = gc', tc = tc'}
    syncA a@Tick s =
-      do pc' <- sync (refineP a s (sit (pc s)))
-         return (do_ a s){pc = pc'}
+      do let s' = do_ a s
+         pc' <- sync (pc s')
+         return s'{pc = pc'}
 
 keepCentered :: Sit A -> Prog T.A
 keepCentered s = atomic $ ifThenElse tooFast slowDown speedUp `Seq` steer

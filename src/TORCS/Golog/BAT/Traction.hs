@@ -61,9 +61,8 @@ fillCc s cc' = cc'{accelCmd = accelCmd (cc s),
                    steerCmd = steerCmd (cc s)}
 
 instance IOBAT A IO where
-   syncA (Test _) s = return s
-   syncA a s = do cc' <- readIORef (ccRef s)
-                  writeIORef (ccRef s) (updateCc a cc')
+   syncA a@(Test _) s = return $ do_ a s
+   syncA a s = do atomicModifyIORef' (ccRef s) (\cc' -> (updateCc a cc', ()))
                   return $ do_ a s
 
 accel :: Double -> Prog A

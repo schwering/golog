@@ -14,6 +14,7 @@ import Golog.Macro
 import TORCS.CarControl
 import TORCS.CarState
 import TORCS.Golog.Simulation
+import Debug.Trace
 
 type TickDur = Double
 
@@ -31,7 +32,7 @@ instance BAT A where
    s0 = Sit defaultState defaultControl tickDurInSec undefined undefined
 
    do_ (Sense cc' mcs' mt') s = s{cs = cs', cc = cc', tickDur = t'}
-      where cs' = fromMaybe (simulateState tickDurInSec cc' (cs s)) mcs'
+      where cs' = fromMaybe (simulateState (tickDur s) cc' (cs s)) mcs'
             t' = maybe (tickDur s) (\t -> (t + tickDur s) / 2) mt'
 
    poss _ _ = True

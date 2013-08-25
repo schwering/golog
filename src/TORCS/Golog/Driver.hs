@@ -69,6 +69,7 @@ import Control.Concurrent
 import qualified Control.Concurrent.SSem as Sem
 import Data.IORef
 import Data.Maybe (fromMaybe)
+import Data.Time.Clock
 import System.Timeout (timeout)
 import Text.Printf
 import TORCS.CarControl
@@ -87,19 +88,24 @@ gologDriver = undefined
 
 instance Driver GD where
    data Context GD = Context (IORef CarState) (IORef CarControl)
-                              Sem.SSem ThreadId ThreadId
+                              Sem.SSem ThreadId ThreadId UTCTime
 
    initialState _ = do  csRef <- newIORef defaultState
                         ccRef <- newIORef defaultControl
                         tickSem <- Sem.new 0
-                        gologThread <- forkIO $ gologAgent csRef ccRef tickSem
+                        gologThread <- forkOS $ gologAgent csRef ccRef tickSem
                         visThread <- forkOS $ visualize csRef ccRef
-                        return (Context csRef ccRef tickSem gologThread visThread)
+                        startTime <- getCurrentTime
+                        return (Context csRef ccRef tickSem gologThread visThread startTime)
 
-   command ctx@(Context csRef ccRef tickSem _ _) cs =
-      do writeIORef csRef cs
-         --putStrLn $ show cs
-         Sem.signal tickSem
+   command ctx@(Context csRef ccRef tickSem _ _ startTime) cs' =
+      do writeIORef csRef cs'
+         --putStrLn $ show cs'
+         _ <- Sem.signal tickSem
+         --now <- getCurrentTime
+         --let diff = (curLapTime cs') - realToFrac (diffUTCTime now startTime)
+         --printf (kred ++ "time-diff = %.4f" ++ knrm ++ "\n") diff
+         --printf (kred ++ "gear = %d" ++ knrm ++ "\n") (gear cs')
          --_ <- printf (kred ++
          --             "time = %.2f  " ++
          --             "pos = %.2f  " ++
@@ -110,29 +116,30 @@ instance Driver GD where
          --             "track[0] = %.2f s = %.2f m " ++
          --             "track[5] = %.2f s = %.2f m " ++
          --             knrm ++ "\n")
-         --      (curLapTime cs)
-         --      (trackPos cs)
-         --      (deg $ rad2deg $ angle cs)
-         --      (speedX cs)
-         --      (speedY cs)
-         --      (trackTime cs Neg5) (trackDist cs Neg5)
-         --      (trackTime cs Zero)  (trackDist cs Zero)
-         --      (trackTime cs Pos5) (trackDist cs Pos5)
-         --putStrLn (kmag ++ show (track cs) ++ knrm)
-         cc <- timeout (tickDurMicroSec) $ readIORef ccRef
-         maybe (return ()) (\cc' -> do
-            return ()) cc
-            --printf (kblu ++
-            --        "accel = %.2f  " ++
-            --        "brake = %.2f  " ++
-            --        "gear = %d  " ++
-            --        "steer = %.2f  " ++
-            --        knrm ++ "\n")
-            --       (accelCmd cc')
-            --       (brakeCmd cc')
-            --       (gearCmd cc')
-            --       (steerCmd cc')) cc
-         return (ctx, fromMaybe defaultControl cc)
+         --      (curLapTime cs')
+         --      (trackPos cs')
+         --      (deg $ rad2deg $ angle cs')
+         --      (speedX cs')
+         --      (speedY cs')
+         --      (trackTime cs' Neg5) (trackDist cs' Neg5)
+         --      (trackTime cs' Zero)  (trackDist cs' Zero)
+         --      (trackTime cs' Pos5) (trackDist cs' Pos5)
+         --putStrLn (kmag ++ show (track cs') ++ knrm)
+         --cc <- timeout (tickDurMicroSec) $ readIORef ccRef
+         threadDelay (tickDurMicroSec * 8 `div` 10)
+         cc' <- readIORef ccRef
+         --printf (kblu ++ "gear = %d" ++ knrm ++ "\n") (gearCmd cc')
+         --printf (kblu ++
+         --        "accel = %.2f  " ++
+         --        "brake = %.2f  " ++
+         --        "gear = %d  " ++
+         --        "steer = %.2f  " ++
+         --        knrm ++ "\n")
+         --       (accelCmd cc')
+         --       (brakeCmd cc')
+         --       (gearCmd cc')
+         --       (steerCmd cc')
+         return (ctx, cc')
 
    shutdown ctx =
       do putStrLn "SHUTDOWN"
@@ -140,14 +147,15 @@ instance Driver GD where
          ctx' <- restart ctx
          return (Just ctx')
 
-   restart (Context csRef ccRef _ gologThread visThread) =
+   restart (Context csRef ccRef _ gologThread visThread _) =
       do putStrLn "RESTART"
          killThread gologThread
          tickSem <- Sem.new 0
          writeIORef csRef defaultState
          writeIORef ccRef defaultControl
-         newGologThread <- forkIO $ gologAgent csRef ccRef tickSem
-         return (Context csRef ccRef tickSem newGologThread visThread)
+         newGologThread <- forkOS $ gologAgent csRef ccRef tickSem
+         startTime <- getCurrentTime
+         return (Context csRef ccRef tickSem newGologThread visThread startTime)
 
    beamOris _ = Sensors.beamOris
 

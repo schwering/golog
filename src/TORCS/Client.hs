@@ -2,8 +2,8 @@
 -- An instance of the 'Driver' class should be handed to the 'run' function.
 module TORCS.Client (Driver(..), run) where
 
+import Control.Monad (when)
 import Data.ByteString.Char8 (pack, unpack)
-import Data.Maybe (isNothing, fromJust)
 import Network.Socket (Socket, SockAddr, SocketType(Datagram), addrAddress,
                        getAddrInfo, socket, addrFamily, sClose)
 import Network.Socket.ByteString (sendAllTo, recvFrom)
@@ -24,10 +24,10 @@ udpTimeout = 1000000
 
 createHandle :: HostName -> Port -> IO Handle
 createHandle hostname port =
-    do   addrinfos <- getAddrInfo Nothing (Just hostname) (Just port)
-         let serveraddr = head addrinfos
-         sock <- socket (addrFamily serveraddr) Datagram defaultProtocol
-         return $ Handle sock (addrAddress serveraddr)
+   do addrinfos <- getAddrInfo Nothing (Just hostname) (Just port)
+      let serveraddr = head addrinfos
+      sock <- socket (addrFamily serveraddr) Datagram defaultProtocol
+      return $ Handle sock (addrAddress serveraddr)
 
 closeHandle :: Handle -> IO ()
 closeHandle (Handle sock _) = sClose sock
@@ -37,13 +37,17 @@ send (Handle sock addr) str = do sendAllTo sock (pack str) addr
                                  --putStrLn $ "SEND: " ++ str
 
 recv :: Handle -> IO String
-recv (Handle sock addr) = do  (bstr, addr') <- recvFrom sock 1000
-                              if addr /= addr'
-                                 then fail "Invalid sender address"
-                                 else return ()
+recv (Handle sock addr) = do  (bstr, addr') <- recvFrom sock 4096
+                              when (addr /= addr') $ fail "Invalid sender address"
                               let str = unpack bstr
                               --putStrLn $ " RECV: " ++ str
                               return str
+
+cases :: Eq a => a -> [(a, b)] -> b
+cases _ []                        = error "cases: empty list"
+cases _ [(_, y)]                  = y
+cases z ((x,y):ps) | x == z   = y
+                    | otherwise = cases z ps
 
 -- | Client loop for a driver @a@.
 -- The 'HostName' and 'Port' identify the SCR competition server, i.e., the
@@ -66,17 +70,14 @@ run driver host port =
                            greet handle
          loop handle state =
             do str <- recv handle
-               if "***shutdown***\0" == str
-                  then do  state' <- shutdown state
-                           if isNothing state'
-                              then do  closeHandle handle
-                              else do  greet handle
-                                       loop handle (fromJust state')
-                  else
-                     if "***restart***\0" == str
-                        then do  state' <- restart state
-                                 loop handle state'
-                        else do  (state', ctrl) <- command state (parseState str)
-                                 send handle (stringifyControl ctrl)
-                                 loop handle state'
+               cases str
+                  [("***shutdown***\0",
+                     shutdown state >>= maybe (closeHandle handle) (\state' -> greet handle >> loop handle state'))
+                  ,("***restart***\0",
+                     restart state >>= loop handle)
+                  ,(undefined,
+                     do (state', ctrl) <- command state (parseState str)
+                        send handle (stringifyControl ctrl)
+                        loop handle state')
+                  ]
 
