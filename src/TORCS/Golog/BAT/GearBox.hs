@@ -50,15 +50,12 @@ fillCc s cc' = cc'{gearCmd = gearCmd (cc s)}
 instance IOBAT A IO where
    syncA a@GearDown s = do let s' = do_ a s
                            atomicModifyIORef' (ccRef s) (\cc' -> (cc'{gearCmd = gearCmd (cc s)}, ()))
-                           --putStrLn $ "GearDown "++ show (gearCmd (cc s))
                            return s'
    syncA a@GearUp   s = do let s' = do_ a s
                            atomicModifyIORef' (ccRef s) (\cc' -> (cc'{gearCmd = gearCmd (cc s)}, ()))
-                           --putStrLn $ "GearUp   "++ show (gearCmd (cc s))
                            return s'
-   syncA a@(Sense cs') s = do --putStrLn $ "Sense    "++ show (curLapTime cs')
-                              return $ do_ a s
-   syncA a@(Test _)  s = return $ do_ a s
+   syncA a@(Sense cs') s = return $ do_ a s
+   syncA a@(Test _)    s = return $ do_ a s
 
 -- | Performs a gear change if necessary. The necessity of gear changes depends
 -- on the current RPM and is defined by a simple transmission table, i.e., if

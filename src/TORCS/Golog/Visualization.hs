@@ -1,20 +1,22 @@
 module TORCS.Golog.Visualization where
 
+import Control.Concurrent.MSampleVar
 import Data.IORef
+import Golog.Interpreter
 import TORCS.CarControl
 import TORCS.CarState
+import qualified TORCS.Golog.BAT.WarmUp as W
 import TORCS.Golog.Sensors
 import TORCS.Golog.Simulation
 import TORCS.OpenGL
 
-visualize :: IORef CarState -> IORef CarControl -> IO ()
-visualize csRef ccRef = runOpenGL (shapes csRef ccRef)
+visualize :: MSampleVar (Sit W.A) -> IO ()
+visualize sitVar = runOpenGL (shapes sitVar)
 
-shapes :: IORef CarState -> IORef CarControl -> IO [Shape]
-shapes csRef ccRef = do
-   cs <- readIORef csRef
-   cc <- readIORef ccRef
-   return $ shapes' cs cc
+shapes :: MSampleVar (Sit W.A) -> IO [Shape]
+shapes sitVar = do
+   sit <- readSV sitVar
+   return $ shapes' (W.cs sit) (W.cc sit)
 
 shapes' :: CarState -> CarControl -> [Shape]
 shapes' cs' cc' = replaceInfByOne $

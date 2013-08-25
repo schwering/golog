@@ -6,8 +6,7 @@
 -- action takes this as argument.
 module TORCS.Golog.BAT.Perception (A, mkS0, sense, cs) where
 
-import Control.Concurrent.SSem
-import Data.IORef
+import Control.Concurrent.MSampleVar
 import Data.Maybe (fromMaybe)
 import Golog.Interpreter
 import Golog.Macro
@@ -25,11 +24,10 @@ instance BAT A where
       cs      :: CarState,
       cc      :: CarControl,
       tickDur :: TickDur,
-      csRef   :: IORef CarState,
-      ticker  :: SSem
+      csVar   :: MSampleVar CarState
    }
 
-   s0 = Sit defaultState defaultControl tickDurInSec undefined undefined
+   s0 = Sit defaultState defaultControl tickDurInSec undefined
 
    do_ (Sense cc' mcs' mt') s = s{cs = cs', cc = cc', tickDur = t'}
       where cs' = fromMaybe (simulateState (tickDur s) cc' (cs s)) mcs'
@@ -37,13 +35,12 @@ instance BAT A where
 
    poss _ _ = True
 
-mkS0 :: IORef CarState -> SSem -> Sit A
-mkS0 csRef' ticker' = s0{csRef = csRef', ticker = ticker'}
+mkS0 :: MSampleVar CarState -> Sit A
+mkS0 csVar' = s0{csVar = csVar'}
 
 instance IOBAT A IO where
    syncA (Sense cc' Nothing Nothing) s =
-      do wait (ticker s)
-         cs' <- readIORef (csRef s)
+      do cs' <- readSV (csVar s)
          let t' = curLapTime cs' - curLapTime (cs s)
          return $ do_ (Sense cc' (Just cs') (Just t')) s
    syncA (Sense _ _ _) _ = error "syncA: unrefinable Sense"

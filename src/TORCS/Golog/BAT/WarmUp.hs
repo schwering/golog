@@ -2,7 +2,7 @@
 
 module TORCS.Golog.BAT.WarmUp where
 
-import Control.Concurrent.SSem
+import Control.Concurrent.MSampleVar
 import Control.Monad ((>=>))
 import Data.IORef
 import Data.Maybe (fromMaybe)
@@ -38,10 +38,10 @@ instance BAT A where
 
    poss _ _ = True
 
-mkS0 :: IORef CarState -> IORef CarControl -> SSem -> Sit A
-mkS0 csRef ccRef ticker = s0{gc = cnf (G.mkS0 ccRef),
-                             pc = cnf (P.mkS0 csRef ticker),
-                             tc = cnf (T.mkS0 ccRef)}
+mkS0 :: MSampleVar CarState -> IORef CarControl -> Sit A
+mkS0 csVar ccRef = s0{gc = cnf (G.mkS0 ccRef),
+                      pc = cnf (P.mkS0 csVar),
+                      tc = cnf (T.mkS0 ccRef)}
 
 cc :: Sit A -> CarControl
 cc s = G.fillCc (sit (gc s)) $ T.fillCc (sit (tc s)) $ defaultControl
@@ -109,9 +109,9 @@ keepCentered s = atomic $ ifThenElse tooFast slowDown speedUp `Seq` steer
          speedUp  = T.accel 1 `Seq` T.brake 0
          steer    = T.steer (angle (cs s) - trackPos (cs s) / 2)
 
-gologAgent :: IORef CarState -> IORef CarControl -> SSem -> IO ()
-gologAgent csRef ccRef ticker = loop conf
-   where conf   = treeNDIO (GM.loop (prim Tick `Seq` prim Drive))
-                           (mkS0 csRef ccRef ticker)
-         loop c = maybe (putStrLn "EOP") (sync >=> loop) (trans' c)
+gologAgent :: MSampleVar CarState -> IORef CarControl -> MSampleVar (Sit A) -> IO ()
+gologAgent csVar ccRef sitVar = loop conf
+   where conf = treeNDIO (GM.loop (prim Tick `Seq` prim Drive)) (mkS0 csVar ccRef)
+         loop c = maybe (putStrLn "EOP") (sync >=> store >=> loop) (trans' c)
+         store c = writeSV sitVar (sit c) >> return c
 

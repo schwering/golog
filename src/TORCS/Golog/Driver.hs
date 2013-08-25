@@ -66,16 +66,15 @@
 module TORCS.Golog.Driver (gologDriver) where
 
 import Control.Concurrent
-import qualified Control.Concurrent.SSem as Sem
+import Control.Concurrent.MSampleVar
+import Control.Monad (when)
 import Data.IORef
-import Data.Maybe (fromMaybe)
-import Data.Time.Clock
-import System.Timeout (timeout)
+import Golog.Interpreter
 import Text.Printf
 import TORCS.CarControl
 import TORCS.CarState
 import TORCS.Client
-import TORCS.Golog.BAT.WarmUp
+import qualified TORCS.Golog.BAT.WarmUp as W
 import TORCS.Golog.Sensors hiding (beamOris)
 import qualified TORCS.Golog.Sensors as Sensors
 import TORCS.Golog.Visualization
@@ -87,25 +86,18 @@ gologDriver :: GD
 gologDriver = undefined
 
 instance Driver GD where
-   data Context GD = Context (IORef CarState) (IORef CarControl)
-                              Sem.SSem ThreadId ThreadId UTCTime
+   data Context GD = Context (MSampleVar CarState) (IORef CarControl)
+                             (MSampleVar (Sit W.A)) ThreadId ThreadId
 
-   initialState _ = do  csRef <- newIORef defaultState
+   initialState _ = do  csVar <- newEmptySV
                         ccRef <- newIORef defaultControl
-                        tickSem <- Sem.new 0
-                        gologThread <- forkOS $ gologAgent csRef ccRef tickSem
-                        visThread <- forkOS $ visualize csRef ccRef
-                        startTime <- getCurrentTime
-                        return (Context csRef ccRef tickSem gologThread visThread startTime)
+                        sitVar <- newEmptySV
+                        gologThread <- forkOS $ W.gologAgent csVar ccRef sitVar
+                        visThread <- forkOS $ visualize sitVar
+                        return (Context csVar ccRef sitVar gologThread visThread)
 
-   command ctx@(Context csRef ccRef tickSem _ _ startTime) cs' =
-      do writeIORef csRef cs'
-         --putStrLn $ show cs'
-         _ <- Sem.signal tickSem
-         --now <- getCurrentTime
-         --let diff = (curLapTime cs') - realToFrac (diffUTCTime now startTime)
-         --printf (kred ++ "time-diff = %.4f" ++ knrm ++ "\n") diff
-         --printf (kred ++ "gear = %d" ++ knrm ++ "\n") (gear cs')
+   command ctx@(Context csVar ccRef _ _ _) cs' =
+      do writeSV csVar cs'
          --_ <- printf (kred ++
          --             "time = %.2f  " ++
          --             "pos = %.2f  " ++
@@ -124,11 +116,8 @@ instance Driver GD where
          --      (trackTime cs' Neg5) (trackDist cs' Neg5)
          --      (trackTime cs' Zero)  (trackDist cs' Zero)
          --      (trackTime cs' Pos5) (trackDist cs' Pos5)
-         --putStrLn (kmag ++ show (track cs') ++ knrm)
-         --cc <- timeout (tickDurMicroSec) $ readIORef ccRef
          threadDelay (tickDurMicroSec * 8 `div` 10)
          cc' <- readIORef ccRef
-         --printf (kblu ++ "gear = %d" ++ knrm ++ "\n") (gearCmd cc')
          --printf (kblu ++
          --        "accel = %.2f  " ++
          --        "brake = %.2f  " ++
@@ -147,15 +136,13 @@ instance Driver GD where
          ctx' <- restart ctx
          return (Just ctx')
 
-   restart (Context csRef ccRef _ gologThread visThread _) =
+   restart (Context csVar ccRef sitVar gologThread visThread) =
       do putStrLn "RESTART"
          killThread gologThread
-         tickSem <- Sem.new 0
-         writeIORef csRef defaultState
+         isEmptySV csVar >>= (flip when) (emptySV csVar)
          writeIORef ccRef defaultControl
-         newGologThread <- forkOS $ gologAgent csRef ccRef tickSem
-         startTime <- getCurrentTime
-         return (Context csRef ccRef tickSem newGologThread visThread startTime)
+         newGologThread <- forkOS $ W.gologAgent csVar ccRef sitVar
+         return (Context csVar ccRef sitVar newGologThread visThread)
 
    beamOris _ = Sensors.beamOris
 
