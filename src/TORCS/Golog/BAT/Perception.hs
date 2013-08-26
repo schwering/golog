@@ -41,8 +41,13 @@ mkS0 csVar' = s0{csVar = csVar'}
 instance IOBAT A IO where
    syncA (Sense cc' Nothing Nothing) s =
       do cs' <- readSV (csVar s)
-         let t' = curLapTime cs' - curLapTime (cs s)
-         return $ do_ (Sense cc' (Just cs') (Just t')) s
+         let diff f = f cs' - f (cs s)
+         let t      = diff curLapTime
+         let aX     = diff speedX
+         let aY     = diff speedY
+         let aZ     = diff speedZ
+         let cs''   = cs'{accelX = aX, accelY = aY, accelZ = aZ}
+         return $ do_ (Sense cc' (Just cs'') (Just t)) s
    syncA (Sense _ _ _) _ = error "syncA: unrefinable Sense"
 
 tickDurInSec :: TickDur

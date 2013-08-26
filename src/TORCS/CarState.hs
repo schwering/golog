@@ -5,7 +5,13 @@ import TORCS.MessageParser
 import TORCS.PhysicsUtil
 
 -- | The current state of the car, as received from the SCR server.
+--
 -- Each field's comment is copied from the SCR manual.
+--
+-- The specification of the fields 'opponents', 'speedX', 'speedY', 'speedZ'
+-- differ from SCR; c.f. the respective field's documentation.
+--
+-- We alsl*o
 data CarState = CarState {
       -- | Angle between the car direction and the direction of the track axis.
       -- A positive angle indicates that the car is steering to the right.
@@ -103,7 +109,22 @@ data CarState = CarState {
       -- | Distance of the car mass center from the surface of the track along
       -- the Z axis.
       -- Range @(-inf,+inf)@, unit meters.
-      z             :: Double
+      z             :: Double,
+      -- | Acceleration of the car along the X axis of the car.
+      -- Range @(-inf,+inf)@, unit m\/s.
+      -- NOTE: this is not sent by the SCR server, we estimate the value
+      -- instead over the last two 'CarState's.
+      accelX        :: Double,
+      -- | Acceleration of the car along the Y axis of the car.
+      -- Range @(-inf,+inf)@, unit m\/s.
+      -- NOTE: this is not sent by the SCR server, we estimate the value
+      -- instead over the last two 'CarState's.
+      accelY        :: Double,
+      -- | Acceleration of the car along the Z axis of the car.
+      -- Range @(-inf,+inf)@, unit m\/s.
+      -- NOTE: this is not sent by the SCR server, we estimate the value
+      -- instead over the last two 'CarState's.
+      accelZ        :: Double
    }
    deriving Show
 
@@ -127,6 +148,9 @@ parseState str = CarState { angle          = parseMsg1 result "angle"
                           , trackPos       = parseMsg1 result "trackPos"
                           , wheelSpinVel   = parseMsg  result "wheelSpinVel"
                           , z              = parseMsg1 result "z"
+                          , accelX         = 0
+                          , accelY         = 0
+                          , accelZ         = 0
                           }
    where result = parseMsg' str
 
@@ -150,6 +174,9 @@ defaultState = CarState {
                   track          = replicate 19 200,
                   trackPos       = 0.33,
                   wheelSpinVel   = replicate 4 0,
-                  z              = 0
+                  z              = 0,
+                  accelX         = 0,
+                  accelY         = 0,
+                  accelZ         = 0
                }
 

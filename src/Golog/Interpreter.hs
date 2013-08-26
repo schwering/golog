@@ -138,7 +138,7 @@ trans (Val Flop       _) = []
 trans (Val (Node _ _) t) = trans' t
    where trans' Empty                 = []
          trans' (Alt ts)              = concat (map trans' ts)
-         trans' (Val Flop       _)    = []
+         trans' (Val Flop          _) = []
          trans' t'@(Val (Node _ _) _) = [t']
 
 sit :: Conf a b -> Sit a
