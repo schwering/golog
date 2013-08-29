@@ -1,0 +1,53 @@
+Name: torcs-agent
+Version: 1.0
+License: BSD3
+Author: Christoph Schwering
+Synopsis: Self-driving racing car.
+Cabal-Version: >= 1.8
+Build-Type: Simple
+
+Description:
+    An agent for the racing game TORCS using the SCR framework.
+
+Library
+    Hs-Source-Dirs:  src
+    Exposed-Modules: TORCS.CarControl
+                     TORCS.CarState
+                     TORCS.Client
+                     TORCS.Driver
+                     TORCS.Golog.BAT.GearBox
+                     TORCS.Golog.BAT.Perception
+                     TORCS.Golog.BAT.Traction
+                     TORCS.Golog.BAT.WarmUp
+                     TORCS.Golog.Control
+                     TORCS.Golog.Driver
+                     TORCS.Golog.Sensors
+                     TORCS.Golog.Simulation
+                     TORCS.Golog.Visualization
+                     --TORCS.Golog.LUT
+                     TORCS.MessageParser
+                     TORCS.OpenGL
+                     TORCS.PhysicsUtil
+                     TORCS.SimpleDriver
+    Other-Modules:
+--    C-Sources:       src/TORCS/lut_angle.c
+--                     src/TORCS/lut_speed.c
+    Build-Depends:   base, bytestring, golog, network, GLUT, OpenGL, parsec, SafeSemaphore, time
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
+
+
+Executable Driver
+    Hs-Source-Dirs:  main
+    Main-Is:         Driver.hs
+    Build-Depends:   base, torcs-agent
+    GHC-Options:     -Wall -O -rtsopts -threaded
+    --GHC-Prof-Options:-prof -auto-all
+
+
+Test-Suite Test
+    Hs-Source-Dirs: test
+    Main-Is:        Main.hs
+    Type:           exitcode-stdio-1.0
+    Build-Depends:  base, torcs-agent, QuickCheck
+

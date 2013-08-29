@@ -1,0 +1,18 @@
+Name: golog-examples
+Version: 0.0
+License: BSD3
+Author: Christoph Schwering
+Synopsis: Golog examples
+Cabal-Version: >= 1.8
+Build-Type: Simple
+
+Description:
+    Example worlds using Golog.
+
+Executable Maze
+    Hs-Source-Dirs:  maze
+    Main-Is:         Maze.hs
+    Build-Depends:   base, golog
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
+

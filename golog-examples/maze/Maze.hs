@@ -10,7 +10,7 @@ import Data.List (sortBy)
 import Golog.Interpreter
 import Golog.Macro
 import Golog.Util
-import qualified Util.Random as Random
+import qualified Random
 
 
 {- Maze functions: -}

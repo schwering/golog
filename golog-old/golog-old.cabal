@@ -1,0 +1,32 @@
+Name: golog-old
+Version: 3.0
+License: BSD3
+Author: Christoph Schwering
+Synopsis: Golog interpreter
+Cabal-Version: >= 1.8
+Build-Type: Simple
+
+Description:
+    Interpreter for the action language Golog.
+    Supports regression and progression, nondeterministic and decision-theoretic
+    execution, step-by-step execution, concurrency by interleaving.
+
+
+Library
+    Hs-Source-Dirs:  src
+    Exposed-Modules: Golog.Old.Interpreter
+                     Golog.Old.Tree
+                     Golog.Old.TreeUtil
+    Other-Modules:
+    C-Sources:
+    Build-Depends:   base
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
+
+
+Test-Suite Test
+    Hs-Source-Dirs: test
+    Main-Is:        Main.hs
+    Type:           exitcode-stdio-1.0
+    Build-Depends:  base, golog-old, QuickCheck
+

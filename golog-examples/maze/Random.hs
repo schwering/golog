@@ -1,4 +1,4 @@
-module Util.Random where
+module Random where
 
 newtype Supply = Supply Int deriving Show
 

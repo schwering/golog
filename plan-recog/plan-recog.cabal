@@ -1,0 +1,54 @@
+Name: plan-recog
+Version: 2.0
+License: BSD3
+Author: Christoph Schwering
+Synopsis: Plan recognition for cars.
+Cabal-Version: >= 1.8
+Build-Type: Simple
+
+Description:
+    Plan recognition for cars.
+
+Library
+    Hs-Source-Dirs:  src
+    Exposed-Modules: RSTC.BAT.Base
+                     RSTC.BAT.Regression
+                     RSTC.BAT.Progression
+                     RSTC.Car
+                     RSTC.Obs
+                     RSTC.Progs
+                     RSTC.Theorems
+                     Util.Interpolation
+                     Util.MemoCache
+                     Util.NativePSO
+    Other-Modules:
+    C-Sources:       src/RSTC/obs.c
+                     src/Util/memo_cache.c
+                     src/Util/native_pso.c
+    Build-Depends:   array, base, golog
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
+
+
+Executable Main
+    Hs-Source-Dirs:  main
+    Main-Is:         Main.hs
+    Build-Depends:   base, bytestring, ekg, golog, plan-recog
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
+
+
+Executable Web
+    Hs-Source-Dirs:  main
+    Main-Is:         Web.hs
+    Build-Depends:   base, bytestring, golog, plan-recog, wai, warp, enumerator, blaze-builder, http-types
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
+
+
+Test-Suite Test
+    Hs-Source-Dirs: test
+    Main-Is:        Main.hs
+    Type:           exitcode-stdio-1.0
+    Build-Depends:  base, plan-recog, QuickCheck, random
+

@@ -1,19 +1,15 @@
 PROFILING = --enable-library-profiling --enable-executable-profiling
 PROFILING =
 
-all: dist replay
-	cabal build
-
-dist: prgolog.cabal
-	cabal configure $(PROFILING)
-
-replay: scripts/replay.c
-	cc -Wall -o replay scripts/replay.c
-
-doc:
-	cabal haddock --hyperlink-source
+all:
+	make -C golog
+	make -C plan-recog
+	make -C torcs-agent
+	make -C golog-examples
 
 clean:
-	rm -rf dist
-	rm -f replay
+	make -C golog clean
+	make -C plan-recog clean
+	make -C torcs-agent clean
+	make -C golog-examples clean
 
