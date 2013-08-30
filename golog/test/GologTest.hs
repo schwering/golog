@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeFamilies, NoMonomorphismRestriction #-}
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- | A simple BAT for manual comparison between the old and new Golog
 -- interpreters.
@@ -16,9 +17,14 @@ instance BAT Int where
    poss a _ = even a
 
 instance DTBAT Int where
-   reward _ s         | sitlen s > 5 = -1000
-   reward a (Do a' _) | a == a'      = -1
-   reward a _                        = fromIntegral (max 0 a)
+   newtype Reward Int = Reward { rew :: (Double, Depth) } deriving (Eq, Ord, Show)
+   reward (Do _ s)         | sitlen s > 5 = Reward $ rew (reward s) `plus2` (-1000, 1)
+   reward (Do a (Do a' s)) | a == a'      = Reward $ rew (reward s) `plus2` (-1, 1)
+   reward (Do a s)                        = Reward $ rew (reward s) `plus2` (fromIntegral (max 0 a), 1)
+   reward S0                              = Reward $ (0, 0)
+
+plus2 :: (Num a, Num b) => (a, b) -> (a, b) -> (a, b)
+plus2 (u,v) (x,y) = (u+x,v+y)
 
 instance Monad m => IOBAT Int m where
    syncA 4 s = return $ do_ 2 s
@@ -38,10 +44,6 @@ atomic = M.atomic
 doDT :: DTBAT a => Depth -> Prog a -> Sit a -> [Sit a]
 doDT l p s = map sit $ doo (treeDT l p s)
 
-rewardSum :: Sit Int -> Reward
-rewardSum S0       = 0
-rewardSum (Do a s) = rewardSum s + reward a s
-
 testDTIO :: IO (Sit Int)
 testDTIO = do  c <- return $ t
                c <- return $ n c -- 2
@@ -52,7 +54,7 @@ testDTIO = do  c <- return $ t
                -- c <- sync c
                c <- return $ n c -- 14 vs 18
                c <- sync c
-               putStrLn $ show $ rewardSum (sit c)
+               putStrLn $ show $ reward (sit c)
                return $ sit c
    where t = treeDTIO 3 (p 2 `Seq` p 4 `Seq` nondet [p 4 `Seq` p 16, p 0 `Seq` p 16] :: Prog Int) s0
          n = head.trans

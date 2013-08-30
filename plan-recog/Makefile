@@ -4,7 +4,7 @@ PROFILING =
 all: dist replay
 	cabal build
 
-dist: plan-recog.cabal
+dist: plan-recog.cabal ../golog/dist/build/libHSgolog-3.1.a
 	cabal configure $(PROFILING)
 
 replay: scripts/replay.c
