@@ -4,7 +4,7 @@ PROFILING =
 all: dist
 	cabal build
 
-dist: golog-examples.cabal
+dist: golog-examples.cabal ../golog/dist/build/libHSgolog-3.1.a
 	cabal configure $(PROFILING)
 
 doc:

@@ -9,6 +9,13 @@ Build-Type: Simple
 Description:
     Example worlds using Golog.
 
+Executable ElevatorBasic
+    Hs-Source-Dirs:  elevator-basic
+    Main-Is:         ElevatorBasic.hs
+    Build-Depends:   base, golog
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
+
 Executable Maze
     Hs-Source-Dirs:  maze
     Main-Is:         Maze.hs

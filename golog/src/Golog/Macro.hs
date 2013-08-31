@@ -5,6 +5,7 @@ module Golog.Macro
    ifThen, ifThenElse, if_, then_, else_, while, when, until,
    pick, withCtrl, monitor) where
 
+import Prelude hiding (until)
 import Golog.Interpreter
 
 class TestAction a where
@@ -60,6 +61,9 @@ else_ = ElseBranch
 
 while :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
 while phi p = star (test phi `Seq` p) `Seq` test (not.phi)
+
+until :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
+until phi = while (not.phi)
 
 pick :: [b] -> (b -> Prog a) -> Prog a
 pick xs p = Nondet (map p xs)

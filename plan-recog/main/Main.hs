@@ -11,7 +11,7 @@ import Golog.Util
 --import Interpreter.Tree
 --import Interpreter.TreeUtil
 import RSTC.BAT.Base
-import RSTC.BAT.Regression
+import RSTC.BAT.Progression
 import qualified RSTC.Obs as O
 import RSTC.Progs
 --import RSTC.Theorems
