@@ -2,7 +2,10 @@ A Golog Interpreter in Haskell
 ==============================
 
 This is a Golog interpreter written in the purely functional programming
-language.
+language [Haskell][Haskell].
+[Golog][Golog] is an action language based on the [situation calculus][SitCalc]
+which is a formalism for reasoning about actions and change.
+
 Besides [toy examples](../golog-examples/) it is currently used for [plan
 recognition](../plan-recog/) in traffic domains and [control of a racing
 car](../torcs-agent/) in the video game TORCS.
@@ -38,6 +41,8 @@ prototypes in [ECLiPSe-CLP][ECLiPSe] and [Mercury][Mercury] (see
 Contact: [Christoph Schwering][HP] (schwering at kbsg.rwth-aachen.de).
 
 
+[Golog]: http://www.cs.toronto.edu/cogrobo/main/systems/index.html
+[SitCalc]: http://en.wikipedia.org/wiki/Situation_calculus
 [Haskell]: http://www.haskell.org/
 [ECLiPSe]: http://www.eclipseclp.org/
 [Mercury]: http://www.mercurylang.org/

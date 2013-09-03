@@ -1,4 +1,17 @@
 {-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
+
+-- An elevator which can move and down and serve floors.
+--
+-- The example appears in the first Golog paper and Reiter's book (with
+-- additional Open and Close actions):
+--
+--  GOLOG: A Logic Programming Language for Dynamic Domains. Levesque, H.;
+--  Reiter, R.; Lesperance, Y.; Lin, F.; and Scherl, R. Journal of Logic
+--  Programming, 31:59--84. 1997. 
+--
+--  Knowledge in Action. Logical Foundations for Specifying and Implementing
+--  Dynamical Systems. Reiter, R. MIT Press, 2001. 
+--
 module Main where
 
 import Prelude hiding (floor, until)

@@ -1,4 +1,27 @@
 {-# LANGUAGE TypeFamilies, MultiParamTypeClasses, GeneralizedNewtypeDeriving #-}
+
+-- | A reactive Golog interpreter.
+--
+-- It reads exogenous actions from the standard input device. You may execute
+-- the program and type one of "Smoke", "TurnOn N" for some integer N between 1
+-- and 10, "Heat" or "Cold" to trigger respective events. If you just press
+-- enter, no exogenous action is executed.
+--
+-- The elevator reacts to smoke by giving the alarm, to heat and cold by turning
+-- on/off the fan, and to turned on call-buttons by serving the floor.
+--
+-- Also see 'ElevatorBasic' for a simpler example without exogenous actions.
+--
+-- Very similar examples appear in a ConGolog paper and Reiter's book:
+--
+--  Reasoning About Concurrent Execution, Prioritized Interrupts, and Exogenous
+--  Actions in the Situation Calculus. Giacomo, G. D.; Lesperance, Y.; and
+--  Levesque, H. In Proceedings of the Fifteenth International Joint Conference
+--  on AI (IJCAI-97), page 1221--1226, Nagoya, August 1997. 
+--
+--  Knowledge in Action. Logical Foundations for Specifying and Implementing
+--  Dynamical Systems. Reiter, R. MIT Press, 2001. 
+--
 module Main where
 
 import Prelude hiding (floor, until)
@@ -27,8 +50,6 @@ data A = Up | Down | TurnOff | ToggleFan | Ring |
 
 instance TestAction A where
    testAction = Test . TestFormula
-   isTest (Test _) = True
-   isTest _        = False
 
 instance BAT A where
    data Sit A = State { floor     :: Floor,
@@ -36,11 +57,10 @@ instance BAT A where
                         fan       :: Bool,
                         alarm     :: Bool,
                         onButtons :: [Floor],
-                        syncable  :: Bool,
                         rew       :: Reward A }
       deriving Show
 
-   s0 = State { floor = 7, temp = 0, fan = False, alarm = False, onButtons = [3, 5], syncable = False, rew = Reward (0, 0) }
+   s0 = State { floor = 7, temp = 0, fan = False, alarm = False, onButtons = [3, 5], rew = Reward (0, 0) }
 
    do_ Up         s = update $ s{floor = floor s + 1}
    do_ Down       s = update $ s{floor = floor s - 1}
@@ -52,7 +72,7 @@ instance BAT A where
    do_ Cold       s = update $ s{temp = temp s - 1}
    do_ Smoke      s = update $ s{alarm = True}
    do_ Reset      s = update $ s{alarm = False}
-   do_ Wait       s = (update $ s){syncable = True}
+   do_ Wait       s = update $ s
    do_ (Test _)   s = update $ s
 
    poss Up         s = floor s < 10
@@ -80,7 +100,7 @@ rew' s = Reward (x, y)
          y  = m - minimum (0 : map (\n -> abs (n - floor s)) bs)
 
 update :: Sit A -> Sit A
-update s = s{rew = rew' s, syncable = False}
+update s = s{rew = rew' s}
 
 on :: Floor -> Sit A -> Bool
 on n s = n `elem` onButtons s
@@ -92,8 +112,6 @@ goFloor n = until (\s -> floor s == n)
                   (else_ (prim Down)))
 
 control :: Prog A
---control = monitor [ prim ToggleFan, prim Ring `Seq` prim Ring ]
---control = monitor [ prim ToggleFan, while alarm (prim Ring) ]
 control = monitor [ when (\s -> temp s < -2 && fan s) (prim ToggleFan)
                   , when (\s -> temp s > 2 && not (fan s)) (prim ToggleFan)
                   , while alarm (prim Ring)
@@ -117,7 +135,6 @@ instance IOBAT A IO where
    syncA a          s = putStrLn (show a ++": "++ show (do_ a s)) >> exog (do_ a s)
 
 main :: IO ()
-main = do --putStrLn $ show control
-          _ <- dooSync' (treeNDIO control s0)
+main = do _ <- dooSync' (treeNDIO control s0)
           return ()
 
