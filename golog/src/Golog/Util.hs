@@ -4,7 +4,7 @@
 module Golog.Util
    (HistBAT(..), defaultPredSit, sit2list, list2sit, append2sit,
     trans', transStar, transTrace, transTrace',
-    doo, doo', dooSync') where
+    doo, doo', dooSync', dooSyncP) where
 
 import Data.Maybe (listToMaybe)
 import qualified Data.Tree as T
@@ -90,6 +90,12 @@ dooSync' c | final c   = return (Just c)
            | otherwise = case trans' c of
                               Just c' -> sync c' >>= dooSync'
                               Nothing -> return Nothing
+
+dooSyncP :: Monad m => (Sit a -> Bool) -> ConfIO a m -> m (Maybe (ConfIO a m))
+dooSyncP f c | final c   = return $ Just c
+             | otherwise = case map sync $ filter (f.sit) $ concat $ tail $ transStar c of
+                                []  -> return Nothing
+                                x:_ -> x >>= dooSyncP f
 
 -- toLists :: Tree a -> [[a]]
 -- toLists Empty     = [[]]

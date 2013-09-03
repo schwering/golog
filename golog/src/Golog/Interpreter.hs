@@ -100,9 +100,9 @@ treeNDIO :: IOBAT a m => Prog a -> Sit a -> ConfIO a m
 treeNDIO p sz = cnf sz (ast p)
    where cnf s t = scan (exec f) (root s t) t
          root s t = Node s (SyncIO $ return (cnf s t))
-         f pl a t = (SyncIO $ do c <- runSync pl
-                                 s' <- syncA a (sit c)
-                                 return (cnf s' t))
+         f pl a t = SyncIO $ do c <- runSync pl
+                                s' <- syncA a (sit c)
+                                return (cnf s' t)
 
 treeDTIO :: (DTBAT a, IOBAT a m) => Depth -> Prog a -> Sit a -> ConfIO a m
 treeDTIO l p sz = f (treeNDIO p sz)

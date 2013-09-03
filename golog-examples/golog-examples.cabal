@@ -16,6 +16,13 @@ Executable ElevatorBasic
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 
+Executable ElevatorReactive
+    Hs-Source-Dirs:  elevator-reactive
+    Main-Is:         ElevatorReactive.hs
+    Build-Depends:   base, golog
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
+
 Executable Maze
     Hs-Source-Dirs:  maze
     Main-Is:         Maze.hs
