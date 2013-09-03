@@ -135,6 +135,6 @@ instance IOBAT A IO where
    syncA a          s = putStrLn (show a ++": "++ show (do_ a s)) >> exog (do_ a s)
 
 main :: IO ()
-main = do _ <- dooSync' (treeNDIO control s0)
+main = do _ <- dooIO (const Online) (treeNDIO control s0)
           return ()
 

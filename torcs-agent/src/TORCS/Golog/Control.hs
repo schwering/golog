@@ -79,7 +79,7 @@ instance DTBAT Prim1 where
 instance IOBAT Prim1 IO where
    syncA a s =
       do --putStrLn $ show a
-         c2 <- dooSync' (refine a s (assoc s))
+         c2 <- dooIO (const Online) (refine a s (assoc s))
          if isNothing c2
             then fail $ "syncA: refinement of " ++ show a ++ " failed"
             else return ()

@@ -247,7 +247,15 @@ main = do
                             , primf left
                             , primf right]) `Seq`
                test (\s -> pos s == goalPos)
-       tree  = treeDTIO lookahead prog s0 :: ConfIO (Prim Regr) IO
+       tree = treeDTIO lookahead prog s0 :: ConfIO (Prim Regr) IO
+       mode c = case history (sit c) of []         -> Offline BFS
+                                        Test _ : _ -> Offline BFS
+                                        Left   : _ -> Online
+                                        Right  : _ -> Offline DFS
+                                        Up     : _ -> Offline BFS
+                                        Down   : _ -> Offline BFS
+                                        _          -> Online
+       mode _ = Online
        --confs = transTrace' tree
    putStrLn $ show $ startPos
    putStrLn $ show $ goalPos
@@ -258,7 +266,7 @@ main = do
                   )) $ map sit confs
 -}
    --let conf = last confs
-   Just conf <- dooSync' tree
+   Just conf <- dooIO mode tree
    -- The following lines just test that subsequent syncs have no effect:
    let s = sit conf
    putStrLn $ "Actions: " ++ show (sitlen s)

@@ -22,7 +22,7 @@ pr :: [Sit (Prim (Qty Double))]
 pr = let obs  = obsprog $ take 100 O.observations
          cand = pass D B `Conc` overtake H B
          prog = obs `Conc` cand
-     in map sit $ transTrace' (treeDT lookahead prog s0)
+     in map sit $ transStarDFS' (treeDT lookahead prog s0)
      --in map (\(s,_,_) -> s) $ do3 lookahead prog s0
 
 

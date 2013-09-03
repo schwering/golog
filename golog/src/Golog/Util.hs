@@ -3,12 +3,14 @@
 
 module Golog.Util
    (HistBAT(..), defaultPredSit, sit2list, list2sit, append2sit,
-    trans', transStar, transTrace, transTrace',
-    doo, doo', dooSync', dooSyncP) where
+    trans', transStarBFS, transStarDFS, transStarDFS',
+    doo, doo',
+    Mode(..), Search(..), dooIO) where
 
+import Control.Monad ((>=>))
 import Data.Maybe (listToMaybe)
+import qualified Data.Foldable as F
 import qualified Data.Tree as T
---import Control.Monad.State.Lazy
 import Golog.Interpreter
 
 -- Class for situations which store a history.
@@ -54,6 +56,12 @@ list2sit = append2sit s0
 append2sit :: BAT a => Sit a -> [a] -> Sit a
 append2sit = foldl (flip do_)
 
+-- | Search mode used in during 'Offline' execution in 'dooIO'.
+data Search = BFS | DFS deriving Eq
+
+-- | Execution mode in 'dooIO'.
+data Mode = Online | Offline Search deriving Eq
+
 --- | Variant of 'trans' which commits to the first option.
 trans' :: Conf a b -> Maybe (Conf a b)
 trans' = listToMaybe . trans
@@ -61,41 +69,61 @@ trans' = listToMaybe . trans
 -- | Returns a list of lists of configurations where the @n@-th list of
 -- configuration is the result of applying 'trans' to the configurations in the
 -- @n-1@-th list.
-transStar :: Conf a b -> [[Conf a b]]
-transStar c = takeWhile (not.null) $ iterate (concatMap trans) [c]
+transStarBFS :: Conf a b -> [[Conf a b]]
+transStarBFS c = takeWhile (not.null) $ iterate (concatMap trans) [c]
 
 -- Returns a tree of configurations where each branch indicates the various
 -- opportunities in the respective configuration.
 -- We use a tree instead of lists of lists because the latter for reasons which
 -- I don't understand has some issues with lazy evaluation.
-transTrace :: Conf a b -> T.Tree (Conf a b)
-transTrace c = T.Node c (map transTrace (trans c))
+transStarDFS :: Conf a b -> T.Tree (Conf a b)
+transStarDFS c = T.Node c (map transStarDFS (trans c))
 
--- | Variant of 'transTrace' which commits to the first option in each
+-- | Variant of 'transStarDFS' which commits to the first option in each
 -- transition.
-transTrace' :: Conf a b -> [Conf a b]
-transTrace' c = c : case trans' c of Just c' -> transTrace' c'
-                                     Nothing -> []
+transStarDFS' :: Conf a b -> [Conf a b]
+transStarDFS' c = c : maybe [] transStarDFS' (trans' c)
 
 -- | Returns the list of final configurations reached from the given one.
 doo :: Conf a b -> [Conf a b]
-doo c = concat $ map (filter final) (transStar c)
+doo c = concat $ map (filter final) (transStarBFS c)
 
 -- | Variant of 'doo' which commits to the first option in each configuration.
 doo' :: Conf a b -> Maybe (Conf a b)
 doo' = listToMaybe . doo
 
-dooSync' :: Monad m => ConfIO a m -> m (Maybe (ConfIO a m))
-dooSync' c | final c   = return (Just c)
-           | otherwise = case trans' c of
-                              Just c' -> sync c' >>= dooSync'
-                              Nothing -> return Nothing
-
-dooSyncP :: Monad m => (Sit a -> Bool) -> ConfIO a m -> m (Maybe (ConfIO a m))
-dooSyncP f c | final c   = return $ Just c
-             | otherwise = case map sync $ filter (f.sit) $ concat $ tail $ transStar c of
-                                []  -> return Nothing
-                                x:_ -> x >>= dooSyncP f
+-- | Execution in online and/or offline mode.
+-- The first parameter may assign to a configuration whether at this point
+-- 'dooIO' should continue with 'Online' execution or 'Offline' execution,
+-- where the latter distinguishes between 'BFS' and 'DFS'.
+--
+-- The latest point the current configuration is 'sync'ed is when it is 'final'
+-- and execution therefore ends.
+-- This is also the case for 'Offline' execution, i.e., 'dooIO' implicitly
+-- switches to 'Online' mode at the end.
+--
+-- Pre-'final' 'sync's happen when for each configuration which is the successor
+-- of a configuration which is assigned mode 'Online'.
+--
+-- Thus, if all configurations are assigned mode 'Online', 'sync' is called
+-- after each transition.
+-- On the other hand, if some configuration with 'Offline' mode and search
+-- strategy 'DFS' is encountered, 'dooIO' starts a depth-first search which ends
+-- successfully when it hits a 'final' configuration or a configuration with a
+-- different mode. In the former case, the configuration is 'sync'ed and
+-- returned. In the latter case, execution continues with the new mode. If this
+-- new mode is 'Online', this means a pre-'final' 'sync'hronization point. If it
+-- is 'Offline', it continues with the new search strategy.
+dooIO :: Monad m => (ConfIO a m -> Mode) -> ConfIO a m -> m (Maybe (ConfIO a m))
+dooIO m c = case (m c,       final c) of
+                 (Offline e, False) -> h (filter stop (transStar e c)) (dooIO m)
+                 (Online,    False) -> h (trans c) (sync >=> dooIO m)
+                 (_,         True)  -> sync c >>= return . Just
+   where transStar BFS = concat . tail . transStarBFS
+         transStar DFS = tail . F.foldr (:) [] . transStarDFS
+         stop c'       = final c' || m c' /= m c
+         h []    _     = return Nothing
+         h (x:_) f     = f x
 
 -- toLists :: Tree a -> [[a]]
 -- toLists Empty     = [[]]
