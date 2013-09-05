@@ -130,13 +130,6 @@ dooIO m c = case (m c,       final c) of
 -- toLists (Alt ts)  = concat (map toLists ts)
 -- toLists (Val x t) = [x:xs | xs <- toLists t]
 
-{-
-exec :: BAT a => a -> State (Maybe (Sit a)) ()
-exec a = state f
-   where f (Just s) | poss a s = ((), Just (do_ a s))
-         f _                   = ((), Nothing)
--}
-
 instance Show a => Show (Atom a) where
    show (Prim a)  = "Prim " ++ show a
    show (PrimF _) = "PrimF <...>"

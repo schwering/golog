@@ -30,3 +30,10 @@ Executable Maze
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 
+Executable Traffic
+    Hs-Source-Dirs:  traffic
+    Main-Is:         Traffic.hs
+    Build-Depends:   base, containers, golog
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
+
