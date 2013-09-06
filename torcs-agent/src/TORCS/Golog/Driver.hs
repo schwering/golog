@@ -93,41 +93,43 @@ instance Driver GD where
                         ccRef <- newIORef defaultControl
                         sitVar <- newEmptySV
                         gologThread <- forkOS $ W.gologAgent csVar ccRef sitVar
-                        visThread <- forkOS $ visualize sitVar
+                        visThread <- forkOS $ return () -- visualize sitVar
                         return (Context csVar ccRef sitVar gologThread visThread)
 
    command ctx@(Context csVar ccRef _ _ _) cs' =
       do writeSV csVar cs'
-         --_ <- printf (kred ++
-         --             "time = %.2f  " ++
-         --             "pos = %.2f  " ++
-         --             "angle = %.2f  " ++
-         --             "vX = %.2f  " ++
-         --             "vY = %.2f  " ++
-         --             "track[-5] = %.2f s = %.2f m " ++
-         --             "track[0] = %.2f s = %.2f m " ++
-         --             "track[5] = %.2f s = %.2f m " ++
-         --             knrm ++ "\n")
-         --      (curLapTime cs')
-         --      (trackPos cs')
-         --      (deg $ rad2deg $ angle cs')
-         --      (speedX cs')
-         --      (speedY cs')
-         --      (trackTime cs' Neg5) (trackDist cs' Neg5)
-         --      (trackTime cs' Zero)  (trackDist cs' Zero)
-         --      (trackTime cs' Pos5) (trackDist cs' Pos5)
+         _ <- printf (kred ++
+                      "time = %.2f  " ++
+                      "pos = %.2f  " ++
+                      "rpm = %.2f  " ++
+                      "angle = %.2f  " ++
+                      "vX = %.2f  " ++
+                      "vY = %.2f  " ++
+                      --"track[-5] = %.2f s = %.2f m " ++
+                      "track[0] = %.2f s = %.2f m " ++
+                      --"track[5] = %.2f s = %.2f m " ++
+                      knrm ++ "\n")
+               (curLapTime cs')
+               (trackPos cs')
+               (rpm cs')
+               (deg $ rad2deg $ angle cs')
+               (speedX cs')
+               (speedY cs')
+               --(trackTime cs' Neg5) (trackDist cs' Neg5)
+               (trackTime cs' Zero)  (trackDist cs' Zero)
+               --(trackTime cs' Pos5) (trackDist cs' Pos5)
          threadDelay (tickDurMicroSec * 8 `div` 10)
          cc' <- readIORef ccRef
-         --printf (kblu ++
-         --        "accel = %.2f  " ++
-         --        "brake = %.2f  " ++
-         --        "gear = %d  " ++
-         --        "steer = %.2f  " ++
-         --        knrm ++ "\n")
-         --       (accelCmd cc')
-         --       (brakeCmd cc')
-         --       (gearCmd cc')
-         --       (steerCmd cc')
+         printf (kblu ++
+                 "accel = %.2f  " ++
+                 "brake = %.2f  " ++
+                 "gear = %d  " ++
+                 "steer = %.2f  " ++
+                 knrm ++ "\n")
+                (accelCmd cc')
+                (brakeCmd cc')
+                (gearCmd cc')
+                (steerCmd cc')
          return (ctx, cc')
 
    shutdown ctx =

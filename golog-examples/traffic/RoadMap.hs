@@ -1,7 +1,7 @@
 module RoadMap
   (Direction(..), ColorString, TrafficLightState(..), LUT, Street, World,
    color, maxX, maxY, lut, carLut, switchLights, mkStreet, mkWorld,
-   reachable) where
+   direction, successor, reachable) where
 
 import Car
 import Data.List (minimumBy)
@@ -49,15 +49,26 @@ neighbors (x,y) = [(x',y') | x' <- [x-1,x,x+1], y' <- [y-1,y,y+1], (x,y) /= (x',
 -- | Returns the cardinal direction in which @p1@ lies from the point of view of
 -- @p0@.
 direction :: Ord a => (a, a) -> (a, a) -> Direction
-direction p0 p1 | fst p0 <  fst p1 && snd p0 == snd p1 = East
-                | fst p0 >  fst p1 && snd p0 == snd p1 = West
-                | fst p0 == fst p1 && snd p0 <  snd p1 = South
-                | fst p0 == fst p1 && snd p0 >  snd p1 = North
-                | fst p0 <  fst p1 && snd p0 <  snd p1 = SouthEast
-                | fst p0 >  fst p1 && snd p0 <  snd p1 = SouthWest
-                | fst p0 <  fst p1 && snd p0 >  snd p1 = NorthEast
-                | fst p0 >  fst p1 && snd p0 >  snd p1 = NorthWest
-                | otherwise                            = error "direction: same points"
+direction (x0,y0) (x1,y1) | x0 <  x1 && y0 == y1 = East
+                          | x0 >  x1 && y0 == y1 = West
+                          | x0 == x1 && y0 <  y1 = South
+                          | x0 == x1 && y0 >  y1 = North
+                          | x0 <  x1 && y0 <  y1 = SouthEast
+                          | x0 >  x1 && y0 <  y1 = SouthWest
+                          | x0 <  x1 && y0 >  y1 = NorthEast
+                          | x0 >  x1 && y0 >  y1 = NorthWest
+                          | otherwise            = error "direction: same points"
+
+
+successor :: Ord a => (a, a) -> Direction -> (a, a)
+successor (x,y) West      = (x-1,y)
+successor (x,y) North     = (x,y-1)
+successor (x,y) East      = (x+1,y)
+successor (x,y) South     = (x,y+1)
+successor (x,y) NorthWest = (x-1,y-1)
+successor (x,y) NorthEast = (x+1,y-1)
+successor (x,y) SouthWest = (x-1,y+1)
+successor (x,y) SouthEast = (x+1,y+1)
 
 -- | Points legally reachable from the current coordinate.
 -- This depends on the road segments and the current traffic lights.

@@ -6,6 +6,7 @@ import TORCS.Golog.Driver
 
 main :: IO ()
 main = do args <- getArgs
-          let args' = args ++ ["localhost", "3001"]
-          run (gologDriver) (args' !! 0) (args' !! 1)
+          let host = if length args >= 1 then args !! 0 else "localhost"
+          let port = if length args >= 2 then args !! 1 else "3001"
+          run gologDriver host port
 

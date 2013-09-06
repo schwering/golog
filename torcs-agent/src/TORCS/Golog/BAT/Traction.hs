@@ -71,7 +71,7 @@ accel x = accel' (const x)
 -- | Accelerates unless the steering angle is too steep.
 accel' :: (Sit A -> Double) -> Prog A
 accel' x = primf action
-   where action s | speedX (cs s) > 5 && abs (currentSteeringAngle (cc s)) > maxSteeringAngle (cs s) = Accel (avgAccel s / 2)
+   where action s | speedX (cs s) > 5 && abs (currentSteeringAngle (cc s)) > maxSteeringAngle (cs s) = Accel (avgAccel s / 4)
                   | otherwise                                                                        = Accel (x s)
 
 brake :: Double -> Prog A
@@ -105,7 +105,7 @@ steer x = steer' (const x)
 -- If the steering is considered too strong with respect to the
 -- 'maxSteeringAngle', the car is decelerated.
 steer' :: (Sit A -> Double) -> Prog A
-steer' x = primf action `Seq` if_ tooMuchSteering (then_ slowDown) (else_ Nil)
+steer' x = primf action `Seq` when tooMuchSteering slowDown
    where action s = Steer (x s)
          tooMuchSteering s = currentSteeringAngle (cc s) > maxSteeringAngle (cs s)
          slowDown = brake' (\s -> max 0.1 (brakeCmd (cc s))) `Seq` accel 0

@@ -20,11 +20,12 @@ instance BAT A where
       cs       :: CarState,
       cc       :: CarControl,
       ccRef    :: IORef CarControl,
+      avgRpm   :: Double,
       lastTime :: Double,
       sitLen   :: Int
    }
 
-   s0 = Sit defaultState defaultControl undefined 0 0
+   s0 = Sit defaultState defaultControl undefined 0 (-10) 0
 
    do_ a@GearDown  s = s{cc = (cc s){gearCmd = gear (cs s) - 1},
                          lastTime = curLapTime (cs s),
@@ -33,6 +34,7 @@ instance BAT A where
                          lastTime = curLapTime (cs s),
                          sitLen = sitLen s + 1}
    do_ (Sense cs') s = s{cs = cs',
+                         avgRpm = (rpm cs' + avgRpm s) / 2,
                          sitLen = sitLen s + 1}
    do_ (Test _)    s = s
 
@@ -64,13 +66,10 @@ instance IOBAT A IO where
 -- To thrashing, shifting up is only allowed after a certain time period has
 -- passed since the last change.
 transmission :: Prog A
-transmission = if_ gearDownCond (then_
-                  (prim GearDown))
-               (else_ (if_ gearUpCond (then_
-                  (prim GearUp))
-               (else_ Nil)))
-   where gearDownCond s = maybe False (\(lo,_) -> rpm (cs s) < lo) (rpms (gear (cs s)))
-         gearUpCond   s = maybe False (\(_,hi) -> rpm (cs s) > hi && changeOk s) (rpms (gear (cs s)))
+transmission = when gearDownCond (prim GearDown) `Seq`
+               when gearUpCond (prim GearUp)
+   where gearDownCond s = maybe False (\(lo,_) -> avgRpm s < lo && changeOk s) (rpms (gear (cs s)))
+         gearUpCond   s = maybe False (\(_,hi) -> avgRpm s > hi && changeOk s) (rpms (gear (cs s)))
          changeOk s = curLapTime (cs s) - lastTime s > 1 -- min duration before shifting up
          rpms :: Int -> Maybe (Double, Double)
          rpms 0 = Just (-1/0,    1)

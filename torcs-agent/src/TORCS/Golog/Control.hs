@@ -330,13 +330,11 @@ steerTrajectory' = primf (\s -> Steer (lock s))
          diff s   = tgtPos s - curPos s
 
 gologAgent :: IORef CarState -> IORef CarControl -> Sem.SSem -> IO ()
-gologAgent csRef ccRef tickSem = loop conf
-   where loop c = do let cs = trans c
-                     if null cs
-                        then do putStrLn "EOP"
-                        else do let c' = head cs
-                                c'' <- sync c'
-                                loop c''
+gologAgent csRef ccRef tickSem = loop' conf
+   where loop' c = do let cs = trans c
+                      if null cs
+                         then putStrLn "EOP"
+                         else sync (head cs) >>= loop'
          conf   = treeDTIO 3 p s01 :: Conf1
          p      = star $ Nondet $ map prim [AntiDrift, AntiBlock, AntiSlip,
                                             ApproachLeft, DriveCenter,

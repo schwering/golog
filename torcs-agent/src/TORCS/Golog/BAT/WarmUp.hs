@@ -80,7 +80,7 @@ instance IOBAT A IO where
          return s'{pc = pc'}
 
 keepCentered :: Sit A -> Prog T.A
-keepCentered s = atomic $ ifThenElse tooFast slowDown speedUp `Seq` steer
+keepCentered s = atomic $ if_ tooFast (then_ slowDown) (else_ speedUp) `Seq` steer
    where tooFast _ | speedX (cs s) < kmh2ms 50  = False
                    | brakeD >= beamD            = True
                    | speedX (cs s) > kmh2ms 225 = True
