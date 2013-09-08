@@ -1,68 +1,61 @@
 -- | 2d drawing utilities.
-module TORCS.OpenGL where
+module TORCS.OpenGL
+  (white, black, red, green, blue, yellow, cyan, magenta,
+   Shape, draw, rotate, scale, translate, mirrorV, mirrorH,
+   replaceInfByOne, replaceInfBy,
+   mkLine, mkLine', mkPolyline, mkRect, mkRect',
+   runOpenGL) where
 
 import Data.IORef
-import Graphics.Rendering.OpenGL hiding (Color, Point, Line, scale)
-import Graphics.UI.GLUT hiding (Color, Line, Point, scale)
+import Graphics.Rendering.OpenGL hiding (RGB, scale, translate, rotate)
+import Graphics.UI.GLUT hiding (RGB, scale, translate, rotate)
 
-data Color = Color Double Double Double Double deriving Show
+data RGB = RGB Double Double Double deriving Show
 
-white, black, red, green, blue, yellow, cyan, magenta :: Color
-white   = Color 1 1 1 0
-black   = Color 0 0 0 0
-red     = Color 1 0 0 0
-green   = Color 0 1 0 0
-blue    = Color 0 0 1 0
-yellow  = Color 1 1 0 0
-magenta = Color 1 0 1 0
-cyan    = Color 0 1 1 0
+white, black, red, green, blue, yellow, cyan, magenta :: RGB
+white   = RGB 1 1 1
+black   = RGB 0 0 0
+red     = RGB 1 0 0
+green   = RGB 0 1 0
+blue    = RGB 0 0 1
+yellow  = RGB 1 1 0
+magenta = RGB 1 0 1
+cyan    = RGB 0 1 1
 
-light :: Color -> Color
-light (Color r g b alpha) = Color r g b (alpha / 2)
+data Shape = Shape PrimitiveMode RGB [(Double, Double)] deriving Show
 
-data ShapeType = Point | Line | Rectangle deriving Show
-data Shape = Shape ShapeType Color [(Double, Double)] deriving Show
+draw :: Shape -> IO ()
+draw (Shape m (RGB r g b) ps) = renderPrimitive m $ do
+   color $ Color4 (realToFrac r) (realToFrac g) (realToFrac b) (0 :: GLfloat)
+   mapM_ (\(x,y) -> vertex $ Vertex3 (realToFrac x) (realToFrac y) (0::GLfloat)) ps
 
-type2mode :: ShapeType -> PrimitiveMode
-type2mode Point = Points
-type2mode Line = LineStrip
-type2mode Rectangle = Polygon
+rotate :: Double -> Shape -> Shape
+rotate rad (Shape m c ps) = Shape m c (map f ps)
+   where f (x, y) = (x', y')
+            where x' | sin rad == 0 = x * cos rad
+                     | cos rad == 0 = - y * sin rad
+                     | otherwise    = x * cos rad - y * sin rad
+                  y' | sin rad == 0 = y * cos rad
+                     | cos rad == 0 = x * sin rad
+                     | otherwise    = x * sin rad + y * cos rad
+scale :: Double -> Shape -> Shape
+scale n (Shape m c ps) = Shape m c (map f ps)
+   where f (x, y) = (x * n, y * n)
 
-class Drawable a where
-   draw :: a -> IO ()
+translate :: (Double, Double) -> Shape -> Shape
+translate (x', y') (Shape m c ps) = Shape m c (map f ps)
+   where f (x, y) = (x + x', y + y')
 
-class Transformable a where
-   rotate    :: Double -> a -> a
-   scale     :: Double -> a -> a
-   translate :: (Double,Double) -> a -> a
-   mirrorV   :: a -> a
-   mirrorH   :: a -> a
+mirrorV :: Shape -> Shape
+mirrorV (Shape m c ps) = Shape m c (map f ps)
+   where f (x, y) = (x, -y)
 
-instance Drawable Shape where
-   draw (Shape t (Color r g b a) ps) = renderPrimitive (type2mode t) $ do
-      color $ Color4 (realToFrac r) (realToFrac g) (realToFrac b) ((realToFrac a) :: GLfloat)
-      mapM_ (\(x,y) -> vertex $ Vertex3 (realToFrac x) (realToFrac y) (0::GLfloat)) ps
-
-instance Transformable Shape where
-   rotate rad (Shape t c ps) = Shape t c (map f ps)
-      where f (x, y) = (x', y')
-               where x' | sin rad == 0 = x * cos rad
-                        | cos rad == 0 = - y * sin rad
-                        | otherwise    = x * cos rad - y * sin rad
-                     y' | sin rad == 0 = y * cos rad
-                        | cos rad == 0 = x * sin rad
-                        | otherwise    = x * sin rad + y * cos rad
-   scale n (Shape t c ps) = Shape t c (map f ps)
-      where f (x, y) = (x * n, y * n)
-   translate (x', y') (Shape t c ps) = Shape t c (map f ps)
-      where f (x, y) = (x + x', y + y')
-   mirrorV (Shape t c ps) = Shape t c (map f ps)
-      where f (x, y) = (x, -y)
-   mirrorH (Shape t c ps) = Shape t c (map f ps)
-      where f (x, y) = (-x, y)
+mirrorH :: Shape -> Shape
+mirrorH (Shape m c ps) = Shape m c (map f ps)
+   where f (x, y) = (-x, y)
 
 replaceInfByOne :: [Shape] -> [Shape]
-replaceInfByOne = map (\(Shape t c ps) -> Shape t c (map (replaceInfBy 1) ps))
+replaceInfByOne = map (\(Shape m c ps) -> Shape m c (map (replaceInfBy 1) ps))
 
 replaceInfBy :: RealFloat a => a -> (a, a) -> (a, a)
 replaceInfBy z (x', y') = (g x', g y')
@@ -70,24 +63,24 @@ replaceInfBy z (x', y') = (g x', g y')
              | isInfinite x && x < 0 = -z
              | otherwise             = x
 
-mkLine :: Color -> (Double, Double) -> (Double, Double) -> Shape
-mkLine c p1 p2 = Shape Line c [p1,p2]
+mkLine :: RGB -> (Double, Double) -> (Double, Double) -> Shape
+mkLine c p1 p2 = Shape LineStrip c [p1,p2]
 
-mkLine' :: Color -> Double -> Double -> Shape
-mkLine' c phi r = Shape Line c [(0,0), (x,y)]
+mkLine' :: RGB -> Double -> Double -> Shape
+mkLine' c phi r = mkLine c (0,0) (x,y)
    where x | cos phi == 0 = 0
            | otherwise    = r * cos phi
          y | sin phi == 0 = 0
            | otherwise    = r * sin phi
 
-mkPolyline :: Color -> [(Double, Double)] -> Shape
-mkPolyline c ps = Shape Line c ps
+mkPolyline :: RGB -> [(Double, Double)] -> Shape
+mkPolyline c ps = Shape LineStrip c ps
 
-mkRect :: Color -> (Double, Double) -> (Double, Double) -> (Double, Double) -> (Double, Double) -> Shape
-mkRect c p1 p2 p3 p4 = Shape Rectangle c [p1,p2,p3,p4]
+mkRect :: RGB -> (Double, Double) -> (Double, Double) -> (Double, Double) -> (Double, Double) -> Shape
+mkRect c p1 p2 p3 p4 = Shape Polygon c [p1,p2,p3,p4]
 
-mkRect' :: Color -> (Double, Double) -> (Double, Double) -> Shape
-mkRect' c (x,y) (w,h) = Shape Rectangle c [(x-w/2,y+h/2), (x+w/2,y+h/2), (x+w/2,y-h/2), (x-w/2,y-h/2)]
+mkRect' :: RGB -> (Double, Double) -> (Double, Double) -> Shape
+mkRect' c (x,y) (w,h) = Shape Polygon c [(x-w/2,y+h/2), (x+w/2,y+h/2), (x+w/2,y-h/2), (x-w/2,y-h/2)]
 
 runOpenGL :: IO [Shape] -> IO ()
 runOpenGL getShapes = do

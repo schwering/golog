@@ -9,6 +9,13 @@ Build-Type: Simple
 Description:
     Example worlds using Golog.
 
+Executable Wumpus
+    Hs-Source-Dirs:  wumpus
+    Main-Is:         Wumpus.hs
+    Build-Depends:   base, golog
+    GHC-Options:     -Wall -O -rtsopts
+    --GHC-Prof-Options:-prof -auto-all
+
 Executable ElevatorBasic
     Hs-Source-Dirs:  elevator-basic
     Main-Is:         ElevatorBasic.hs
