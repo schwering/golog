@@ -2,7 +2,7 @@
 
 module Golog.Interpreter
   (BAT(..), DTBAT(..), IOBAT(..),
-   Atom(..), PseudoAtom(..), Prog(..), Conf, ConfIO, Depth,
+   PseudoAtom(..), Prog(..), Conf, ConfIO, Depth,
    treeND, treeDT, treeNDIO, treeDTIO, final, trans, sit, sync) where
 
 import Control.Monad (liftM)
@@ -23,8 +23,7 @@ class (BAT a, Ord (Reward a)) => DTBAT a where
 class (BAT a, Monad m) => IOBAT a m where
    syncA         :: a -> Sit a -> m (Sit a)
 
-data Atom a       = Prim a | PrimF (Sit a -> a)
-data PseudoAtom a = Atom (Atom a) | Complex (Prog a)
+data PseudoAtom a = Atom (Sit a -> a) | Complex (Prog a)
 data Prog a       = Seq (Prog a) (Prog a)  | Nondet [Prog a]
                   | Conc (Prog a) (Prog a) | PseudoAtom (PseudoAtom a) | Nil
 
@@ -71,15 +70,16 @@ itl (Alt ts)       t2             = Alt (map (\t1 -> itl t1 t2) ts)
 itl t1             (Alt ts)       = Alt (map (\t2 -> itl t1 t2) ts)
 itl t1@(Val x1 r1) t2@(Val x2 r2) = Alt [Val x1 (itl t2 r1), Val x2 (itl t1 r2)]
 
-ast :: Prog a -> Tree (Atom a)
+ast :: Prog a -> Tree (Sit a -> a)
 ast p' = rec (ast' p')
-   where rec :: Tree (PseudoAtom a) -> Tree (Atom a)
+   where rec :: Tree (PseudoAtom a) -> Tree (Sit a -> a)
          rec Empty               = Empty
          rec (Alt ts)            = Alt (map rec ts)
          rec (Val (Atom a)    t) = Val a (rec t)
          rec (Val (Complex p) t) = mappend (ast p) (rec t)
          ast' :: Prog a -> Tree (PseudoAtom a)
          ast' (Seq p1 p2)    = mappend (ast' p1) (ast' p2)
+         ast' (Nondet [])    = Empty
          ast' (Nondet ps)    = Alt (map ast' ps)
          ast' (Conc p1 p2)   = itl (ast' p1) (ast' p2)
          ast' (PseudoAtom a) = Val a Empty
@@ -91,30 +91,27 @@ type ConfIO a m = Conf a (SyncIO a m)
 newtype SyncIO a m = SyncIO { runSync :: m (ConfIO a m) }
 
 treeND :: BAT a => Prog a -> Sit a -> Conf a ()
-treeND p sz = scan (exec (\_ _ _ -> ())) (Node sz ()) (ast p)
+treeND p sz = scan e (Node sz ()) (ast p)
+   where e (Node s _) a _ | poss (a s) s = Node (do_ (a s) s) ()
+         e _          _ _                = Flop
 
 treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> Conf a ()
-treeDT l p sz = resolveDT l (treeND p sz)
+treeDT l = (resolveDT l .) . treeND
 
 treeNDIO :: IOBAT a m => Prog a -> Sit a -> ConfIO a m
-treeNDIO p sz = cnf sz (ast p)
-   where cnf s t = scan (exec f) (root s t) t
-         root s t = Node s (SyncIO $ return (cnf s t))
-         f pl a t = SyncIO $ do c <- runSync pl
-                                s' <- syncA a (sit c)
-                                return (cnf s' t)
+treeNDIO = cnf . ast
+   where cnf t s = scan e (Node s (SyncIO $ return (cnf t s))) t
+         e (Node s pl) a t | poss (a s) s = Node (do_ (a s) s) (SyncIO $ do
+                                                     c <- runSync pl
+                                                     s' <- syncA (a s) (sit c)
+                                                     return (cnf t s'))
+         e _           _ _                = Flop
 
 treeDTIO :: (DTBAT a, IOBAT a m) => Depth -> Prog a -> Sit a -> ConfIO a m
-treeDTIO l p sz = f (treeNDIO p sz)
+treeDTIO l = (f .) . treeNDIO
    where f = fmap g . resolveDT l
          g (Node s (SyncIO c)) = Node s (SyncIO $ liftM f c)
          g Flop                = Flop
-
-exec :: BAT a => (b -> a -> Tree (Atom a) -> b) ->
-                 Node a b -> Atom a -> Tree (Atom a) -> Node a b
-exec f (Node s pl)  (Prim a)  t | poss a s = Node (do_ a s) (f pl a t)
-exec f c@(Node s _) (PrimF a) t            = exec f c (Prim (a s)) t
-exec _ _            _         _            = Flop
 
 resolveDT :: DTBAT a => Depth -> Conf a b -> Conf a b
 resolveDT l = resolve chooseDT Flop

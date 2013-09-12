@@ -26,13 +26,6 @@ import GHC.Stats
 --import Data.ByteString.Char8 (pack)
 -- import System.Remote.Monitoring
 
-class Show a => ShowPart a where
-   showPart :: Int -> a -> String
-   partSize :: a -> Int
-
-   showPart _ = show
-   partSize _ = 0
-
 instance Show a => Show (Prim (Qty a)) where
    show (Wait t) = "Wait " ++ show (unwrap t)
    show (Accel b q) = "Accel " ++ show b ++ " " ++ show (unwrap q)
@@ -47,88 +40,8 @@ instance Show a => Show (Prim (Qty a)) where
    show (Msg s) = "Msg " ++ s
    show (Test _) = "Test <...>"
 
-{-
-instance Show Finality where
-   show Final = "Final"
-   show Nonfinal = "Nonfinal"
--}
-
-{-
-instance Show a => Show (Atom a) where
-   show (Prim a)  = "Prim(" ++ (show a) ++ ")"
-   show (PrimF _) = "PrimF(...)"
-   show (Test _)  = "Test(...)"
--}
-
-{-
-instance Show a => Show (PseudoAtom a) where
-   show (Atom a) = "Atom(" ++ (show a) ++ ")"
-   show (Complex p) = "Complex(" ++ (show p) ++ ")"
-
-instance Show a => Show (Prog a) where
-   show (Seq p1 p2) = "Seq(" ++ (show p1) ++ " " ++ (show p2) ++ ")"
-   --show (Nondet p1 p2) = "Nondet(" ++ (show p1) ++ " " ++ (show p2) ++ ")"
-   show (Nondet ps) = "Nondet[ " ++ concat (map (\p -> show p ++" ") ps) ++ "]"
-   show (Conc p1 p2) = "Conc(" ++ (show p1) ++ " " ++ (show p2) ++ ")"
-   --show (Star p) = "Star(" ++ (show p) ++ ")"
-   --show (Pick _ _ _) = "Pick(...)"
-   show (PseudoAtom p) = "PseudoAtom(" ++ (show p) ++ ")"
-   show Nil = "nil"
--}
-
 instance Show (Sit (Prim (Qty Double))) where
    show = show . reverse . sit2list
-
-{-
-instance ShowPart c => Show (Tree a b c) where
-   show = showTree 0 0
--}
-
-instance ShowPart Double where
---instance ShowPart Prim where
-instance ShowPart a => ShowPart (Prim (Qty a)) where
---instance ShowPart Finality where
-instance ShowPart a => ShowPart (Atom a) where
-instance ShowPart a => ShowPart (PseudoAtom a) where
-instance ShowPart a => ShowPart (Prog a) where
-
-instance ShowPart (Sit (Prim (Qty Double))) where
-   showPart n s = show (drop n (sit2list s))
-
-{-
-instance ShowPart (Conf (Prim (Qty Double))) where
-   showPart n (s,r,d,f) = "("++ showPart n s ++", "++ show r ++", "++ show d ++", "++ show f ++")"
-   partSize (s,_,_,_) = length (sit2list s)
--}
-
-{-
-showTree :: ShowPart c => Int -> Int -> Tree a b c -> String
-showTree n _ _ | n > 100 = (replicate (2*n) ' ') ++ "...\n"
-showTree n _ Empty = (replicate (2*n) ' ') ++ "Empty\n"
-showTree n m (Leaf x) = (replicate (2*n) ' ') ++ "Leaf " ++ showPart m x ++ "\n"
-showTree n m (Parent x t) = (replicate (2*n) ' ') ++ "Parent " ++ showPart m x ++ "\n" ++ (showTree (n+1) (partSize x) t)
-showTree n m (Branch t1 t2) = (replicate (2*n) ' ') ++ "Branch\n" ++ (showTree (n+1) m t1) ++ (showTree (n+1) m t2)
-showTree n _ (Sprout _ _ _) = (replicate (2*n) ' ') ++ "Sprout g, <unknown tree>\n"
--}
-
-{-
-data Prim = A | B | C | D | E Double deriving Show
-
-instance BAT Prim where
-   poss D _ = False
-   poss _ _ = True
-
-   reward A s = case s of Do A _ -> 0
-                          _      -> 0
-   reward B s = case s of Do B _ -> 1
-                          _      -> 0
-   reward C s = case s of Do C _ -> 2
-                          _      -> 0
-   reward D s = case s of Do D _ -> 3
-                          _      -> 0
-   reward (E x) _ = max 0 (-x*x+100)
--}
-
 
 printFluents :: Sit (Prim (Qty Double)) -> IO ()
 printFluents s = case reverse (sit2list s)

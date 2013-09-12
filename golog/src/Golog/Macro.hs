@@ -7,16 +7,19 @@ module Golog.Macro
    forSome, forAll, pick, withCtrl, monitor) where
 
 import Prelude hiding (until)
+import Data.List (foldl', foldl1')
 import Golog.Interpreter
 
 class TestAction a where
    testAction :: (Sit a -> Bool) -> a
+   noop :: a
+   noop = testAction (const True)
 
 prim :: a -> Prog a
-prim = PseudoAtom . Atom . Prim
+prim = PseudoAtom . Atom . const
 
 primf :: (Sit a -> a) -> Prog a
-primf = PseudoAtom . Atom . PrimF
+primf = PseudoAtom . Atom
 
 test :: TestAction a => (Sit a -> Bool) -> Prog a
 test = prim . testAction
@@ -67,7 +70,7 @@ until :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
 until phi = while (not.phi)
 
 forAll :: [b] -> (b -> Prog a) -> Prog a
-forAll xs pf = foldl (\p x -> p `Seq` pf x) Nil xs
+forAll xs pf = foldl' (\p x -> p `Seq` pf x) Nil xs
 
 forSome :: [b] -> (b -> Prog a) -> Prog a
 forSome = pick
@@ -75,18 +78,18 @@ forSome = pick
 pick :: [b] -> (b -> Prog a) -> Prog a
 pick xs pf = Nondet (map pf xs)
 
-mergeAtomic :: Prog a -> Prog a -> Prog a
-mergeAtomic addon p = Nondet $
-   [atomic (addon `Seq` PseudoAtom c) `Seq` p' | (c, p') <- nextPA p]
 
-
--- Branching and looping constructs where the condition and the first atom are
--- atomic.
--- XXX may not work at the moment!
-
+-- | If-then-else construct where the condition and the first atom of the branch
+-- are atomic. This prevents concurrent programs from getting in between of them
+-- (and making flipping the condition just evaluated).
 ifThenElseA :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a -> Prog a
 ifThenElseA phi p1 p2 = Nondet [ mergeAtomic (test phi) p1
                                , mergeAtomic (test (not.phi)) p2 ]
+
+mergeAtomic :: Prog a -> Prog a -> Prog a
+mergeAtomic addon p = case nextPA p of
+   [] -> atomic addon
+   ds -> Nondet [atomic (addon `Seq` PseudoAtom c) `Seq` p' | (c, p') <- ds]
 
 whenA :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
 whenA phi p = ifA phi (then_ p) (else_ Nil)
@@ -133,7 +136,7 @@ withCtrl phi = intersperse (test phi)
 --
 -- This construct is taken from (HOW TO CITE?).
 monitor :: TestAction a => [Prog a] -> Prog a
-monitor = foldl1 intersperse
+monitor = foldl1' intersperse
 
 -- | Injects the first program before every atom of the second program.
 --

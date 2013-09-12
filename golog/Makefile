@@ -6,7 +6,7 @@ all: dist
 	cabal install --force-reinstalls
 
 dist: golog.cabal
-	cabal configure $(PROFILING)
+	cabal configure --enable-tests $(PROFILING)
 
 doc:
 	cabal haddock --hyperlink-source

@@ -8,6 +8,7 @@ module Golog.Util
     Mode(..), Search(..), dooIO) where
 
 import Control.Monad ((>=>))
+import Data.List (foldl', foldl1')
 import Data.Maybe (listToMaybe)
 import qualified Data.Foldable as F
 import qualified Data.Tree as T
@@ -54,7 +55,7 @@ list2sit = append2sit s0
 
 -- | Appends list of actions in given order to situation term as new actions.
 append2sit :: BAT a => Sit a -> [a] -> Sit a
-append2sit = foldl (flip do_)
+append2sit = foldl' (flip do_)
 
 -- | Search mode used in during 'Offline' execution in 'dooIO'.
 data Search = BFS | DFS deriving Eq
@@ -130,18 +131,18 @@ dooIO m c = case (m c,       final c) of
 -- toLists (Alt ts)  = concat (map toLists ts)
 -- toLists (Val x t) = [x:xs | xs <- toLists t]
 
-instance Show a => Show (Atom a) where
-   show (Prim a)  = "Prim " ++ show a
-   show (PrimF _) = "PrimF <...>"
+--instance Show a => Show (Atom a) where
+--   show (Prim a)  = "Prim " ++ show a
+--   show (PrimF _) = "PrimF <...>"
 
-instance Show a => Show (PseudoAtom a) where
-   show (Atom a)    = show a
+instance (BAT a, Show a) => Show (PseudoAtom a) where
+   show (Atom a)    = show (a s0)
    show (Complex a) = "Complex (" ++ show a ++ ")"
 
-instance Show a => Show (Prog a) where
+instance (BAT a, Show a) => Show (Prog a) where
    show (Seq p q)      = "(" ++ show p ++ " `Seq` " ++ show q ++ ")"
    show (Nondet [])    = "Nondet []"
-   show (Nondet ps)    = "Nondet [" ++ foldl1 (\s1 s2 -> s1 ++ ", " ++ s2) (map show ps) ++ "]"
+   show (Nondet ps)    = "Nondet [" ++ foldl1' (\s1 s2 -> s1 ++ ", " ++ s2) (map show ps) ++ "]"
    show (Conc p q)     = "(" ++ show p ++ " `Conc` " ++ show q ++ ")"
    show (PseudoAtom p) = show p
    show Nil            = "Nil"

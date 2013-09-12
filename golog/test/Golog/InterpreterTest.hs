@@ -13,7 +13,6 @@ import Test.QuickCheck.All
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Modifiers
-import Debug.Trace
 
 newtype Lookahead = Lookahead Depth deriving Show
 
@@ -35,8 +34,8 @@ instance DTBAT Int where
 
 instance Monad m => IOBAT Int m where
    -- For our tests, syncA should preserve whether or not a is even or odd.
-   -- Reason: dooSync' performs trans' and then applies sync. If we have a
-   -- program 1;2;3, this leads to
+   -- Reason: dooIO (const Online) performs trans' and then applies sync.
+   -- If we have a program 1;2;3, this leads to
    --    1 --trans--> Just 1 --sync--> 2 --trans--> Nothing
    -- because then 2 (even number) is executed in an even situation (due to
    -- sync).
@@ -129,24 +128,30 @@ prop_sync2 = let t = treeNDIO (p 1 `Seq` Nondet [p i `Seq` p (i+1) | i <- [1..5]
 prop_sync3 = let t = treeNDIO (p 1 `Seq` Nondet [p i `Seq` p (i+1) | i <- [1..5]]) s0
              in sit (fromJust (sync (fromJust (trans' t)))) == do_ 3 s0
 prop_sync4 = let t = treeNDIO (p 1 `Seq` p 2 `Seq` p 3 `Seq` p 4 `Seq` p 5 `Seq`  Nil) s0
-             in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooSync' t))
+             in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
 prop_sync5 = let t = treeNDIO (p 1 `Seq` Nondet [p i `Seq` p (i+1) | i <- [1..5]]) s0
-             in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooSync' t))
+             in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
 
 prop_dtsync1 = let t = treeDTIO 3 (Nondet [p 1, p 3, p 1] `Seq` Nondet [p i | i <- [1,2,3,4,5,4,3,2,1]] `Seq` Nondet [p i | i <- [1,2,3,4,5,4,3,2,1]]) s0
                -- This tests that nondeterminism in results of sync is resolved.
                -- If it isn't, the interpreter executes 3 in the second Nondet.
                in (trans' t >>= sync >>= trans' >>= sync >>= trans' >>= sync >>= (return . sit)) == Just (do_ 7 (do_ 6 (do_ 5 s0)))
 prop_dtsync2 = let t = treeDTIO 3 (p 1 `Seq` p 2 `Seq` p 3 `Seq` p 4 `Seq` p 5 `Seq`  Nil) s0
-               in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooSync' t))
+               in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
 prop_dtsync3 = let t = treeDTIO 3 (p 1 `Seq` Nondet [p i `Seq` p (i+1) | i <- [1..5]]) s0
                in fmap sit (doo' t >>= sync) == Just (do_ 7 (do_ 6 (do_ 3 s0)))
 prop_dtsync4 = let t = treeDTIO 3 (p 1 `Seq` Nondet [p i `Seq` p (i+1) | i <- [1..5]]) s0
-               in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooSync' t))
+               in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
 prop_dtsync5 = let t = treeDTIO 3 (prim A `Seq` Nondet [prim C, prim D]) s0
-               in fmap sit (fromJust (dooSync' t)) == Just (do_ D (do_ B s0))
+               in fmap sit (fromJust (dooIO (const Online) t)) == Just (do_ D (do_ B s0))
 prop_dtsync6 = let t = treeDTIO 3 (prim A `Seq` Nondet [prim C, prim D]) s0
                in fmap sit (doo' t >>= sync) == Just (do_ C (do_ B s0))
+
+prop_NondetEmpty1 = map sit (doo (treeND p s0)) == [do_ A s0]
+   where p = prim A `Seq` Nondet []
+
+prop_NondetEmpty2 = map sit (doo (treeND p s0)) == [do_ B (do_ A s0)]
+   where p = prim A `Seq` Nondet [] `Seq` prim B
 
 
 runTests :: IO Bool

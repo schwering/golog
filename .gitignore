@@ -1,5 +1,8 @@
 dist
 .*.swp
+.*.swo
+.swp
+.swo
 *.csv
 a.out
 replay
