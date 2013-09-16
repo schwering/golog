@@ -70,7 +70,7 @@ p = prim
 
 prop_final1 = final $ treeND (Nil :: Prog Int) s0
 prop_final2 = not $ final $ treeND (p 1 `Seq` p 2) s0
-prop_final3 = final $ treeND (nondet [Nil, p 1 `Seq` p 2]) s0
+prop_final3 = final $ treeND (choice [Nil, p 1 `Seq` p 2]) s0
 prop_final4 = final $ treeND (star (p 1 `Seq` p 2)) s0
 prop_final5 = not $ final $ treeND (plus (p 1 `Seq` p 2)) s0
 prop_final6 = not $ final $ trans'' $ treeND (p 1 `Seq` p 2) s0
@@ -87,22 +87,22 @@ prop_final24 (Lookahead l) = (l /= 0 && l /= 2) == (final $ treeDT l (star (p 1 
 
 prop_final25 (Lookahead l) = not $ final $ treeDT l (p 1 `Seq` p 2) s0
 
-prop_trans1 = let t = treeND (nondet [p 1, p 3] `Seq` nondet [p i `Seq` p (i+1) | i <- [1,2,3,4,5]]) s0
+prop_trans1 = let t = treeND (choice [p 1, p 3] `Seq` choice [p i `Seq` p (i+1) | i <- [1,2,3,4,5]]) s0
               in (trans' t >>= trans' >>= (return . sit)) == Just (do_ 2 (do_ 1 s0))
-prop_trans2 = let t = treeND (nondet [p 1, p 3] `Seq` nondet [p i `Seq` p (i+1) | i <- [1,2,3,4,5]]) s0
+prop_trans2 = let t = treeND (choice [p 1, p 3] `Seq` choice [p i `Seq` p (i+1) | i <- [1,2,3,4,5]]) s0
               in (trans' t >>= trans' >>= trans' >>= (return . sit)) == Just (do_ 3 (do_ 2 (do_ 1 s0)))
-prop_trans3 = let t = treeND (nondet [p 1, p 3] `Seq` nondet [p i `Seq` p (i+1) | i <- [1,2,3,4,5]] `Seq` p 2) s0
+prop_trans3 = let t = treeND (choice [p 1, p 3] `Seq` choice [p i `Seq` p (i+1) | i <- [1,2,3,4,5]] `Seq` p 2) s0
               in (trans' t >>= trans' >>= trans' >>= (return . sit)) == Just (do_ 3 (do_ 2 (do_ 1 s0)))
-prop_trans4 = let t = treeND (nondet [p 1, p 3] `Seq` nondet [p i `Seq` p (i+1) | i <- [1,2,3,4,5]] `Seq` p 1) s0
+prop_trans4 = let t = treeND (choice [p 1, p 3] `Seq` choice [p i `Seq` p (i+1) | i <- [1,2,3,4,5]] `Seq` p 1) s0
               in (trans' t >>= trans' >>= trans' >>= (return . sit)) == Just (do_ 3 (do_ 2 (do_ 1 s0)))
 
-prop_dttrans1 = let t = treeDT 3 (nondet [p 1, p 3, p 1] `Seq` nondet [p i `Seq` p (i+1) | i <- [1,2,3,4,5,4,3,2,1]]) s0
+prop_dttrans1 = let t = treeDT 3 (choice [p 1, p 3, p 1] `Seq` choice [p i `Seq` p (i+1) | i <- [1,2,3,4,5,4,3,2,1]]) s0
                 in (trans' t >>= trans' >>= (return . sit)) == Just (do_ 4 (do_ 3 s0))
-prop_dttrans2 = let t = treeDT 3 (nondet [p 1, p 3, p 1] `Seq` nondet [p i `Seq` p (i+1) | i <- [1,2,3,4,5,4,3,2,1]]) s0
+prop_dttrans2 = let t = treeDT 3 (choice [p 1, p 3, p 1] `Seq` choice [p i `Seq` p (i+1) | i <- [1,2,3,4,5,4,3,2,1]]) s0
                 in (trans' t >>= trans' >>= trans' >>= (return . sit)) == Just (do_ 5 (do_ 4 (do_ 3 s0)))
-prop_dttrans3 = let t = treeDT 3 (nondet [p 1, p 3, p 1] `Seq` nondet [p i `Seq` p (i+1) | i <- [1,2,3,4,5,4,3,2,1]] `Seq` p 2) s0
+prop_dttrans3 = let t = treeDT 3 (choice [p 1, p 3, p 1] `Seq` choice [p i `Seq` p (i+1) | i <- [1,2,3,4,5,4,3,2,1]] `Seq` p 2) s0
                 in (trans' t >>= trans' >>= trans' >>= (return . sit)) == Just (do_ 5 (do_ 4 (do_ 3 s0)))
-prop_dttrans4 = let t = treeDT 3 (nondet [p 1, p 3, p 1] `Seq` nondet [p i `Seq` p (i+1) | i <- [1,2,3,4,5,4,3,2,1]] `Seq` p 1) s0
+prop_dttrans4 = let t = treeDT 3 (choice [p 1, p 3, p 1] `Seq` choice [p i `Seq` p (i+1) | i <- [1,2,3,4,5,4,3,2,1]] `Seq` p 1) s0
                 -- This is a special case: the last action, p 1, is not
                 -- executable (because it's executed in an odd situation).
                 -- The interpreter assigns the worst-case reward, and because
@@ -110,7 +110,7 @@ prop_dttrans4 = let t = treeDT 3 (nondet [p 1, p 3, p 1] `Seq` nondet [p i `Seq`
                 -- in the nondet that fails even earlier.
                 in (trans' t >>= trans' >>= trans' >>= (return . sit)) == Nothing
 
-prop_doo1 = map sit (doo (treeND (p 1 `Seq` nondet [p i `Seq` p (i+1) | i <- [1..5]]) s0)) ==
+prop_doo1 = map sit (doo (treeND (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0)) ==
             map list2sit [[1,2,3], [1,4,5]]
 prop_doo2 = sort (map sit (doo (treeND (p 1 `Seq` ((p 10 `Seq` (atomic $ p 11 `Seq` p 12) `Seq` p 13) `Conc` (p 20 `Seq` p 21)) `Seq` p 100) s0))) ==
             sort (map list2sit [[1,10,11,12,13,20,21,100], [1,20,21,10,11,12,13,100]])
@@ -118,33 +118,33 @@ prop_doo3 = take 11 (map sit (doo (treeND (p 0 `Seq` (star (primf (\(Do i _) -> 
             [list2sit [0..i] | i <- [0..10]]
 
 prop_doo4 (Lookahead l) =
-            map sit (doo (treeDT l (p 1 `Seq` nondet [p i `Seq` p (i+1) | i <- [1..5]]) s0)) ==
+            map sit (doo (treeDT l (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0)) ==
             map list2sit [[1,4,5]]
 
-prop_sync1 = let t = treeNDIO (p 1 `Seq` nondet [p i `Seq` p (i+1) | i <- [1..5]]) s0
+prop_sync1 = let t = treeNDIO (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0
              in sit (fromJust (sync t)) == s0
-prop_sync2 = let t = treeNDIO (p 1 `Seq` nondet [p i `Seq` p (i+1) | i <- [1..5]]) s0
+prop_sync2 = let t = treeNDIO (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0
              in sit (fromJust (trans' (fromJust (sync t)))) == do_ 1 s0
-prop_sync3 = let t = treeNDIO (p 1 `Seq` nondet [p i `Seq` p (i+1) | i <- [1..5]]) s0
+prop_sync3 = let t = treeNDIO (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0
              in sit (fromJust (sync (fromJust (trans' t)))) == do_ 3 s0
 prop_sync4 = let t = treeNDIO (p 1 `Seq` p 2 `Seq` p 3 `Seq` p 4 `Seq` p 5 `Seq`  Nil) s0
              in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
-prop_sync5 = let t = treeNDIO (p 1 `Seq` nondet [p i `Seq` p (i+1) | i <- [1..5]]) s0
+prop_sync5 = let t = treeNDIO (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0
              in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
 
-prop_dtsync1 = let t = treeDTIO 3 (nondet [p 1, p 3, p 1] `Seq` nondet [p i | i <- [1,2,3,4,5,4,3,2,1]] `Seq` nondet [p i | i <- [1,2,3,4,5,4,3,2,1]]) s0
+prop_dtsync1 = let t = treeDTIO 3 (choice [p 1, p 3, p 1] `Seq` choice [p i | i <- [1,2,3,4,5,4,3,2,1]] `Seq` choice [p i | i <- [1,2,3,4,5,4,3,2,1]]) s0
                -- This tests that nondeterminism in results of sync is resolved.
                -- If it isn't, the interpreter executes 3 in the second nondet.
                in (trans' t >>= sync >>= trans' >>= sync >>= trans' >>= sync >>= (return . sit)) == Just (do_ 7 (do_ 6 (do_ 5 s0)))
 prop_dtsync2 = let t = treeDTIO 3 (p 1 `Seq` p 2 `Seq` p 3 `Seq` p 4 `Seq` p 5 `Seq`  Nil) s0
                in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
-prop_dtsync3 = let t = treeDTIO 3 (p 1 `Seq` nondet [p i `Seq` p (i+1) | i <- [1..5]]) s0
+prop_dtsync3 = let t = treeDTIO 3 (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0
                in fmap sit (doo' t >>= sync) == Just (do_ 7 (do_ 6 (do_ 3 s0)))
-prop_dtsync4 = let t = treeDTIO 3 (p 1 `Seq` nondet [p i `Seq` p (i+1) | i <- [1..5]]) s0
+prop_dtsync4 = let t = treeDTIO 3 (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0
                in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
-prop_dtsync5 = let t = treeDTIO 3 (prim A `Seq` nondet [prim C, prim D]) s0
+prop_dtsync5 = let t = treeDTIO 3 (prim A `Seq` choice [prim C, prim D]) s0
                in fmap sit (fromJust (dooIO (const Online) t)) == Just (do_ D (do_ B s0))
-prop_dtsync6 = let t = treeDTIO 3 (prim A `Seq` nondet [prim C, prim D]) s0
+prop_dtsync6 = let t = treeDTIO 3 (prim A `Seq` choice [prim C, prim D]) s0
                in fmap sit (doo' t >>= sync) == Just (do_ C (do_ B s0))
 
 --prop_NondetEmpty1 = map sit (doo (treeND p s0)) == [do_ A s0]

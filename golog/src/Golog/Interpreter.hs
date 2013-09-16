@@ -24,7 +24,7 @@ class (BAT a, Monad m) => IOBAT a m where
    syncA         :: a -> Sit a -> m (Sit a)
 
 data Atom a = Act (Sit a -> a) | Complex (Prog a)
-data Prog a = Seq (Prog a) (Prog a)  | Nondet (Prog a) (Prog a)
+data Prog a = Seq (Prog a) (Prog a)  | Choice (Prog a) (Prog a)
             | Conc (Prog a) (Prog a) | Atom (Atom a) | Nil
 
 type Depth = Int
@@ -78,7 +78,7 @@ nf p' = rec (nf' p')
          rec (Val (Complex p) t) = mappend (nf p) (rec t)
          nf' :: Prog a -> Tree (Atom a)
          nf' (Seq p1 p2)    = mappend (nf' p1) (nf' p2)
-         nf' (Nondet p1 p2) = Alt (nf' p1) (nf' p2)
+         nf' (Choice p1 p2) = Alt (nf' p1) (nf' p2)
          nf' (Conc p1 p2)   = itl (nf' p1) (nf' p2)
          nf' (Atom a)       = Val a Empty
          nf' Nil            = Empty

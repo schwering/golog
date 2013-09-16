@@ -58,7 +58,7 @@ on :: Floor -> Sit A -> Bool
 on n s = n `elem` onButtons s
 
 goFloor :: Floor -> Prog A
-goFloor n = nondet [ prim (Up n), test (\s -> floor s == n), prim (Down n) ]
+goFloor n = choice [ prim (Up n), test (\s -> floor s == n), prim (Down n) ]
 
 control :: Prog A
 control = until (null.onButtons)

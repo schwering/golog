@@ -242,7 +242,7 @@ lookahead = 5
 main :: IO ()
 main = do
    let prog :: Prog (Prim Regr)
-       prog  = star (nondet [ primf up
+       prog  = star (choice [ primf up
                             , primf down
                             , primf left
                             , primf right]) `Seq`

@@ -141,7 +141,7 @@ instance (BAT a, Show a) => Show (Atom a) where
 
 instance (BAT a, Show a) => Show (Prog a) where
    show (Seq p q)    = "(" ++ show p ++ " `Seq` " ++ show q ++ ")"
-   show (Nondet p q) = "(" ++ show p ++ " `Nondet` " ++ show q ++ ")"
+   show (Choice p q) = "(" ++ show p ++ " `Choice` " ++ show q ++ ")"
    show (Conc p q)   = "(" ++ show p ++ " `Conc` " ++ show q ++ ")"
    show (Atom p)     = show p
    show Nil          = "Nil"

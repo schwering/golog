@@ -26,7 +26,7 @@ star p = Nil `Nondet` (p `Seq` star p)
 --star p = Nondet Nil (plus p)
 --star = Star
 plus p = Nondet p (p `Seq` plus p)
-nondet = foldl1 Nondet
+choice = foldl1 Nondet
 conc = foldl1 Conc
 atomic = PseudoAtom . Complex
 
