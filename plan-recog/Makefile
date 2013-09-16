@@ -5,7 +5,7 @@ all: dist replay
 	cabal build
 
 dist: plan-recog.cabal ../golog/dist/build/libHSgolog-3.1.a
-	cabal configure $(PROFILING)
+	cabal configure --enable-tests $(PROFILING)
 
 replay: scripts/replay.c
 	cc -Wall -o replay scripts/replay.c

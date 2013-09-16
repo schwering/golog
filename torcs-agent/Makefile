@@ -5,7 +5,7 @@ all: dist
 	cabal build
 
 dist: torcs-agent.cabal ../golog/dist/build/libHSgolog-3.1.a
-	cabal configure $(PROFILING)
+	cabal configure --enable-tests $(PROFILING)
 
 doc:
 	cabal haddock --hyperlink-source

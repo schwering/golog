@@ -336,7 +336,7 @@ gologAgent csRef ccRef tickSem = loop' conf
                          then putStrLn "EOP"
                          else sync (head cs) >>= loop'
          conf   = treeDTIO 3 p s01 :: Conf1
-         p      = star $ Nondet $ map prim [AntiDrift, AntiBlock, AntiSlip,
+         p      = star $ nondet $ map prim [AntiDrift, AntiBlock, AntiSlip,
                                             ApproachLeft, DriveCenter,
                                             ApproachRight, FollowMaxBeam]
          s01    = s0{assoc = s02}

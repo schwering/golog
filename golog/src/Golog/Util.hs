@@ -8,7 +8,7 @@ module Golog.Util
     Mode(..), Search(..), dooIO) where
 
 import Control.Monad ((>=>))
-import Data.List (foldl', foldl1')
+import Data.List (foldl')
 import Data.Maybe (listToMaybe)
 import qualified Data.Foldable as F
 import qualified Data.Tree as T
@@ -135,17 +135,16 @@ dooIO m c = case (m c,       final c) of
 --   show (Prim a)  = "Prim " ++ show a
 --   show (PrimF _) = "PrimF <...>"
 
-instance (BAT a, Show a) => Show (PseudoAtom a) where
-   show (Atom a)    = show (a s0)
+instance (BAT a, Show a) => Show (Atom a) where
+   show (Act a)     = show (a s0)
    show (Complex a) = "Complex (" ++ show a ++ ")"
 
 instance (BAT a, Show a) => Show (Prog a) where
-   show (Seq p q)      = "(" ++ show p ++ " `Seq` " ++ show q ++ ")"
-   show (Nondet [])    = "Nondet []"
-   show (Nondet ps)    = "Nondet [" ++ foldl1' (\s1 s2 -> s1 ++ ", " ++ s2) (map show ps) ++ "]"
-   show (Conc p q)     = "(" ++ show p ++ " `Conc` " ++ show q ++ ")"
-   show (PseudoAtom p) = show p
-   show Nil            = "Nil"
+   show (Seq p q)    = "(" ++ show p ++ " `Seq` " ++ show q ++ ")"
+   show (Nondet p q) = "(" ++ show p ++ " `Nondet` " ++ show q ++ ")"
+   show (Conc p q)   = "(" ++ show p ++ " `Conc` " ++ show q ++ ")"
+   show (Atom p)     = show p
+   show Nil          = "Nil"
 
 {-
 class ShowStopper a where

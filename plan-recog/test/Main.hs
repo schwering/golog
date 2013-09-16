@@ -18,5 +18,6 @@ main = do b <- liftM and $ sequence $ [RSTC.TheoremsTest.runTests
                                       ,Util.NativePSOTest.runTests
                                       --,Util.PSOTest.runTests
                                       ]
+          when (not b) $ do putStrLn "Some tests failed!!!"
           if b then exitSuccess else exitFailure
 

@@ -2,7 +2,7 @@
 
 module Golog.Interpreter
   (BAT(..), DTBAT(..), IOBAT(..),
-   PseudoAtom(..), Prog(..), Conf, ConfIO, Depth,
+   Atom(..), Prog(..), Conf, ConfIO, Depth,
    treeND, treeDT, treeNDIO, treeDTIO, final, trans, sit, sync) where
 
 import Control.Monad (liftM)
@@ -23,67 +23,65 @@ class (BAT a, Ord (Reward a)) => DTBAT a where
 class (BAT a, Monad m) => IOBAT a m where
    syncA         :: a -> Sit a -> m (Sit a)
 
-data PseudoAtom a = Atom (Sit a -> a) | Complex (Prog a)
-data Prog a       = Seq (Prog a) (Prog a)  | Nondet [Prog a]
-                  | Conc (Prog a) (Prog a) | PseudoAtom (PseudoAtom a) | Nil
+data Atom a = Act (Sit a -> a) | Complex (Prog a)
+data Prog a = Seq (Prog a) (Prog a)  | Nondet (Prog a) (Prog a)
+            | Conc (Prog a) (Prog a) | Atom (Atom a) | Nil
 
 type Depth = Int
 
-data Tree a = Empty | Alt [Tree a] | Val a (Tree a)
+data Tree a = Empty | Alt (Tree a) (Tree a) | Val a (Tree a)
 
 instance Monoid (Tree a) where
    mempty                = Empty
-   mappend Empty      t2 = t2
-   mappend (Alt ts)   t2 = Alt (fmap (\t1 -> mappend t1 t2) ts)
-   mappend (Val x t1) t2 = Val x (mappend t1 t2)
+   mappend Empty       t = t
+   mappend (Alt t1 t2) t = Alt (mappend t1 t) (mappend t2 t)
+   mappend (Val x t')  t = Val x (mappend t' t)
 
 instance Functor Tree where
-   fmap _ Empty     = Empty
-   fmap f (Alt ts)  = Alt (map (fmap f) ts)
-   fmap f (Val x t) = Val (f x) (fmap f t)
+   fmap _ Empty       = Empty
+   fmap f (Alt t1 t2) = Alt (fmap f t1) (fmap f t2)
+   fmap f (Val x t)   = Val (f x) (fmap f t)
 
 scan :: (b -> a -> Tree a -> b) -> b -> Tree a -> Tree b
 scan f x0 t0 = Val x0 (scan' x0 t0)
-   where scan' _ Empty     = Empty
-         scan' x (Val y t) = let z = f x y t in Val z (scan' z t)
-         scan' x (Alt ts)  = Alt (map (scan' x) ts)
+   where scan' _ Empty       = Empty
+         scan' x (Alt t1 t2) = Alt (scan' x t1) (scan' x t2)
+         scan' x (Val y t)   = let z = f x y t in Val z (scan' z t)
 
 best :: (a -> a -> Ordering) -> (Tree a -> Bool) -> Depth -> a -> Tree a -> a
-best _   _   _ x Empty     = x
-best _   _   _ x (Alt [])  = x
-best cmp cut l x (Alt ts)  = maximumBy cmp (map (best cmp cut l x) ts)
+best _   _   _ x Empty       = x
+best cmp cut l x (Alt t1 t2) = maximumBy cmp (map (best cmp cut l x) [t1, t2])
 best cmp cut l x (Val y t) | l == 0    = y
                            | cut t     = best cmp cut (l-1) y t
                            | l > 0     = best cmp cut (l-1) x t
                            | otherwise = error "best: l < 0"
 
 resolve :: (a -> [Tree a] -> Tree a) -> a -> Tree a -> Tree a
-resolve _ _ Empty     = Empty
-resolve _ _ (Alt [])  = Empty
-resolve f x (Alt ts)  = resolve f x (f x ts)
-resolve f _ (Val x t) = Val x (resolve f x t)
+resolve _ _ Empty       = Empty
+resolve f x (Alt t1 t2) = resolve f x (f x [t1, t2])
+resolve f _ (Val x t)   = Val x (resolve f x t)
 
 itl :: Tree a -> Tree a -> Tree a
-itl Empty          t2             = t2
-itl t1             Empty          = t1
-itl (Alt ts)       t2             = Alt (map (\t1 -> itl t1 t2) ts)
-itl t1             (Alt ts)       = Alt (map (\t2 -> itl t1 t2) ts)
-itl t1@(Val x1 r1) t2@(Val x2 r2) = Alt [Val x1 (itl t2 r1), Val x2 (itl t1 r2)]
+itl Empty          t              = t
+itl t              Empty          = t
+itl (Alt t1 t2)    t              = Alt (itl t1 t) (itl t2 t)
+itl t              (Alt t1 t2)    = Alt (itl t t1) (itl t t2)
+itl t1@(Val x1 r1) t2@(Val x2 r2) = Alt (Val x1 (itl t2 r1))
+                                        (Val x2 (itl t1 r2))
 
-ast :: Prog a -> Tree (Sit a -> a)
-ast p' = rec (ast' p')
-   where rec :: Tree (PseudoAtom a) -> Tree (Sit a -> a)
+nf :: Prog a -> Tree (Sit a -> a)
+nf p' = rec (nf' p')
+   where rec :: Tree (Atom a) -> Tree (Sit a -> a)
          rec Empty               = Empty
-         rec (Alt ts)            = Alt (map rec ts)
-         rec (Val (Atom a)    t) = Val a (rec t)
-         rec (Val (Complex p) t) = mappend (ast p) (rec t)
-         ast' :: Prog a -> Tree (PseudoAtom a)
-         ast' (Seq p1 p2)    = mappend (ast' p1) (ast' p2)
-         ast' (Nondet [])    = Empty
-         ast' (Nondet ps)    = Alt (map ast' ps)
-         ast' (Conc p1 p2)   = itl (ast' p1) (ast' p2)
-         ast' (PseudoAtom a) = Val a Empty
-         ast' Nil            = Empty
+         rec (Alt t1 t2)         = Alt (rec t1) (rec t2)
+         rec (Val (Act a)     t) = Val a (rec t)
+         rec (Val (Complex p) t) = mappend (nf p) (rec t)
+         nf' :: Prog a -> Tree (Atom a)
+         nf' (Seq p1 p2)    = mappend (nf' p1) (nf' p2)
+         nf' (Nondet p1 p2) = Alt (nf' p1) (nf' p2)
+         nf' (Conc p1 p2)   = itl (nf' p1) (nf' p2)
+         nf' (Atom a)       = Val a Empty
+         nf' Nil            = Empty
 
 data Node a b = Node (Sit a) b | Flop
 type Conf a b = Tree (Node a b)
@@ -91,7 +89,7 @@ type ConfIO a m = Conf a (SyncIO a m)
 newtype SyncIO a m = SyncIO { runSync :: m (ConfIO a m) }
 
 treeND :: BAT a => Prog a -> Sit a -> Conf a ()
-treeND p sz = scan e (Node sz ()) (ast p)
+treeND p sz = scan e (Node sz ()) (nf p)
    where e (Node s _) a _ | poss (a s) s = Node (do_ (a s) s) ()
          e _          _ _                = Flop
 
@@ -99,7 +97,7 @@ treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> Conf a ()
 treeDT l = (resolveDT l .) . treeND
 
 treeNDIO :: IOBAT a m => Prog a -> Sit a -> ConfIO a m
-treeNDIO = cnf . ast
+treeNDIO = cnf . nf
    where cnf t s = scan e (Node s (SyncIO $ return (cnf t s))) t
          e (Node s pl) a t | poss (a s) s = Node (do_ (a s) s) (SyncIO $ do
                                                      c <- runSync pl
@@ -123,18 +121,17 @@ resolveDT l = resolve chooseDT Flop
 
 final :: Conf a b -> Bool
 final = final' True
-   where final' _    Empty     = True
-         final' _    (Alt [])  = True
-         final' next (Alt ts)  = any (final' next) ts
-         final' next (Val _ t) = next && final' False t
+   where final' _    Empty       = True
+         final' next (Alt t1 t2) = final' next t1 || final' next t2
+         final' next (Val _ t)   = next && final' False t
 
 trans :: Conf a b -> [Conf a b]
 trans Empty              = error "trans: invalid conf"
-trans (Alt _)            = error "trans: invalid conf"
+trans (Alt _ _)          = error "trans: invalid conf"
 trans (Val Flop       _) = []
 trans (Val (Node _ _) t) = trans' t
    where trans' Empty                 = []
-         trans' (Alt ts)              = concat (map trans' ts)
+         trans' (Alt t1 t2)           = trans' t1 ++ trans' t2
          trans' (Val Flop          _) = []
          trans' t'@(Val (Node _ _) _) = [t']
 

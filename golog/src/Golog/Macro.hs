@@ -1,7 +1,7 @@
 module Golog.Macro
   (TestAction(..),
    prim, primf, test,
-   atomic, star, plus, loop, opt,
+   atomic, nondet, star, plus, loop, opt,
    ifThen, ifThenElse, if_, then_, else_, while, when, unless,
    ifA, whenA, unlessA, ifThenElseA, whileA, until, untilA,
    forSome, forAll, pick, withCtrl, monitor) where
@@ -16,31 +16,36 @@ class TestAction a where
    noop = testAction (const True)
 
 prim :: a -> Prog a
-prim = PseudoAtom . Atom . const
+prim = Atom . Act . const
 
 primf :: (Sit a -> a) -> Prog a
-primf = PseudoAtom . Atom
+primf = Atom . Act
 
 test :: TestAction a => (Sit a -> Bool) -> Prog a
 test = prim . testAction
 
 atomic :: Prog a -> Prog a
-atomic = PseudoAtom . Complex
+atomic = Atom . Complex
+
+nondet :: [Prog a] -> Prog a
+nondet []     = error "Golog.Macro.nondet: empty list"
+nondet [p]    = p
+nondet (p:ps) = Nondet p (nondet ps)
 
 star :: Prog a -> Prog a
-star p = Nondet [Nil, p `Seq` star p]
+star p = Nondet Nil (p `Seq` star p)
 
 plus :: Prog a -> Prog a
-plus p = Nondet [p, p `Seq` plus p]
+plus p = Nondet p (p `Seq` plus p)
 
 loop :: Prog a -> Prog a
 loop p = p `Seq` loop p
 
 opt :: Prog a -> Prog a
-opt p = Nondet [Nil, p]
+opt = Nondet Nil
 
 ifThenElse :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a -> Prog a
-ifThenElse phi p1 p2 = Nondet [ test phi `Seq` p1 , test (not.phi) `Seq` p2 ]
+ifThenElse phi p1 p2 = Nondet (test phi `Seq` p1) (test (not.phi) `Seq` p2)
 
 ifThen :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
 ifThen phi p1 = if_ phi (then_ p1) (else_ Nil)
@@ -76,20 +81,22 @@ forSome :: [b] -> (b -> Prog a) -> Prog a
 forSome = pick
 
 pick :: [b] -> (b -> Prog a) -> Prog a
-pick xs pf = Nondet (map pf xs)
+pick []     _ = error "Golog.Macro.pick: empty list"
+pick [x]    p = p x
+pick (x:xs) p = Nondet (p x) (pick xs p)
 
 
 -- | If-then-else construct where the condition and the first atom of the branch
 -- are atomic. This prevents concurrent programs from getting in between of them
 -- (and making flipping the condition just evaluated).
 ifThenElseA :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a -> Prog a
-ifThenElseA phi p1 p2 = Nondet [ mergeAtomic (test phi) p1
-                               , mergeAtomic (test (not.phi)) p2 ]
+ifThenElseA phi p1 p2 = Nondet (mergeAtomic (test phi) p1)
+                               (mergeAtomic (test (not.phi)) p2)
 
 mergeAtomic :: Prog a -> Prog a -> Prog a
 mergeAtomic addon p = case nextPA p of
    [] -> atomic addon
-   ds -> Nondet [atomic (addon `Seq` PseudoAtom c) `Seq` p' | (c, p') <- ds]
+   ds -> nondet [atomic (addon `Seq` Atom c) `Seq` p' | (c, p') <- ds]
 
 whenA :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
 whenA phi p = ifA phi (then_ p) (else_ Nil)
@@ -155,34 +162,34 @@ intersperse :: Prog a -> Prog a -> Prog a
 intersperse q p =
    case nextPA p of []                   -> Nil
                     [(c,p')] | finalP p  -> Nondet
-                                               [ Nil
-                                               , q `Seq` PseudoAtom c `Seq`
-                                                 intersperse q p' ]
-                             | otherwise -> q `Seq` PseudoAtom c `Seq`
+                                               Nil
+                                               (q `Seq` Atom c `Seq`
+                                                 intersperse q p')
+                             | otherwise -> q `Seq` Atom c `Seq`
                                             intersperse q p'
-                    ds       | finalP p  -> Nondet
+                    ds       | finalP p  -> nondet
                                                ( Nil
                                                : map (\(c,p') ->
-                                                  q `Seq` PseudoAtom c `Seq`
+                                                  q `Seq` Atom c `Seq`
                                                   intersperse q p') ds)
                              | otherwise -> q `Seq`
-                                            Nondet (map (\(c,p') ->
-                                               PseudoAtom c `Seq`
+                                            nondet (map (\(c,p') ->
+                                               Atom c `Seq`
                                                intersperse q p') ds)
 
--- | Returns a list of decompositions of a 'Prog' into a next 'PseudoAtom' and a
+-- | Returns a list of decompositions of a 'Prog' into a next 'Atom' and a
 -- remaining 'Prog'.
 --
 -- This function is slightly adapted from the old Golog interpreter
 -- "Golog.Old.Interpreter". Here, we use it just to make atomic if-then-else
 -- possible, and for interspersing programs.
-nextPA :: Prog a -> [(PseudoAtom a, Prog a)]
+nextPA :: Prog a -> [(Atom a, Prog a)]
 nextPA (Seq p1 p2)    = map (\(c, p') -> (c, Seq p' p2)) (nextPA p1) ++
                         if finalP p1 then nextPA p2 else []
-nextPA (Nondet ps)    = concat $ map nextPA ps
+nextPA (Nondet p1 p2) = nextPA p1 ++ nextPA p2
 nextPA (Conc p1 p2)   = map (\(c, p') -> (c, Conc p' p2)) (nextPA p1) ++
                         map (\(c, p') -> (c, Conc p1 p')) (nextPA p2)
-nextPA (PseudoAtom c) = [(c, Nil)]
+nextPA (Atom c)       = [(c, Nil)]
 nextPA Nil            = []
 
 -- | Indicates whether or not execution may stop for the given program.
@@ -191,10 +198,10 @@ nextPA Nil            = []
 -- "Golog.Old.Interpreter". Here, we use it just to make atomic if-then-else
 -- possible, and for interspersing programs.
 finalP :: Prog a -> Bool
-finalP (Seq p1 p2)              = finalP p1 && finalP p2
-finalP (Nondet ps)              = any finalP ps
-finalP (Conc p1 p2)             = finalP p1 && finalP p2
-finalP (PseudoAtom (Atom _))    = False
-finalP (PseudoAtom (Complex p)) = finalP p
-finalP Nil                      = True
+finalP (Seq p1 p2)        = finalP p1 && finalP p2
+finalP (Nondet p1 p2)     = finalP p1 || finalP p2
+finalP (Conc p1 p2)       = finalP p1 && finalP p2
+finalP (Atom (Act _))     = False
+finalP (Atom (Complex p)) = finalP p
+finalP Nil                = True
 

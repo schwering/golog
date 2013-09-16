@@ -88,13 +88,13 @@ prop_ifThenElseA3 = map sit (doo (treeND p s0)) == [Sit [A,C,t,B]
 
 prop_While1 = map sit (doo (treeND p s0)) == [Sit [t,A,t,C], Sit [t,B,t,C]]
    where p = while (\(Sit as) -> A `notElem` as && B `notElem` as)
-                   (Nondet $ map prim [A,B])
+                   (nondet $ map prim [A,B])
              `Seq` prim C
          t = Test undefined
 
 prop_While2 = fmap sit (doo' (treeND p s0)) == Just (Sit [t,A,t,B,t,C,t,D])
    where p = while (\(Sit as) -> filter (not.isTest) as /= [A,B,C])
-                   (Nondet $ map prim [A,B,C])
+                   (nondet $ map prim [A,B,C])
              `Seq` prim D
          t = Test undefined
          isTest (Test _) = True
