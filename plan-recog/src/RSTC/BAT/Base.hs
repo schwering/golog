@@ -181,8 +181,7 @@ defaultPoss (Msg _)              _ = True
 defaultPoss (Test cond)          s = cond s
 
 
-actionReward :: HistState a =>
-                Prim a -> Sit (Prim a) -> (Double, Depth)
+actionReward :: HistState a => Prim a -> Sit (Prim a) -> (Double, Depth)
 actionReward (Wait _)         _ = (0, 1)
 actionReward (Accel _ _)      _ = (-0.01, 1)
 actionReward (LaneChange _ _) _ = (-0.01, 1)

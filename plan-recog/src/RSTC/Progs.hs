@@ -15,7 +15,7 @@ import Util.NativePSO
 import Data.Maybe
 import Debug.Trace
 
---star = Star
+--iter = Star
 --atomic = PseudoAtom . Complex
 --prim = PseudoAtom . Atom . Prim
 --primf = PseudoAtom . Atom . PrimF
@@ -78,7 +78,7 @@ pass b c =
       test (\s -> isFollowing (ntg s) b c) `Seq`
       test (\s -> isConverging (ttc s) b c)
    ) `Seq` (
-      star (Pick (fst . value lookahead) (picknum (0.95, 1.2)) (\q -> prim (Accel b q)))
+      iter (Pick (fst . value lookahead) (picknum (0.95, 1.2)) (\q -> prim (Accel b q)))
    ) `Seq` atomic (
       test (\s -> ntg s b c <= 0) `Seq`
       prim (End b "pass") 
@@ -93,7 +93,7 @@ pass b c =
       test (\s -> lane s b /= lane s c) `Seq`
       test (\s -> isFollowing (ntg s) b c)
    ) `Seq` (
-      star (primf (\s -> Accel b (bestAccel s b c)))
+      iter (primf (\s -> Accel b (bestAccel s b c)))
    ) `Seq` atomic (
       test (\s -> ntg s b c < 0) `Seq`
       prim (End b "pass") 
@@ -113,9 +113,9 @@ overtake b c =
          test (\s -> ntg s b c < 0) `Seq`
          prim (LaneChange b RightLane)
       ) `Conc` (
-         --star (Pick (fst . value lookahead) (picknum (0.9, 1.5)) (\q -> prim (Accel b q)))
+         --iter (Pick (fst . value lookahead) (picknum (0.9, 1.5)) (\q -> prim (Accel b q)))
          {-
-         star (Pick (valueByQuality b c lookahead)
+         iter (Pick (valueByQuality b c lookahead)
                     --(\val -> interpolateRecipLin id (0.7, 1.5) 0 (fromMaybe 100 . val))
                     --(\val -> interpolateRecipLinAndLinForZero id (0.7, 1.5) (fromMaybe (100, 100) . val))
                     (\val -> 0.5 * nullAt id (canonicalizeRecip (fst . fromMaybe (nan,nan) . val) 0) +
@@ -123,8 +123,8 @@ overtake b c =
                     (\q -> prim (Accel b q)))
                     --(\q -> (prim (Accel b (q)) `Seq` (primf (\s -> Msg (show (sitlen s)))))))
          -}
-         --star (primf (\s -> Accel b (bestAccel s b c)))
-         star (primf (\s -> Accel b (bestAccel s b c)))
+         --iter (primf (\s -> Accel b (bestAccel s b c)))
+         iter (primf (\s -> Accel b (bestAccel s b c)))
       )
    ) `Seq` atomic (
       test (\s -> ntg s b c < 0) `Seq`

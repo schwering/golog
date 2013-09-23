@@ -7,7 +7,7 @@
 module GologTest where
 
 import Golog.Interpreter
-import qualified Golog.Macro as M
+import Golog.Macro
 import Golog.Util hiding (HistBAT(..))
 
 instance BAT Int where
@@ -34,12 +34,8 @@ sitlen :: Sit Int -> Int
 sitlen S0       = 0
 sitlen (Do _ s) = 1 + sitlen s
 
-p = M.prim
-q = M.atomic
-star = M.star
-nondet = Nondet
-conc = foldl1 Conc
-atomic = M.atomic
+p = prim
+q = atomic
 
 doDT :: DTBAT a => Depth -> Prog a -> Sit a -> [Sit a]
 doDT l p s = map sit $ doo (treeDT l p s)
@@ -56,5 +52,5 @@ testDTIO = do  c <- return $ t
                c <- sync c
                putStrLn $ show $ reward (sit c)
                return $ sit c
-   where t = treeDTIO 3 (p 2 `Seq` p 4 `Seq` nondet [p 4 `Seq` p 16, p 0 `Seq` p 16] :: Prog Int) s0
+   where t = treeDTIO 3 (p 2 `Seq` p 4 `Seq` choice [p 4 `Seq` p 16, p 0 `Seq` p 16] :: Prog Int) s0
          n = head.trans

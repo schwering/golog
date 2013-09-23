@@ -22,9 +22,9 @@ sitlen (Do _ s) = 1 + sitlen s
 p = PseudoAtom . Atom . Prim
 q = PseudoAtom . Complex
 
-star p = Nil `Nondet` (p `Seq` star p)
---star p = Nondet Nil (plus p)
---star = Star
+iter p = Nil `Nondet` (p `Seq` iter p)
+--iter p = Nondet Nil (plus p)
+--iter = Star
 plus p = Nondet p (p `Seq` plus p)
 choice = foldl1 Nondet
 conc = foldl1 Conc

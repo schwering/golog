@@ -6,7 +6,6 @@ module Golog.Interpreter
    treeND, treeDT, treeNDIO, treeDTIO, final, trans, sit, sync) where
 
 import Control.Monad (liftM)
-import Data.List (maximumBy)
 import Data.Monoid (Monoid(..))
 import Data.Ord (comparing)
 
@@ -48,18 +47,23 @@ scan f x0 t0 = Val x0 (scan' x0 t0)
          scan' x (Alt t1 t2) = Alt (scan' x t1) (scan' x t2)
          scan' x (Val y t)   = let z = f x y t in Val z (scan' z t)
 
+maxBy :: (a -> a -> Ordering) -> a -> a -> a
+maxBy cmp x y = case cmp x y of GT -> x
+                                _  -> y
+
 best :: (a -> a -> Ordering) -> (Tree a -> Bool) -> Depth -> a -> Tree a -> a
 best _   _   _ x Empty       = x
-best cmp cut l x (Alt t1 t2) = maximumBy cmp (map (best cmp cut l x) [t1, t2])
+best cmp cut l x (Alt t1 t2) = maxBy cmp (best cmp cut l x t1)
+                                         (best cmp cut l x t2)
 best cmp cut l x (Val y t) | l == 0    = y
                            | cut t     = best cmp cut (l-1) y t
                            | l > 0     = best cmp cut (l-1) x t
                            | otherwise = error "best: l < 0"
 
-resolve :: (a -> [Tree a] -> Tree a) -> a -> Tree a -> Tree a
-resolve _ _ Empty       = Empty
-resolve f x (Alt t1 t2) = resolve f x (f x [t1, t2])
-resolve f _ (Val x t)   = Val x (resolve f x t)
+choose :: (a -> Tree a -> Tree a -> Tree a) -> a -> Tree a -> Tree a
+choose _ _ Empty       = Empty
+choose f x (Alt t1 t2) = choose f x (f x t1 t2)
+choose f _ (Val x t)   = Val x (choose f x t)
 
 itl :: Tree a -> Tree a -> Tree a
 itl Empty          t              = t
@@ -112,8 +116,8 @@ treeDTIO l = (f .) . treeNDIO
          g Flop                = Flop
 
 resolveDT :: DTBAT a => Depth -> Conf a b -> Conf a b
-resolveDT l = resolve chooseDT Flop
-   where chooseDT def = maximumBy (comparing value)
+resolveDT l = choose dt Flop
+   where dt def = maxBy (comparing value)
             where value t = val (best cmp final l def t)
                   val (Node s _) = Just (reward s)
                   val Flop       = Nothing

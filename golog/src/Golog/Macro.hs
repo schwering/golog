@@ -1,7 +1,7 @@
 module Golog.Macro
   (TestAction(..),
    prim, primf, test,
-   atomic, choice, star, plus, loop, opt,
+   atomic, choice, iter, plus, loop, opt,
    ifThen, ifThenElse, if_, then_, else_, while, when, unless,
    ifA, whenA, unlessA, ifThenElseA, whileA, until, untilA,
    forSome, forAll, pick, withCtrl, monitor) where
@@ -32,8 +32,8 @@ choice []     = error "Golog.Macro.choice: empty list"
 choice [p]    = p
 choice (p:ps) = Choice p (choice ps)
 
-star :: Prog a -> Prog a
-star p = Choice Nil (p `Seq` star p)
+iter :: Prog a -> Prog a
+iter p = Choice Nil (p `Seq` iter p)
 
 plus :: Prog a -> Prog a
 plus p = Choice p (p `Seq` plus p)
@@ -43,6 +43,9 @@ loop p = p `Seq` loop p
 
 opt :: Prog a -> Prog a
 opt = Choice Nil
+
+iterconc :: Prog a -> Prog a
+iterconc p = Choice Nil (p `Conc` iterconc p)
 
 ifThenElse :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a -> Prog a
 ifThenElse phi p1 p2 = Choice (test phi `Seq` p1) (test (not.phi) `Seq` p2)
@@ -69,7 +72,7 @@ else_ :: Prog a -> ElseBranch a
 else_ = ElseBranch
 
 while :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
-while phi p = star (test phi `Seq` p) `Seq` test (not.phi)
+while phi p = iter (test phi `Seq` p) `Seq` test (not.phi)
 
 until :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
 until phi = while (not.phi)
@@ -108,7 +111,7 @@ ifA :: TestAction a => (Sit a -> Bool) -> IfBranch a -> ElseBranch a -> Prog a
 ifA phi (IfBranch p1) (ElseBranch p2) = ifThenElseA phi p1 p2
 
 whileA :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
-whileA phi p = star (mergeAtomic (test phi) p) `Seq` test (not.phi)
+whileA phi p = iter (mergeAtomic (test phi) p) `Seq` test (not.phi)
 
 untilA :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
 untilA phi = whileA (not.phi)

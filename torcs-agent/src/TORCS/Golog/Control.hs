@@ -290,7 +290,7 @@ filterABS cs b | v < absMinSpeed = b
          slip = v - avgWheelSpeed cs
 
 steerAngle :: Double -> Prog2
-steerAngle lock  = star action `Seq` success
+steerAngle lock  = iter action `Seq` success
    where action  = primf (steerAngleAction lock)
          success = test (\s -> abs (angle (currentState2 s) - lock) < deg2rad 3)
 
@@ -305,7 +305,7 @@ steerAngleAction lock s = Steer lock'
          --steerSensitivityOffset = kmh2ms 80
 
 steerTrackPos :: Double -> Prog2
-steerTrackPos pos = star action `Seq` success
+steerTrackPos pos = iter action `Seq` success
    where action   = primf (\s -> steerAngleAction (lock (currentState2 s)) s)
          lock cs  = maxAngle * (diff cs) / 2
          diff cs  = pos - trackPos cs
@@ -336,7 +336,7 @@ gologAgent csRef ccRef tickSem = loop' conf
                          then putStrLn "EOP"
                          else sync (head cs) >>= loop'
          conf   = treeDTIO 3 p s01 :: Conf1
-         p      = star $ choice $ map prim [AntiDrift, AntiBlock, AntiSlip,
+         p      = iter $ choice $ map prim [AntiDrift, AntiBlock, AntiSlip,
                                             ApproachLeft, DriveCenter,
                                             ApproachRight, FollowMaxBeam]
          s01    = s0{assoc = s02}
