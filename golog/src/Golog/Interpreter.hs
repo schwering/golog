@@ -24,34 +24,38 @@ class (BAT a, Monad m) => IOBAT a m where
 
 data Atom a = Act (Sit a -> a) | Complex (Prog a)
 data Prog a = Seq (Prog a) (Prog a)  | Choice (Prog a) (Prog a)
-            | Conc (Prog a) (Prog a) | Atom (Atom a) | Nil
+            | Conc (Prog a) (Prog a) | Atom (Atom a)
+            | Eval (Sit a -> Prog a) | Nil
 
 type Depth = Int
 
-data Tree a = Empty | Alt (Tree a) (Tree a) | Val a (Tree a)
+data Tree a b = Empty | Alt (Tree a b) (Tree a b) | Val b (Tree a b) | Sprout (a -> Tree a b)
 
-instance Monoid (Tree a) where
+instance Monoid (Tree a b) where
    mempty                = Empty
    mappend Empty       t = t
    mappend (Alt t1 t2) t = Alt (mappend t1 t) (mappend t2 t)
    mappend (Val x t')  t = Val x (mappend t' t)
+   mappend (Sprout t1) t = Sprout (\x -> mappend (t1 x) t)
 
-instance Functor Tree where
+instance Functor (Tree a) where
    fmap _ Empty       = Empty
    fmap f (Alt t1 t2) = Alt (fmap f t1) (fmap f t2)
    fmap f (Val x t)   = Val (f x) (fmap f t)
+   fmap f (Sprout t)  = Sprout (fmap f . t)
 
-scan :: (b -> a -> Tree a -> b) -> b -> Tree a -> Tree b
-scan f x0 t0 = Val x0 (scan' x0 t0)
+scan :: (c -> b -> Tree a b -> c) -> (c -> a) -> c -> Tree a b -> Tree a c
+scan f g x0 t0 = Val x0 (scan' x0 t0)
    where scan' _ Empty       = Empty
          scan' x (Alt t1 t2) = Alt (scan' x t1) (scan' x t2)
          scan' x (Val y t)   = let z = f x y t in Val z (scan' z t)
+         scan' x (Sprout t)  = scan' x (t (g x))
 
 maxBy :: (a -> a -> Ordering) -> a -> a -> a
 maxBy cmp x y = case cmp x y of GT -> x
                                 _  -> y
 
-best :: (a -> a -> Ordering) -> (Tree a -> Bool) -> Depth -> a -> Tree a -> a
+best :: (b -> b -> Ordering) -> (Tree a b -> Bool) -> Depth -> b -> Tree a b -> b
 best _   _   _ x Empty       = x
 best cmp cut l x (Alt t1 t2) = maxBy cmp (best cmp cut l x t1)
                                          (best cmp cut l x t2)
@@ -60,40 +64,45 @@ best cmp cut l x (Val y t) | l == 0    = y
                            | l > 0     = best cmp cut (l-1) x t
                            | otherwise = error "best: l < 0"
 
-choose :: (a -> Tree a -> Tree a -> Tree a) -> a -> Tree a -> Tree a
+choose :: (b -> Tree a b -> Tree a b -> Tree a b) -> b -> Tree a b -> Tree a b
 choose _ _ Empty       = Empty
 choose f x (Alt t1 t2) = choose f x (f x t1 t2)
 choose f _ (Val x t)   = Val x (choose f x t)
+choose f x (Sprout t)  = Sprout (choose f x . t)
 
-itl :: Tree a -> Tree a -> Tree a
+itl :: Tree a b -> Tree a b -> Tree a b
 itl Empty          t              = t
 itl t              Empty          = t
 itl (Alt t1 t2)    t              = Alt (itl t1 t) (itl t2 t)
 itl t              (Alt t1 t2)    = Alt (itl t t1) (itl t t2)
+itl (Sprout t1)    t2             = Sprout (\x -> itl (t1 x) t2)
+itl t1             (Sprout t2)    = Sprout (\x -> itl t1 (t2 x))
 itl t1@(Val x1 r1) t2@(Val x2 r2) = Alt (Val x1 (itl t2 r1))
                                         (Val x2 (itl t1 r2))
 
-nf :: Prog a -> Tree (Sit a -> a)
+nf :: Prog a -> Tree (Sit a) (Sit a -> a)
 nf p' = rec (nf' p')
-   where rec :: Tree (Atom a) -> Tree (Sit a -> a)
+   where rec :: Tree (Sit a) (Atom a) -> Tree (Sit a) (Sit a -> a)
          rec Empty               = Empty
          rec (Alt t1 t2)         = Alt (rec t1) (rec t2)
          rec (Val (Act a)     t) = Val a (rec t)
          rec (Val (Complex p) t) = mappend (nf p) (rec t)
-         nf' :: Prog a -> Tree (Atom a)
+         rec (Sprout t)          = Sprout (rec . t)
+         nf' :: Prog a -> Tree (Sit a) (Atom a)
          nf' (Seq p1 p2)    = mappend (nf' p1) (nf' p2)
          nf' (Choice p1 p2) = Alt (nf' p1) (nf' p2)
          nf' (Conc p1 p2)   = itl (nf' p1) (nf' p2)
          nf' (Atom a)       = Val a Empty
+         nf' (Eval p)       = Sprout (\s -> nf' (p s))
          nf' Nil            = Empty
 
 data Node a b = Node (Sit a) b | Flop
-type Conf a b = Tree (Node a b)
+type Conf a b = Tree (Sit a) (Node a b)
 type ConfIO a m = Conf a (SyncIO a m)
 newtype SyncIO a m = SyncIO { runSync :: m (ConfIO a m) }
 
 treeND :: BAT a => Prog a -> Sit a -> Conf a ()
-treeND p sz = scan e (Node sz ()) (nf p)
+treeND p sz = scan e (\(Node s _) -> s) (Node sz ()) (nf p)
    where e (Node s _) a _ | poss (a s) s = Node (do_ (a s) s) ()
          e _          _ _                = Flop
 
@@ -102,7 +111,7 @@ treeDT l = (resolveDT l .) . treeND
 
 treeNDIO :: IOBAT a m => Prog a -> Sit a -> ConfIO a m
 treeNDIO = cnf . nf
-   where cnf t s = scan e (Node s (SyncIO $ return (cnf t s))) t
+   where cnf t s = scan e (\(Node s _) -> s) (Node s (SyncIO $ return (cnf t s))) t
          e (Node s pl) a t | poss (a s) s = Node (do_ (a s) s) (SyncIO $ do
                                                      c <- runSync pl
                                                      s' <- syncA (a s) (sit c)
