@@ -117,11 +117,11 @@ doo' = listToMaybe . doo
 -- is 'Offline', it continues with the new search strategy.
 dooIO :: Monad m => (ConfIO a m -> Mode) -> ConfIO a m -> m (Maybe (ConfIO a m))
 dooIO m c = case (m c,       final c) of
-                 (Offline e, False) -> h (filter stop (transStar e c)) (dooIO m)
+                 (Offline e, False) -> h (filter stop (transPlus e c)) (dooIO m)
                  (Online,    False) -> h (trans c) (sync >=> dooIO m)
                  (_,         True)  -> sync c >>= return . Just
-   where transStar BFS = concat . tail . transStarBFS
-         transStar DFS = tail . F.foldr (:) [] . transStarDFS
+   where transPlus BFS = concat . tail . transStarBFS
+         transPlus DFS = tail . F.foldr (:) [] . transStarDFS
          stop c'       = final c' || m c' /= m c
          h []    _     = return Nothing
          h (x:_) f     = f x

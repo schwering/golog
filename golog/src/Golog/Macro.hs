@@ -4,7 +4,7 @@ module Golog.Macro
    atomic, choice, iter, plus, loop, opt,
    ifThen, ifThenElse, if_, then_, else_, while, when, unless,
    ifA, whenA, unlessA, ifThenElseA, whileA, until, untilA,
-   forSome, forAll, pick, withCtrl, monitor) where
+   forSome, forAll, pick, pickInf, withCtrl, monitor) where
 
 import Prelude hiding (until)
 import Data.List (foldl', foldl1')
@@ -87,6 +87,15 @@ pick :: [b] -> (b -> Prog a) -> Prog a
 pick []     _ = error "Golog.Macro.pick: empty list"
 pick [x]    p = p x
 pick (x:xs) p = Choice (p x) (pick xs p)
+
+-- A pick that prevents 'final' from nontermination when the domain is infinite.
+-- This is achieved by adding a 'noop' to the infinite subtree. Note that this
+-- noop is a transition, so it may interfere with resolution of nondeterminism
+-- and `defer' configurations.
+pickInf :: TestAction a => [b] -> (b -> Prog a) -> Prog a
+pickInf []     _ = error "Golog.Macro.pick: empty list"
+pickInf [x]    p = p x
+pickInf (x:xs) p = Choice (p x) (prim noop `Seq` pickInf xs p)
 
 
 -- | If-then-else construct where the condition and the first atom of the branch
