@@ -19,7 +19,7 @@ Description:
 Executable ElevatorBasic
     Hs-Source-Dirs:  elevator-basic
     Main-Is:         ElevatorBasic.hs
-    Build-Depends:   base, golog
+    Build-Depends:   base, golog, time
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 
