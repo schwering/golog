@@ -48,24 +48,24 @@ instance BAT A where
    poss _        _ = True
 
 
-prop_Star = take 10 (map sit (doo (treeND p s0))) ==
+prop_Star = take 10 (map sit (dooBFS (treeND p s0))) ==
             take 10 (map Sit (inits (repeat A)))
    where p = iter $ prim A
 
-prop_ifThenElse1 = map sit (doo (treeND p s0)) == [Sit [t,D,t]]
+prop_ifThenElse1 = map sit (dooBFS (treeND p s0)) == [Sit [t,D,t]]
    where p = if_ (\(Sit as) -> D `notElem` as)
                (then_ $ test (\(Sit as) -> D `elem` as))
                (else_ $ test (\_        -> False))
              `Conc` prim D
          t = Test undefined
 
-prop_ifThenElseA1 = map sit (doo (treeND p s0)) == []
+prop_ifThenElseA1 = map sit (dooBFS (treeND p s0)) == []
    where p = ifA (\(Sit as) -> D `notElem` as)
                (then_ $ test (\(Sit as) -> D `elem` as))
                (else_ $ test (\_        -> False))
              `Conc` prim D
 
-prop_ifThenElseA2 = map sit (doo (treeND p s0)) == [Sit [t,A,C,B]
+prop_ifThenElseA2 = map sit (dooBFS (treeND p s0)) == [Sit [t,A,C,B]
                                                    ,Sit [t,A,B,C]
                                                    ,Sit [C,t,A,B]]
    where p = ifA (\_ -> True)
@@ -74,7 +74,7 @@ prop_ifThenElseA2 = map sit (doo (treeND p s0)) == [Sit [t,A,C,B]
              `Conc` prim C
          t = Test undefined
 
-prop_ifThenElseA3 = map sit (doo (treeND p s0)) == [Sit [A,C,t,B]
+prop_ifThenElseA3 = map sit (dooBFS (treeND p s0)) == [Sit [A,C,t,B]
                                                    ,Sit [A,t,C,B]
                                                    ,Sit [A,t,B,C]
                                                    ,Sit [C,A,t,B]]
@@ -86,13 +86,13 @@ prop_ifThenElseA3 = map sit (doo (treeND p s0)) == [Sit [A,C,t,B]
              ) `Conc` prim C
          t = Test undefined
 
-prop_while1 = map sit (doo (treeND p s0)) == [Sit [t,A,t,C], Sit [t,B,t,C]]
+prop_while1 = map sit (dooBFS (treeND p s0)) == [Sit [t,A,t,C], Sit [t,B,t,C]]
    where p = while (\(Sit as) -> A `notElem` as && B `notElem` as)
                    (choice $ map prim [A,B])
              `Seq` prim C
          t = Test undefined
 
-prop_while2 = fmap sit (doo' (treeND p s0)) == Just (Sit [t,A,t,B,t,C,t,D])
+prop_while2 = fmap sit (dooBFS' (treeND p s0)) == Just (Sit [t,A,t,B,t,C,t,D])
    where p = while (\(Sit as) -> filter (not.isTest) as /= [A,B,C])
                    (choice $ map prim [A,B,C])
              `Seq` prim D
@@ -100,7 +100,7 @@ prop_while2 = fmap sit (doo' (treeND p s0)) == Just (Sit [t,A,t,B,t,C,t,D])
          isTest (Test _) = True
          isTest _        = False
 
-prop_while3 = map sit (doo (treeND p s0)) == [Sit [B,t]
+prop_while3 = map sit (dooBFS (treeND p s0)) == [Sit [B,t]
                                              ,Sit [t,B,A,t]
                                              ,Sit [t,A,B,t]
                                              ,Sit [t,A,t,B]]
@@ -111,7 +111,7 @@ prop_while3 = map sit (doo (treeND p s0)) == [Sit [B,t]
          isTest (Test _) = True
          isTest _        = False
 
-prop_whileA3 = map sit (doo (treeND p s0)) == [Sit [B,t]
+prop_whileA3 = map sit (dooBFS (treeND p s0)) == [Sit [B,t]
                                               ,Sit [t,A,B,t]
                                               ,Sit [t,A,t,B]]
    where p = whileA (\(Sit as) -> A `notElem` as && B `notElem` as)

@@ -7,7 +7,7 @@ module Golog.Macro
    forSome, forAll, pick, pickInf, withCtrl, monitor) where
 
 import Prelude hiding (until)
-import Data.List (foldl', foldl1')
+import Data.List (foldl1')
 import Golog.Interpreter
 
 class TestAction a where
@@ -78,7 +78,7 @@ until :: TestAction a => (Sit a -> Bool) -> Prog a -> Prog a
 until phi = while (not.phi)
 
 forAll :: [b] -> (b -> Prog a) -> Prog a
-forAll xs pf = foldl' (\p x -> p `Seq` pf x) Nil xs
+forAll xs pf = foldr (\x p -> p `Seq` pf x) Nil xs
 
 forSome :: [b] -> (b -> Prog a) -> Prog a
 forSome = pick

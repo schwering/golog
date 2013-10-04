@@ -1,5 +1,5 @@
-PROFILING = --enable-library-profiling --enable-executable-profiling
 PROFILING =
+PROFILING = --enable-library-profiling
 
 all: dist
 	cabal build

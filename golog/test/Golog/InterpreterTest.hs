@@ -39,8 +39,9 @@ instance Monad m => IOBAT Int m where
    --    1 --trans--> Just 1 --sync--> 2 --trans--> Nothing
    -- because then 2 (even number) is executed in an even situation (due to
    -- sync).
-   -- This does of course not occur when we first use doo' and then apply sync
-   -- the final configuration, because then no preconditions are checked.
+   -- This does of course not occur when we first use dooBFS' and then apply
+   -- sync -- the final configuration, because then no preconditions are
+   -- checked.
    syncA a s = return $ do_ (a+2) s
 
 data Prim = A | B | C | D deriving (Eq, Ord, Show)
@@ -110,15 +111,15 @@ prop_dttrans4 = let t = treeDT 3 (choice [p 1, p 3, p 1] `Seq` choice [p i `Seq`
                 -- in the nondet that fails even earlier.
                 in (trans' t >>= trans' >>= trans' >>= (return . sit)) == Nothing
 
-prop_doo1 = map sit (doo (treeND (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0)) ==
+prop_doo1 = map sit (dooBFS (treeND (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0)) ==
             map list2sit [[1,2,3], [1,4,5]]
-prop_doo2 = sort (map sit (doo (treeND (p 1 `Seq` ((p 10 `Seq` (atomic $ p 11 `Seq` p 12) `Seq` p 13) `Conc` (p 20 `Seq` p 21)) `Seq` p 100) s0))) ==
+prop_doo2 = sort (map sit (dooBFS (treeND (p 1 `Seq` ((p 10 `Seq` (atomic $ p 11 `Seq` p 12) `Seq` p 13) `Conc` (p 20 `Seq` p 21)) `Seq` p 100) s0))) ==
             sort (map list2sit [[1,10,11,12,13,20,21,100], [1,20,21,10,11,12,13,100]])
-prop_doo3 = take 11 (map sit (doo (treeND (p 0 `Seq` (iter (primf (\(Do i _) -> i+1)))) s0))) ==
+prop_doo3 = take 11 (map sit (dooBFS (treeND (p 0 `Seq` (iter (primf (\(Do i _) -> i+1)))) s0))) ==
             [list2sit [0..i] | i <- [0..10]]
 
 prop_doo4 (Lookahead l) =
-            map sit (doo (treeDT l (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0)) ==
+            map sit (dooBFS (treeDT l (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0)) ==
             map list2sit [[1,4,5]]
 
 prop_sync1 = let t = treeNDIO (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0
@@ -128,29 +129,29 @@ prop_sync2 = let t = treeNDIO (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]
 prop_sync3 = let t = treeNDIO (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0
              in sit (fromJust (sync (fromJust (trans' t)))) == do_ 3 s0
 prop_sync4 = let t = treeNDIO (p 1 `Seq` p 2 `Seq` p 3 `Seq` p 4 `Seq` p 5 `Seq`  Nil) s0
-             in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
+             in fmap sit (dooBFS' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
 prop_sync5 = let t = treeNDIO (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0
-             in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
+             in fmap sit (dooBFS' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
 
 prop_dtsync1 = let t = treeDTIO 3 (choice [p 1, p 3, p 1] `Seq` choice [p i | i <- [1,2,3,4,5,4,3,2,1]] `Seq` choice [p i | i <- [1,2,3,4,5,4,3,2,1]]) s0
                -- This tests that nondeterminism in results of sync is resolved.
                -- If it isn't, the interpreter executes 3 in the second nondet.
                in (trans' t >>= sync >>= trans' >>= sync >>= trans' >>= sync >>= (return . sit)) == Just (do_ 7 (do_ 6 (do_ 5 s0)))
 prop_dtsync2 = let t = treeDTIO 3 (p 1 `Seq` p 2 `Seq` p 3 `Seq` p 4 `Seq` p 5 `Seq`  Nil) s0
-               in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
+               in fmap sit (dooBFS' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
 prop_dtsync3 = let t = treeDTIO 3 (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0
-               in fmap sit (doo' t >>= sync) == Just (do_ 7 (do_ 6 (do_ 3 s0)))
+               in fmap sit (dooBFS' t >>= sync) == Just (do_ 7 (do_ 6 (do_ 3 s0)))
 prop_dtsync4 = let t = treeDTIO 3 (p 1 `Seq` choice [p i `Seq` p (i+1) | i <- [1..5]]) s0
-               in fmap sit (doo' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
+               in fmap sit (dooBFS' t >>= sync) == fmap sit (fromJust (dooIO (const Online) t))
 prop_dtsync5 = let t = treeDTIO 3 (prim A `Seq` choice [prim C, prim D]) s0
                in fmap sit (fromJust (dooIO (const Online) t)) == Just (do_ D (do_ B s0))
 prop_dtsync6 = let t = treeDTIO 3 (prim A `Seq` choice [prim C, prim D]) s0
-               in fmap sit (doo' t >>= sync) == Just (do_ C (do_ B s0))
+               in fmap sit (dooBFS' t >>= sync) == Just (do_ C (do_ B s0))
 
---prop_NondetEmpty1 = map sit (doo (treeND p s0)) == [do_ A s0]
+--prop_NondetEmpty1 = map sit (dooBFS (treeND p s0)) == [do_ A s0]
 --   where p = prim A `Seq` Nondet []
 --
---prop_NondetEmpty2 = map sit (doo (treeND p s0)) == [do_ B (do_ A s0)]
+--prop_NondetEmpty2 = map sit (dooBFS (treeND p s0)) == [do_ B (do_ A s0)]
 --   where p = prim A `Seq` Nondet [] `Seq` prim B
 
 

@@ -25,7 +25,7 @@ import Golog.Util
 type Floor = Int
 
 floors :: [Floor]
-floors = [0..2001]
+floors = [0..1001]
 
 -- There are three actions: Up and Down move the elevator to a floor,
 -- TurnOff switches off the call-button. Test is a test-action, because
@@ -43,7 +43,7 @@ instance TestAction A where
 instance BAT A where
    data Sit A = State { floor :: Floor, onButtons :: [Floor] }
 
-   s0 = State { floor = 7, onButtons = take 1000 [3,5..] }
+   s0 = State { floor = 7, onButtons = take ((length floors - 1) `div` 2) [3,5..] }
 
    do_ (Up n)      s = s{floor = n}
    do_ (Down n)    s = s{floor = n}
@@ -65,20 +65,23 @@ goFloor n = choice [ primf (Up . n)
 
 control :: Prog A
 control = until (null.onButtons)
-                (pickInf [0..] (\i -> test (\s -> i < length (onButtons s)) `Seq`
-                                      goFloor (n i) `Seq`
-                                      primf (TurnOff . n i))) `Seq`
+                (pickInf floors (\n -> test (\s -> n `elem` onButtons s) `Seq`
+                                       goFloor (const n) `Seq`
+                                       primf (TurnOff . const n))) `Seq`
+                --(pickInf [0..] (\i -> test (\s -> i < length (onButtons s)) `Seq`
+                --                      goFloor (n i) `Seq`
+                --                      primf (TurnOff . n i))) `Seq`
           goFloor (const 1)
    where n i s = onButtons s !! i
 
 -- The IOBAT typeclass is for defining real world effects of actions. We use
 -- this here to just print the state.
 instance IOBAT A IO where
-   syncA a s = putStr as >> putChar ' ' >> return s'
+   syncA a s = putStr as >> return s'
       where s' = do_ a s
-            as = case a of Up      n -> "Up "++ show n
-                           Down    n -> "Down "++ show n
-                           TurnOff n -> "TurnOff "++ show n
+            as = case a of Up      n -> "Up "++ show n ++ "; "
+                           Down    n -> "Down "++ show n ++ "; "
+                           TurnOff n -> "TurnOff "++ show n ++ "; "
                            Test _    -> ""
 {-
    syncA a s = maybe (return s') (\str -> putStrLn str >> return s') as
@@ -96,7 +99,7 @@ main = do t1 <- getCurrentTime
           t2 <- getCurrentTime
           putStrLn ""
           putStrLn $ show (diffUTCTime t2 t1)
-          --let Just c1 = doo' (treeNDIO control s0)
+          --let Just c1 = dooBFS' (treeNDIO control s0)
           --_ <- sync c1 -- prints all states
           return ()
 

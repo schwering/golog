@@ -4,7 +4,7 @@
 module Golog.Util
    (HistBAT(..), defaultPredSit, sit2list, list2sit, append2sit,
     trans', transStarBFS, transStarDFS, transStarDFS',
-    doo, doo',
+    dooBFS, dooBFS', dooDFS, dooDFS',
     Mode(..), Search(..), dooIO) where
 
 import Control.Monad ((>=>))
@@ -77,21 +77,35 @@ transStarBFS c = takeWhile (not.null) $ iterate (concatMap trans) [c]
 -- opportunities in the respective configuration.
 -- We use a tree instead of lists of lists because the latter for reasons which
 -- I don't understand has some issues with lazy evaluation.
-transStarDFS :: Conf a b -> T.Tree (Conf a b)
-transStarDFS c = T.Node c (map transStarDFS (trans c))
+transStarDFS :: Conf a b -> [Conf a b]
+transStarDFS = F.foldr (:) [] . treeDFS
+   where treeDFS c = T.Node c (map treeDFS (trans c))
 
 -- | Variant of 'transStarDFS' which commits to the first option in each
 -- transition.
 transStarDFS' :: Conf a b -> [Conf a b]
 transStarDFS' c = c : maybe [] transStarDFS' (trans' c)
 
--- | Returns the list of final configurations reached from the given one.
-doo :: Conf a b -> [Conf a b]
-doo c = concat $ map (filter final) (transStarBFS c)
+-- | Returns the list of final configurations reached from the given one
+-- in breadth-first order.
+dooBFS :: Conf a b -> [Conf a b]
+dooBFS c = concat $ map (filter final) (transStarBFS c)
 
--- | Variant of 'doo' which commits to the first option in each configuration.
-doo' :: Conf a b -> Maybe (Conf a b)
-doo' = listToMaybe . doo
+-- | Variant of 'dooBFS' which commits to the first option in each
+-- configuration.
+dooBFS' :: Conf a b -> Maybe (Conf a b)
+dooBFS' = listToMaybe . dooBFS
+
+-- | Returns the list of final configurations reached from the given one
+-- in depth-first order.
+dooDFS :: Conf a b -> [Conf a b]
+dooDFS = filter final . transStarDFS
+
+-- | Variant of 'dooDFS' which commits to the first option in each
+-- configuration.
+dooDFS' :: Conf a b -> Maybe (Conf a b)
+dooDFS' c | final c   = Just c
+          | otherwise = trans' c >>= dooDFS'
 
 -- | Execution in online and/or offline mode.
 -- The first parameter may assign to a configuration whether at this point

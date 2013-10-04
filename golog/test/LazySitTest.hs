@@ -53,7 +53,7 @@ testLazy = take 10 as
          fake4 = fake4' (s0 :: Sit Int) p
          fake4' s (PseudoAtom (Atom (Prim a)) `Seq` p) = do_ a s `then_` fake4' s p
 
-         s = sit $ fromJust $ doo' $ treeND p s0
+         s = sit $ fromJust $ dooBFS' $ treeND p s0
          p = p' 0 :: Prog Int
          p' n = prim n `Seq` p' (n+2)
          cons = (:)

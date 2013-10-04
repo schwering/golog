@@ -54,7 +54,7 @@ cs s = P.cs (sit (pc s))
 type RefineF a = A -> Sit A -> Sit a -> ConfIO a
 
 refine :: IOBAT a IO => String -> Sit a -> Prog a -> ConfIO a
-refine name s p = case doo' (treeNDIO p s) of
+refine name s p = case dooBFS' (treeNDIO p s) of
                        Just c  -> c
                        Nothing -> error $ name ++ ": execution failed"
 

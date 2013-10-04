@@ -229,15 +229,15 @@ main = do
    putStrLn "-------------------------------------------------------\n"
    putStrLn (maybe "nothing" (show . cutoff 10) (trans 100000 t1))
    putStrLn "-------------------------------------------------------\n"
-   mapM_ (\i -> putStrLn (show i ++ ": " ++ show (doo i p2 S0))) [0..9]
+   mapM_ (\i -> putStrLn (show i ++ ": " ++ show (dooBFS i p2 S0))) [0..9]
    putStrLn "-------------------------------------------------------"
-   mapM_ (\i -> putStrLn ("Pick one: " ++ show i ++ ": " ++ show (doo i (p3 i) S0))) [0..5]
+   mapM_ (\i -> putStrLn ("Pick one: " ++ show i ++ ": " ++ show (dooBFS i (p3 i) S0))) [0..5]
    putStrLn "-------------------------------------------------------"
-   mapM_ (\i -> putStrLn ("Pick seq: " ++ show i ++ ": " ++ show (doo i (p4 i) S0))) [0..5]
+   mapM_ (\i -> putStrLn ("Pick seq: " ++ show i ++ ": " ++ show (dooBFS i (p4 i) S0))) [0..5]
    putStrLn "-------------------------------------------------------"
-   mapM_ (\i -> putStrLn ("Pick nested: " ++ show i ++ ": " ++ show (doo i (p5 i) S0))) [0..5]
+   mapM_ (\i -> putStrLn ("Pick nested: " ++ show i ++ ": " ++ show (dooBFS i (p5 i) S0))) [0..5]
    putStrLn "-------------------------------------------------------"
-   mapM_ (\i -> putStrLn ("Pick nested 2: " ++ show i ++ ": " ++ show (doo i (p6 i) S0))) [0..5]
+   mapM_ (\i -> putStrLn ("Pick nested 2: " ++ show i ++ ": " ++ show (dooBFS i (p6 i) S0))) [0..5]
    putStrLn "-------------------------------------------------------"
 -}
          --mapM_ (putStrLn . show) (take 30 O.observations)
@@ -252,7 +252,7 @@ main = do
              prog     = obsProg `Conc` candProg
              --sits     = map (\(s,_,_) -> s) $ do3 4 prog s0
              sits     = map sit $ transStarDFS' (treeDT lookahead prog s0)
-             --confs    = doo' (treeDT 6 prog s0)
+             --confs    = dooBFS' (treeDT 6 prog s0)
              partOfObs (Wait _)     = True
              partOfObs (Prematch _) = True
              partOfObs (Match _)    = True

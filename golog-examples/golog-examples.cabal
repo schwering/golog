@@ -21,26 +21,26 @@ Executable ElevatorBasic
     Main-Is:         ElevatorBasic.hs
     Build-Depends:   base, golog, time
     GHC-Options:     -Wall -O -rtsopts
-    --GHC-Prof-Options:-prof -auto-all
+    GHC-Prof-Options:-prof -auto-all -caf-all
 
 Executable ElevatorReactive
     Hs-Source-Dirs:  elevator-reactive
     Main-Is:         ElevatorReactive.hs
     Build-Depends:   base, golog
     GHC-Options:     -Wall -O -rtsopts
-    --GHC-Prof-Options:-prof -auto-all
+    GHC-Prof-Options:-prof -auto-all -caf-all
 
 Executable Maze
     Hs-Source-Dirs:  maze
     Main-Is:         Maze.hs
     Build-Depends:   base, golog
     GHC-Options:     -Wall -O -rtsopts
-    --GHC-Prof-Options:-prof -auto-all
+    GHC-Prof-Options:-prof -auto-all -caf-all
 
 --Executable Traffic
 --    Hs-Source-Dirs:  traffic
 --    Main-Is:         Traffic.hs
 --    Build-Depends:   base, containers, golog
 --    GHC-Options:     -Wall -O -rtsopts
---    --GHC-Prof-Options:-prof -auto-all
+--    GHC-Prof-Options:-prof -auto-all -caf-all
 

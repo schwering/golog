@@ -38,7 +38,7 @@ p = prim
 q = atomic
 
 doDT :: DTBAT a => Int -> Prog a -> Sit a -> [Sit a]
-doDT l p s = map sit $ doo (treeDT l p s)
+doDT l p s = map sit $ dooBFS (treeDT l p s)
 
 testDTIO :: IO (Sit Int)
 testDTIO = do  c <- return $ t

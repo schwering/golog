@@ -6,9 +6,15 @@ dist
 *.csv
 a.out
 replay
-Main.prof*
 bla.*
 bla-*
 blupp.*
 blupp-*
 *.npy
+*.o
+*.hi
+*.aux
+*.hp
+*.ps
+*.prof
+golog/prof/Profiling
