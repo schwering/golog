@@ -35,8 +35,8 @@ type Sit1 = Sit Prim1
 type Sit2 = Sit Prim2
 type Reward1 = Reward Prim1
 type Reward2 = Reward Prim2
-type Conf1 = ConfIO Prim1 IO
-type Conf2 = ConfIO Prim2 IO
+type Conf1 = Conf Prim1 (Sync Prim1 IO)
+type Conf2 = Conf Prim2 (Sync Prim2 IO)
 type Prog1 = Prog Prim1
 type Prog2 = Prog Prim2
 

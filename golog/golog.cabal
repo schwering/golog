@@ -24,7 +24,7 @@ Library
     Other-Modules:
     Build-Depends:   base, containers
     GHC-Options:     -Wall -O -rtsopts
-    --GHC-Prof-Options:-prof -auto-all
+    GHC-Prof-Options:-prof -auto-all -caf-all
 
 
 Test-Suite Test

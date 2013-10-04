@@ -1,7 +1,7 @@
 module Golog.Macro
   (TestAction(..),
    prim, primf, test,
-   atomic, choice, iter, plus, loop, opt,
+   atomic, choice, iter, plus, loop, opt, iterconc,
    ifThen, ifThenElse, if_, then_, else_, while, when, unless,
    ifA, whenA, unlessA, ifThenElseA, whileA, until, untilA,
    forSome, forAll, pick, pickInf, withCtrl, monitor) where

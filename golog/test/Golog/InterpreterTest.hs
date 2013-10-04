@@ -14,7 +14,7 @@ import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Modifiers
 
-newtype Lookahead = Lookahead Depth deriving Show
+newtype Lookahead = Lookahead Int deriving Show
 
 instance Arbitrary Lookahead where
    arbitrary = fmap Lookahead $ oneof $ map return [0..9]

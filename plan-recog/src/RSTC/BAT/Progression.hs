@@ -117,11 +117,11 @@ instance BAT (Prim (Qty Double)) where
    poss   = defaultPoss
 
 
-addReward :: Reward (Prim (Qty Double)) -> (Double, Depth) -> Reward (Prim (Qty Double))
+addReward :: Reward (Prim (Qty Double)) -> (Double, Int) -> Reward (Prim (Qty Double))
 addReward (Reward (r1,d1)) (r2,d2) = Reward (r1+r2, d1+d2)
 
 instance DTBAT (Prim (Qty Double)) where
-   newtype Reward (Prim (Qty Double)) = Reward (Double, Depth)
+   newtype Reward (Prim (Qty Double)) = Reward (Double, Int)
       deriving (Eq, Ord)
    reward = sitRew
 

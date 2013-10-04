@@ -2,7 +2,7 @@
 
 module Golog.Interpreter
   (BAT(..), DTBAT(..), IOBAT(..),
-   Atom(..), Prog(..), Conf, ConfIO, Depth,
+   Atom(..), Prog(..), Conf, Sync,
    treeND, treeDT, treeNDIO, treeDTIO, final, trans, sit, sync) where
 
 import Control.Monad (liftM)
@@ -25,8 +25,6 @@ class (BAT a, Monad m) => IOBAT a m where
 data Atom a = Act (Sit a -> a) | Complex (Prog a)
 data Prog a = Seq (Prog a) (Prog a)  | Choice (Prog a) (Prog a)
             | Conc (Prog a) (Prog a) | Atom (Atom a) | Nil
-
-type Depth = Int
 
 data Tree a = Empty | Alt (Tree a) (Tree a) | Val a (Tree a)
 
@@ -51,7 +49,7 @@ maxBy :: (a -> a -> Ordering) -> a -> a -> a
 maxBy cmp x y = case cmp x y of GT -> x
                                 _  -> y
 
-best :: (a -> a -> Ordering) -> (Tree a -> Bool) -> Depth -> a -> Tree a -> a
+best :: (a -> a -> Ordering) -> (Tree a -> Bool) -> Int -> a -> Tree a -> a
 best _   _   _ x Empty       = x
 best cmp cut l x (Alt t1 t2) = maxBy cmp (best cmp cut l x t1)
                                          (best cmp cut l x t2)
@@ -89,33 +87,32 @@ nf p' = rec (nf' p')
 
 data Node a b = Node (Sit a) b | Flop
 type Conf a b = Tree (Node a b)
-type ConfIO a m = Conf a (SyncIO a m)
-newtype SyncIO a m = SyncIO { runSync :: m (ConfIO a m) }
+newtype Sync a m = Sync { runSync :: m (Conf a (Sync a m)) }
 
 treeND :: BAT a => Prog a -> Sit a -> Conf a ()
 treeND p sz = scan e (Node sz ()) (nf p)
    where e (Node s _) a _ | poss (a s) s = Node (do_ (a s) s) ()
          e _          _ _                = Flop
 
-treeDT :: DTBAT a => Depth -> Prog a -> Sit a -> Conf a ()
+treeDT :: DTBAT a => Int -> Prog a -> Sit a -> Conf a ()
 treeDT l = (resolveDT l .) . treeND
 
-treeNDIO :: IOBAT a m => Prog a -> Sit a -> ConfIO a m
+treeNDIO :: IOBAT a m => Prog a -> Sit a -> Conf a (Sync a m)
 treeNDIO = cnf . nf
-   where cnf t s = scan e (Node s (SyncIO $ return (cnf t s))) t
-         e (Node s pl) a t | poss (a s) s = Node (do_ (a s) s) (SyncIO $ do
+   where cnf t s = scan e (Node s (Sync $ return (cnf t s))) t
+         e (Node s pl) a t | poss (a s) s = Node (do_ (a s) s) (Sync $ do
                                                      c <- runSync pl
                                                      s' <- syncA (a s) (sit c)
                                                      return (cnf t s'))
          e _           _ _                = Flop
 
-treeDTIO :: (DTBAT a, IOBAT a m) => Depth -> Prog a -> Sit a -> ConfIO a m
+treeDTIO :: (DTBAT a, IOBAT a m) => Int -> Prog a -> Sit a -> Conf a (Sync a m)
 treeDTIO l = (f .) . treeNDIO
    where f = fmap g . resolveDT l
-         g (Node s (SyncIO c)) = Node s (SyncIO $ liftM f c)
-         g Flop                = Flop
+         g (Node s (Sync c)) = Node s (Sync $ liftM f c)
+         g Flop              = Flop
 
-resolveDT :: DTBAT a => Depth -> Conf a b -> Conf a b
+resolveDT :: DTBAT a => Int -> Conf a b -> Conf a b
 resolveDT l = choose dt Flop
    where dt def = maxBy (comparing value)
             where value t = val (best cmp final l def t)
@@ -143,7 +140,7 @@ sit :: Conf a b -> Sit a
 sit (Val (Node s _) _) = s
 sit _                  = error "sit: invalid conf"
 
-sync :: ConfIO a m -> m (ConfIO a m)
+sync :: Conf a (Sync a m) -> m (Conf a (Sync a m))
 sync (Val (Node _ pl) _) = runSync pl
 sync _                   = error "sync: invalid conf"
 

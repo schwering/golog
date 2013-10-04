@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, FlexibleContexts #-}
 
 module TORCS.Golog.BAT.WarmUp where
 
@@ -20,14 +20,16 @@ import TORCS.PhysicsUtil
 
 data A = Drive | Tick
 
-cnf :: IOBAT a m => Sit a -> ConfIO a m
+type ConfIO a = Conf a (Sync a IO)
+
+cnf :: IOBAT a IO => Sit a -> ConfIO a
 cnf = treeNDIO Nil
 
 instance BAT A where
    data Sit A = Sit {
-      gc :: ConfIO G.A IO,
-      pc :: ConfIO P.A IO,
-      tc :: ConfIO T.A IO
+      gc :: ConfIO G.A,
+      pc :: ConfIO P.A,
+      tc :: ConfIO T.A
    }
 
    s0 = Sit (cnf s0) (cnf s0) (cnf s0)
@@ -49,9 +51,9 @@ cc s = G.fillCc (sit (gc s)) $ T.fillCc (sit (tc s)) $ defaultControl
 cs :: Sit A -> CarState
 cs s = P.cs (sit (pc s))
 
-type RefineF a = A -> Sit A -> Sit a -> ConfIO a IO
+type RefineF a = A -> Sit A -> Sit a -> ConfIO a
 
-refine :: IOBAT a m => String -> Sit a -> Prog a -> ConfIO a m
+refine :: IOBAT a IO => String -> Sit a -> Prog a -> ConfIO a
 refine name s p = case doo' (treeNDIO p s) of
                        Just c  -> c
                        Nothing -> error $ name ++ ": execution failed"

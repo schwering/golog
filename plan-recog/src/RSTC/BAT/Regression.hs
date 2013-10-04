@@ -43,7 +43,7 @@ instance RealFloat a => BAT (Prim (Qty a)) where
    poss = defaultPoss
 
 instance DTBAT (Prim (Qty Double)) where
-   newtype Reward (Prim (Qty Double)) = Reward (Double, Depth)
+   newtype Reward (Prim (Qty Double)) = Reward (Double, Int)
       deriving (Eq, Ord)
    reward S0       = Reward (0, 0)
    reward (Do a s) = Reward (r1+r2, d1+d2)

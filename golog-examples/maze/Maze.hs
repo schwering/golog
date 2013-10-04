@@ -236,7 +236,7 @@ best (a0,a1,a2,a3) s |  0 <= pct && pct < 10 && poss a0 s = a0
    where r   = random s
          pct = r `mod` 100
 
-lookahead :: Depth
+lookahead :: Int
 lookahead = 5
 
 main :: IO ()
@@ -247,7 +247,7 @@ main = do
                             , primf left
                             , primf right]) `Seq`
                test (\s -> pos s == goalPos)
-       tree = treeDTIO lookahead prog s0 :: ConfIO (Prim Regr) IO
+       tree = treeDTIO lookahead prog s0 :: Conf (Prim Regr) (Sync (Prim Regr) IO)
        mode c = case history (sit c) of []         -> Offline BFS
                                         Test _ : _ -> Offline BFS
                                         Left   : _ -> Online

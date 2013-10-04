@@ -17,7 +17,7 @@ instance BAT Int where
    poss a _ = even a
 
 instance DTBAT Int where
-   newtype Reward Int = Reward { rew :: (Double, Depth) } deriving (Eq, Ord, Show)
+   newtype Reward Int = Reward { rew :: (Double, Int) } deriving (Eq, Ord, Show)
    reward (Do _ s)         | sitlen s > 5 = Reward $ rew (reward s) `plus2` (-1000, 1)
    reward (Do a (Do a' s)) | a == a'      = Reward $ rew (reward s) `plus2` (-1, 1)
    reward (Do a s)                        = Reward $ rew (reward s) `plus2` (fromIntegral (max 0 a), 1)
@@ -37,7 +37,7 @@ sitlen (Do _ s) = 1 + sitlen s
 p = prim
 q = atomic
 
-doDT :: DTBAT a => Depth -> Prog a -> Sit a -> [Sit a]
+doDT :: DTBAT a => Int -> Prog a -> Sit a -> [Sit a]
 doDT l p s = map sit $ doo (treeDT l p s)
 
 testDTIO :: IO (Sit Int)

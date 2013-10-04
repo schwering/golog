@@ -44,8 +44,8 @@ class BAT a => HistBAT a where
    predSit     = defaultPredSit
 
 defaultPredSit :: HistBAT a => Sit a -> Maybe (a, Sit a)
-defaultPredSit s   = case history s of []   -> Nothing
-                                       a:as -> Just (a, foldr do_ s0 as)
+defaultPredSit s = case history s of []   -> Nothing
+                                     a:as -> Just (a, foldr do_ s0 as)
 
 sit2list :: HistBAT a => Sit a -> [a]
 sit2list = reverse . history
@@ -115,7 +115,7 @@ doo' = listToMaybe . doo
 -- returned. In the latter case, execution continues with the new mode. If this
 -- new mode is 'Online', this means a pre-'final' 'sync'hronization point. If it
 -- is 'Offline', it continues with the new search strategy.
-dooIO :: Monad m => (ConfIO a m -> Mode) -> ConfIO a m -> m (Maybe (ConfIO a m))
+dooIO :: Monad m => (Conf a (Sync a m) -> Mode) -> Conf a (Sync a m) -> m (Maybe (Conf a (Sync a m)))
 dooIO m c = case (m c,       final c) of
                  (Offline e, False) -> h (filter stop (transPlus e c)) (dooIO m)
                  (Online,    False) -> h (trans c) (sync >=> dooIO m)
