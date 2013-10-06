@@ -6,7 +6,7 @@ import Data.IORef
 import Golog.Interpreter
 import Golog.Macro
 import Golog.Util
-import RoadMap
+import World
 import System.Environment (getArgs)
 import Visualization
 

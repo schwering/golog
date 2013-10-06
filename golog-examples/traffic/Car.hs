@@ -1,10 +1,9 @@
+{-# LANGUAGE TypeFamilies #-}
+
 module Car where
 
-import qualified Data.Map as Map
 import Golog.Interpreter
-import RoadMap (Direction)
-
-type CarLUT a = Map.Map (a, a) (Car a)
+import World (Direction)
 
 type Car = Char
 
@@ -17,7 +16,7 @@ instance BAT A where
                       }
       deriving Show
 
-   s0 = State { veloc = 0, position = (0,0), orientation = East }
+   s0 = undefined -- State { veloc = 0, position = (0,0), orientation = East }
 
-   do_ (Accel 
+   do_ = undefined
 

@@ -2,7 +2,7 @@ module Visualization where
 
 import qualified Car as C
 import qualified Data.Map as Map
-import qualified RoadMap as R
+import qualified World as R
 
 roadSymbol :: R.Direction -> Char
 roadSymbol R.North     = '\8593'
@@ -16,10 +16,10 @@ roadSymbol R.SouthWest = '\8601'
 
 draw :: R.World Int -> IO ()
 draw w = draw' 0 0
-   where m  = R.lut w
+   where m  = R.streetLut w
          cs = R.carLut w
          display x y = case (Map.lookup (x,y) cs, Map.lookup (x,y) m) of
-                            (Just c,  Just (_,ls,s)) -> putStr (color ls s) >> putChar (C.symbol c)  >> putStr knrm
+                            (Just c,  Just (_,ls,s)) -> putStr (color ls s) >> putChar c >> putStr knrm
                             (Nothing, Just (d,ls,s)) -> putStr (color ls s) >> putChar (roadSymbol d) >> putStr knrm
                             (Nothing, Nothing)       -> putChar ' '
                             (Just _,  Nothing)       -> error "draw: car outside road"
