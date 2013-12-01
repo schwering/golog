@@ -1,0 +1,4 @@
+In Monads-and-Effects.pdf one Excercise is to write a monad for logical
+variables which can be read before they're written. That might be
+interesting for pick.
+

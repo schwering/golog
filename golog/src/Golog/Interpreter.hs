@@ -98,12 +98,12 @@ treeDT :: DTBAT a => Int -> Prog a -> Sit a -> Conf a ()
 treeDT l = (resolveDT l .) . treeND
 
 treeNDIO :: IOBAT a m => Prog a -> Sit a -> Conf a (Sync a m)
-treeNDIO = cnf . nf
-   where cnf t s = scan e (Node s (Sync $ return (cnf t s))) t
+treeNDIO = tree . nf
+   where tree t s = scan e (Node s (Sync $ return (tree t s))) t
          e (Node s pl) a t | poss (a s) s = Node (do_ (a s) s) (Sync $ do
                                                      c <- runSync pl
                                                      s' <- syncA (a s) (sit c)
-                                                     return (cnf t s'))
+                                                     return (tree t s'))
          e _           _ _                = Flop
 
 treeDTIO :: (DTBAT a, IOBAT a m) => Int -> Prog a -> Sit a -> Conf a (Sync a m)

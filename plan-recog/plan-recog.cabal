@@ -33,7 +33,7 @@ Library
 Executable Main
     Hs-Source-Dirs:  main
     Main-Is:         Main.hs
-    Build-Depends:   base, bytestring, ekg, golog, plan-recog
+    Build-Depends:   base, bytestring, golog, plan-recog
     GHC-Options:     -Wall -O -rtsopts
     --GHC-Prof-Options:-prof -auto-all
 
