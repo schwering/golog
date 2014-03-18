@@ -1,0 +1,25 @@
+Name: limited
+Version: 1.0
+License: BSD3
+Author: Christoph Schwering
+Synopsis: Limited reasoning.
+Cabal-Version: >= 1.8
+Build-Type: Simple
+
+Description:
+    An implementation of ESL, a logic for limited reasoning about actions.
+
+Library
+    Hs-Source-Dirs:  src
+    Exposed-Modules: ESL
+    Other-Modules:
+    Build-Depends:   base, containers
+    GHC-Options:     -Wall -O -rtsopts
+
+
+Test-Suite Test
+    Hs-Source-Dirs: test
+    Main-Is:        Main.hs
+    Type:           exitcode-stdio-1.0
+    Build-Depends:  base, limited, QuickCheck
+

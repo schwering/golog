@@ -43,11 +43,11 @@ app sits req = do
 
 
 indexFile :: String -> Response
-indexFile fileName = ResponseFile status200 [("Content-Type", pack $ mimeType fileName)] ("html/" ++ fileName) Nothing
+indexFile fileName = responseFile status200 [("Content-Type", pack $ mimeType fileName)] ("html/" ++ fileName) Nothing
 
 
 index :: (HistState a, Show a) => [Sit (Prim a)] -> Int -> Response
-index sits i = ResponseBuilder status [("Content-Type", "text/plain")] response
+index sits i = responseBuilder status [("Content-Type", "text/plain")] response
    where restSits = drop i sits
          s        = case restSits of x:_ -> x ; _ -> undefined
          ntgs     = [(b, c, ntg s b c) | b <- cars, c <- cars, b /= c]

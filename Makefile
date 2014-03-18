@@ -6,6 +6,7 @@ all:
 	make -C plan-recog
 	make -C torcs-agent
 	make -C golog-examples
+	make -C limited
 
 clean:
 	make -C golog clean
