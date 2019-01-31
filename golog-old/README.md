@@ -13,8 +13,8 @@ The essential components of this are the 'Sprout' constructor and the 'best'
 function in [Golog.Old.Tree](src/Golog/Old/Tree.hs).
 
 
-Contact: [Christoph Schwering][HP] (schwering at kbsg.rwth-aachen.de).
+Contact: [Christoph Schwering][HP] (schwering at gmail dot com).
 
 
-[HP]: http://www.kbsg.rwth-aachen.de/~schwering/
+[HP]: http://schwering.github.io
 

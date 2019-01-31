@@ -36,16 +36,16 @@ For testing purposes, observations can be recorded and then replayed (using
 [scripts/replay.c](scripts/replay.c)).
 
 
-Contact: [Christoph Schwering][HP] (schwering at kbsg.rwth-aachen.de).
+Contact: [Christoph Schwering][HP] (schwering at gmail dot com).
 
 
 [SitCalc]: http://en.wikipedia.org/wiki/Situation_calculus
 [Golog]: http://www.cs.toronto.edu/cogrobo/main/
-[CogRob-2012]: http://www-kbsg.informatik.rwth-aachen.de/~schwering/CogRob-2012/paper.pdf
-[CogRob-2012-slides]: http://www-kbsg.informatik.rwth-aachen.de/~schwering/CogRob-2012/slides.html
-[Commonsense-2013]: http://www-kbsg.informatik.rwth-aachen.de/~schwering/Commonsense-2013/paper.pdf
-[Commonsense-2013-slides]: http://www-kbsg.informatik.rwth-aachen.de/~schwering/Commonsense-2013/slides.html
+[CogRob-2012]: http://schwering.github.io/cogrob-2012.pdf
+[CogRob-2012-slides]: http://schwering.github.io/cogrob-2012-slides
+[Commonsense-2013]: http://schwering.github.io/commonsense-2013.pdf
+[Commonsense-2013-slides]: http://schwering.github.io/commonsense-2013-slides
 [TORCS]: http://torcs.sourceforge.net/
 [TORCS-robots]: https://github.com/schwering/torcs-drivers
-[HP]: http://www.kbsg.rwth-aachen.de/~schwering/
+[HP]: http://schwering.github.io
 

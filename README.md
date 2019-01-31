@@ -8,19 +8,16 @@ There are many dialects of Golog; this is one of them.
 
 * The [Golog interpreter code](golog/).
 * A few [toy examples](golog-examples/) are available.
-
-More serious applications of the interpreter:
-
-* A [plan recognition system](plan-recog/) particularly for automotive traffic.
+* A [plan recognition system](plan-recog/), particularly for automotive traffic.
   We model the world with a situation calculus theory and define Golog programs
   which represent typical behavior. The plan recognition system then simulates
   execution of these Golog programs and compares the effects of this simulation
   with observations of the real world.
+  [Check out these slides for an overview how it works.](http://schwering.github.io/commonsense-2013-slides/)
 * An [agent for a racing car](torcs-agent/).
   The car is controlled by Golog programs and Basic Action Theories.
   This work is at a very early stage.
 
-
-Contact: [Christoph Schwering](http://www.kbsg.rwth-aachen.de/~schwering/)
-(schwering at kbsg.rwth-aachen.de).
+Contact: [Christoph Schwering](https://schwering.github.io)
+(schwering at gmail dot com).
 

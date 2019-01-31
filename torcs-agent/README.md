@@ -9,10 +9,10 @@ If you are primarily interested in the Golog interpreter, click
 [here](../golog/).
 
 
-Contact: [Christoph Schwering][HP] (schwering at kbsg.rwth-aachen.de).
+Contact: [Christoph Schwering][HP] (schwering at gmail dot com).
 
 
 [TORCS]: http://torcs.sourceforge.net/
 [SCR]: http://sourceforge.net/projects/cig/
-[HP]: http://www.kbsg.rwth-aachen.de/~schwering/
+[HP]: http://schwering.github.io
 

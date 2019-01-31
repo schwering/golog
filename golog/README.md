@@ -38,7 +38,7 @@ prototypes in [ECLiPSe-CLP][ECLiPSe] and [Mercury][Mercury] (see
 [here][prGolog-old] for the code), two logical programming languages.
 
 
-Contact: [Christoph Schwering][HP] (schwering at kbsg.rwth-aachen.de).
+Contact: [Christoph Schwering][HP] (schwering at gmail dot com).
 
 
 [Golog]: http://www.cs.toronto.edu/cogrobo/main/systems/index.html
@@ -47,5 +47,5 @@ Contact: [Christoph Schwering][HP] (schwering at kbsg.rwth-aachen.de).
 [ECLiPSe]: http://www.eclipseclp.org/
 [Mercury]: http://www.mercurylang.org/
 [prGolog-old]: https://github.com/schwering/prgolog-old
-[HP]: http://www.kbsg.rwth-aachen.de/~schwering/
+[HP]: http://schwering.github.io
 
